@@ -104,10 +104,27 @@ def _write_index(path: Path, summaries: list[dict]) -> None:
     path.write_text(json.dumps({"schema_version": SCHEMA, "summaries": summaries}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _load_published_history(url: str | None) -> list[dict]:
+    if not url:
+        return []
+    try:
+        with urlopen(url, timeout=10) as response:
+            payload = json.loads(response.read())
+        if payload.get("schema_version") != SCHEMA or not isinstance(payload.get("summaries"), list):
+            return []
+        return payload["summaries"]
+    except (HTTPError, URLError, TimeoutError, OSError, ValueError, AttributeError, json.JSONDecodeError):
+        return []
+
+
 def run(reports_path: Path, summaries_path: Path, output_path: Path, api_key: str | None,
-        model: str = "MiniMax-M2.7", force: bool = False) -> str:
+        model: str = "MiniMax-M2.7", force: bool = False, history_url: str | None = None) -> str:
     reports = _read_index(reports_path).get("reports", [])
     history = _read_index(summaries_path).get("summaries", [])
+    published_history = _load_published_history(history_url)
+    merged = {(row.get("morning_report_id"), row.get("evening_report_id")): row for row in history}
+    merged.update({(row.get("morning_report_id"), row.get("evening_report_id")): row for row in published_history})
+    history = list(merged.values())
     pair = select_source_pair(reports)
     status = "no eligible source pair"
     if pair and api_key:
@@ -147,9 +164,10 @@ def main() -> int:
     parser.add_argument("--reports", type=Path, required=True)
     parser.add_argument("--summaries", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--history-url", help="previous deployed summary index URL")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
-    status = run(args.reports, args.summaries, args.output, os.environ.get("MINIMAX_API_KEY"), os.environ.get("MINIMAX_MODEL") or "MiniMax-M2.7", args.force)
+    status = run(args.reports, args.summaries, args.output, os.environ.get("MINIMAX_API_KEY"), os.environ.get("MINIMAX_MODEL") or "MiniMax-M2.7", args.force, args.history_url)
     print(status)
     return 0
 

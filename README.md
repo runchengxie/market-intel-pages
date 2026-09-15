@@ -28,4 +28,4 @@ Then open <http://localhost:8000>.
 
 `data/daily_summaries.json` contains a `summaries` array. Each summary has a report date, one short paragraph, the source morning/evening report IDs, a generation timestamp, a model label, and a prompt version. The page displays up to five report dates and renders report text as text, never HTML.
 
-The GitHub Pages workflow runs `scripts/build_site.py` and publishes only the files referenced by the current five-day snapshot. It does not fetch market data or contain credentials. Until MiniMax generation is configured, daily notes are reviewed static records.
+The GitHub Pages workflow runs `scripts/build_site.py` and publishes only the files referenced by the current five-day snapshot. When `MINIMAX_API_KEY` is configured as a repository Actions secret, it generates the newest note and merges the previous deployed five-day note history. Without the key or when MiniMax is unavailable, it keeps the existing notes and still deploys the page. The API key is never sent to the browser.

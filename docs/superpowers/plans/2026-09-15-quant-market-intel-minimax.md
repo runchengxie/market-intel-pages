@@ -4,7 +4,7 @@
 
 **Goal:** Generate one short daily market note from the newest eligible morning report and its preceding evening report during Pages publishing, while keeping publication successful if MiniMax is unavailable.
 
-**Architecture:** A standalone Python script selects and validates the source pair, sends only those two reports to MiniMax's OpenAI-compatible text endpoint, validates the returned paragraph, and writes a daily-summary JSON record. The Pages workflow uses a GitHub Actions secret for the API key; when the key is unavailable or the call fails, it keeps historical summary records and the page shows “暂无简评” for the latest report date.
+**Architecture:** A standalone Python script selects and validates the source pair, sends only those two reports to MiniMax's OpenAI-compatible text endpoint, validates the returned paragraph, and writes a daily-summary JSON record. Before generation, the Pages workflow imports the previous deployed five-day summary index using the Pages base URL, so later deployments retain recent generated notes. The workflow uses a GitHub Actions secret for the API key; when the key is unavailable or the call fails, it keeps historical summary records and the page shows “暂无简评” for the latest report date.
 
 **Tech Stack:** Python 3 standard library, MiniMax OpenAI-compatible Chat Completions API, GitHub Actions secrets and variables.
 
@@ -110,6 +110,7 @@ text = payload["choices"][0]["message"]["content"]
 **Interfaces:**
 - CLI: `python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --output _site/data/daily_summaries.json`.
 - Output uses schema `market_intel_pages.daily_summaries.v1` and records `date`, `text`, `morning_report_id`, `evening_report_id`, `generated_at`, `model`, and `prompt_version`.
+- Merge history from the current tracked summary file and the previous deployed summary index URL before generation.
 - On missing key, no valid pair, or provider failure, copy historical records to output, print one non-sensitive status line, and exit 0. Do not add a record for the new date.
 - If an existing record references the same morning/evening IDs, reuse it and do not incur a second model call unless `--force` is passed.
 
@@ -144,7 +145,7 @@ history.append(record)
 
 - [ ] **Step 1: Add an integration test** that runs the artifact builder with a generated summary file and with only historic summaries, confirming both produce a valid site.
 
-- [ ] **Step 2: Update the workflow** to call the generator before building the site and pass the secret through the process environment only. Keep deployment dependent on successful artifact generation, but let the generator's documented provider-failure path exit successfully. Pass credentials using the job step environment, never a command argument:
+- [ ] **Step 2: Update the workflow** to build the base artifact, call the generator with the previous deployed summary index URL, and pass the secret through the process environment only. Keep deployment dependent on successful artifact generation, but let the generator's documented provider-failure path exit successfully. Pass credentials using the job step environment, never a command argument:
 
 ```yaml
 env:

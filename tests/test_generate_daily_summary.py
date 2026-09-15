@@ -101,6 +101,33 @@ class GenerationHistoryTests(unittest.TestCase):
             self.assertEqual("reused existing summary", run(root / "reports.json", output, output, "key"))
             self.assertEqual(1, generate.call_count)
 
+    @patch("scripts.generate_daily_summary.urlopen")
+    def test_imports_previous_deployment_summaries(self, open_url):
+        class Response:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+            def read(self):
+                return json.dumps({"schema_version": "market_intel_pages.daily_summaries.v1", "summaries": [
+                    {"date": "2026-09-13", "text": "previous", "morning_report_id": "old-m", "evening_report_id": "old-e"}
+                ]}).encode()
+
+        open_url.return_value = Response()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = [report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"),
+                       report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
+                       report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                       report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            (root / "reports.json").write_text(json.dumps({"reports": reports}))
+            (root / "summaries.json").write_text(json.dumps({"summaries": []}))
+            output = root / "out.json"
+            run(root / "reports.json", root / "summaries.json", output, None, history_url="https://pages.invalid/data/daily_summaries.json")
+            self.assertEqual("previous", json.loads(output.read_text())["summaries"][0]["text"])
+
 
 if __name__ == "__main__":
     unittest.main()
