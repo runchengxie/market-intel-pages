@@ -1,7 +1,7 @@
 # Market Intel Pages
 
 A public, static, read-only report viewer for market-intel outputs. It currently
-contains the latest available local reports for 2026-09-10 and 2026-09-11.
+contains local reports through 2026-09-14.
 
 ## Preview locally
 
