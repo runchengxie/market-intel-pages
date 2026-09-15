@@ -18,6 +18,7 @@
 - Store `MINIMAX_API_KEY` only as a GitHub Actions secret; never expose it to the Pages browser or logs.
 - Use the MiniMax OpenAI-compatible endpoint `https://api.minimaxi.com/v1/chat/completions`; take the model ID from `MINIMAX_MODEL` and default to `MiniMax-M2.7`.
 - If the API is unavailable, publish the reports and historic summaries; never present an older summary as the latest report's summary.
+- The default page feed contains up to five recent trading-day summaries; older dates remain only in the local archive and are not available through the public site.
 
 ---
 
@@ -168,7 +169,7 @@ run: python3 scripts/generate_daily_summary.py --reports data/reports.json --sum
 
 - [ ] **Step 3: Run the workflow manually** against the current report index and verify the published paragraph references the expected report date and paired source IDs.
 
-- [ ] **Step 4: Verify the no-secret path** by running the workflow without the secret in a safe branch context; it should publish the viewer and historic summary data with “暂无简评” for an ungenerated current pair.
+- [ ] **Step 4: Verify the no-secret path** by running the workflow without the secret in a safe branch context; it should publish the viewer and five-day summary snapshot with “暂无简评” for an ungenerated current pair. The full archive remains outside the Pages artifact.
 
 ## Verification checklist
 
