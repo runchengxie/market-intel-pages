@@ -60,7 +60,6 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
     shutil.copy2(root / "data/reports.json", output / "data/reports.json")
     shutil.copy2(summaries_path, output / "data/daily_summaries.json")
 
-    copied: set[str] = set()
     for report in reports:
         source_url = report.get("source_url")
         source = (root / source_url).resolve()
@@ -69,7 +68,6 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
         destination = output / source.relative_to(root)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
-        copied.add(source_url)
 
 
 def main() -> None:
