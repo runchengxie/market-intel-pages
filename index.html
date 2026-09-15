@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f2eb">
+    <meta name="description" content="市场晨报与晚报的静态阅读页。">
+    <title>市场简报 · Market Intel</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="wordmark" href="#top" aria-label="Market Intel 首页">
+        <span class="mark" aria-hidden="true">M</span>
+        <span>MARKET INTEL</span>
+      </a>
+      <span class="topbar-note">市场观察 · 每日更新</span>
+    </header>
+
+    <main id="top" class="layout">
+      <aside class="sidebar" aria-label="报告导航">
+        <div class="eyebrow">DAILY BRIEFING</div>
+        <h1>市场简报</h1>
+        <p class="intro">把每天的重要变化，放在一个安静、清晰的地方。</p>
+        <div class="filter-label">报告类型</div>
+        <div class="filters" role="group" aria-label="按报告类型筛选">
+          <button class="filter is-active" data-kind="all" type="button" aria-pressed="true">全部</button>
+          <button class="filter" data-kind="morning" type="button" aria-pressed="false">晨报</button>
+          <button class="filter" data-kind="evening" type="button" aria-pressed="false">晚报</button>
+        </div>
+        <label class="date-label" for="date-filter">查看日期</label>
+        <input id="date-filter" type="date">
+        <button id="clear-date" class="clear-date" type="button">清除日期筛选</button>
+        <div class="sidebar-foot">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="updated-at">正在读取报告目录…</span>
+        </div>
+      </aside>
+
+      <section class="content" aria-live="polite">
+        <div class="content-head">
+          <div>
+            <div class="eyebrow" id="section-kicker">LATEST EDITION</div>
+            <h2 id="section-title">最新报告</h2>
+          </div>
+          <span class="demo-badge">演示数据</span>
+        </div>
+        <div id="report-list" class="report-list"></div>
+        <div id="empty-state" class="empty-state" hidden>
+          <span class="empty-mark" aria-hidden="true">—</span>
+          <h3>没有找到这类报告</h3>
+          <p>试试其他日期，或切换晨报与晚报。</p>
+        </div>
+        <div id="load-error" class="load-error" hidden>
+          报告目录暂时无法读取。请通过本地静态服务器打开此页面。
+        </div>
+      </section>
+    </main>
+    <footer class="footer">
+      <span>MARKET INTEL</span>
+      <span>市场信息仅供研究参考</span>
+    </footer>
+  </body>
+</html>
