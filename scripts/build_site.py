@@ -11,7 +11,7 @@ from pathlib import Path
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 PUBLIC_SESSION_COUNT = 5
-STATIC_FILES = ("index.html", "app.js", "styles.css")
+STATIC_FILES = ("index.html", "app.js", "summary-utils.js", "styles.css")
 
 
 def _read_index(path: Path, schema: str, key: str) -> tuple[dict, list[dict]]:

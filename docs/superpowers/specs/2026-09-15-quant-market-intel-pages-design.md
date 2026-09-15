@@ -22,7 +22,7 @@ Turn the existing market report viewer into a concise daily market-intelligence 
 - Retain the complete archive locally outside the repository, at a path supplied to the local archive/snapshot command. Never copy that archive into the public Pages artifact.
 - Keep the existing report-type navigation within the public five-day window.
 - Show a clear “暂无简评” state when a valid morning/evening pair is unavailable; do not fabricate a note from only one half of the intended input window.
-- Keep all reports locally without an automatic expiry. Publish only the latest five distinct trading dates that have morning reports.
+- Keep all reports locally without an automatic expiry. Publish only the latest five distinct report dates, counting a date even if it currently has only an evening report.
 - Do not rewrite existing public Git history. Older reports already pushed remain accessible through prior public commits; future deployments and current repository snapshots expose only the latest five trading dates.
 
 ## Pairing and summary generation
@@ -44,7 +44,7 @@ This is a prompt-calibration sample, not a deterministic template. The model sho
 ## Data model and publishing
 
 - Add a daily-summary record with a stable date, generated text, the source morning and evening report IDs, generation timestamp, and model/prompt version.
-- A local snapshot command merges current report files into an archive directory outside the repository, then writes a five-trading-day snapshot back to `data/reports.json`, `data/daily_summaries.json`, and `reports/` for publication. It must archive and verify files before removing older report files from the repository worktree.
+- A local snapshot command merges current report files into an archive directory outside the repository, then writes the latest five distinct report-date snapshot back to `data/reports.json`, `data/daily_summaries.json`, and `reports/` for publication. It must archive and verify files before removing older report files from the repository worktree.
 - Build the Pages artifact from that five-day public snapshot and copy only Markdown files referenced by the snapshot.
 - The current repository has no report-ingestion or model-calling workflow. The first implementation should work from committed report records and add a publishing-time generation step only after the MiniMax secret is configured. The site must remain usable with summaries absent.
 

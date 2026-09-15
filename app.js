@@ -1,5 +1,6 @@
 const state = {
   reports: [],
+  summaries: [],
   kind: "all",
   date: "",
 };
@@ -7,6 +8,9 @@ const state = {
 const reportList = document.querySelector("#report-list");
 const emptyState = document.querySelector("#empty-state");
 const loadError = document.querySelector("#load-error");
+const summaryList = document.querySelector("#daily-summary-list");
+const summaryEmpty = document.querySelector("#summary-empty");
+const dateFilter = document.querySelector("#date-filter");
 
 function makeElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -59,14 +63,42 @@ function renderReport(report) {
 }
 
 function visibleReports() {
-  return state.reports.filter((report) => {
-    return (state.kind === "all" || report.kind === state.kind)
-      && (!state.date || report.date === state.date);
-  });
+  return window.marketIntelUtils.selectVisibleReports(state.reports, state.date, state.kind);
+}
+
+function renderDailySummary(summary) {
+  const article = makeElement("article", "daily-note-card");
+  const date = makeElement("time", "daily-note-date", dateLabel(summary.date));
+  date.dateTime = summary.date;
+  article.append(date, makeElement("p", "daily-note-text", summary.text));
+  return article;
+}
+
+function renderDailySummaries() {
+  const summaries = window.marketIntelUtils.selectVisibleSummaries(
+    state.summaries,
+    state.reports,
+    state.date,
+  );
+  summaryList.replaceChildren(...summaries.map(renderDailySummary));
+  summaryEmpty.hidden = summaries.length !== 0;
+}
+
+function populateDateFilter() {
+  const dates = [...new Set(state.reports.map((report) => report.date))]
+    .sort((left, right) => right.localeCompare(left));
+  dateFilter.replaceChildren(makeElement("option", "", "最近报告"));
+  dateFilter.firstElementChild.value = "";
+  for (const date of dates) {
+    const option = makeElement("option", "", dateLabel(date));
+    option.value = date;
+    dateFilter.append(option);
+  }
 }
 
 function render() {
   const reports = visibleReports();
+  renderDailySummaries();
   reportList.replaceChildren(...reports.map(renderReport));
   emptyState.hidden = reports.length !== 0;
   document.querySelector("#section-title").textContent = state.date
@@ -75,10 +107,10 @@ function render() {
       ? "晨间报告"
       : state.kind === "evening"
         ? "晚间报告"
-        : "最新报告与归档";
+        : "最近交易日的报告";
   document.querySelector("#section-kicker").textContent = state.date
     ? "ARCHIVE"
-    : state.kind === "all" ? "LATEST & ARCHIVE" : "DAILY EDITION";
+    : state.kind === "all" ? "LATEST EDITION" : "DAILY EDITION";
 }
 
 async function loadReports() {
@@ -90,6 +122,19 @@ async function loadReports() {
       throw new Error("unsupported report index");
     }
     state.reports = [...data.reports].sort((a, b) => b.date.localeCompare(a.date));
+    try {
+      const summaryResponse = await fetch("data/daily_summaries.json", { cache: "no-store" });
+      if (summaryResponse.ok) {
+        const summaryData = await summaryResponse.json();
+        if (summaryData.schema_version === "market_intel_pages.daily_summaries.v1"
+          && Array.isArray(summaryData.summaries)) {
+          state.summaries = summaryData.summaries;
+        }
+      }
+    } catch {
+      state.summaries = [];
+    }
+    populateDateFilter();
     const updated = new Date(data.generated_at);
     document.querySelector("#updated-at").textContent = `目录更新 ${new Intl.DateTimeFormat("zh-CN", {
       month: "numeric",
@@ -114,13 +159,13 @@ for (const button of document.querySelectorAll(".filter")) {
   });
 }
 
-document.querySelector("#date-filter").addEventListener("change", (event) => {
+dateFilter.addEventListener("change", (event) => {
   state.date = event.target.value;
   render();
 });
 document.querySelector("#clear-date").addEventListener("click", () => {
   state.date = "";
-  document.querySelector("#date-filter").value = "";
+  dateFilter.value = "";
   render();
 });
 

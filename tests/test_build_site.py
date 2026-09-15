@@ -14,7 +14,7 @@ SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 def create_site(root: Path, session_count: int = 6) -> None:
     (root / "data").mkdir(parents=True)
     (root / "reports").mkdir()
-    for name in ("index.html", "app.js", "styles.css"):
+    for name in ("index.html", "app.js", "styles.css", "summary-utils.js"):
         (root / name).write_text(name, encoding="utf-8")
 
     reports = []
@@ -128,6 +128,7 @@ class BuildSiteTests(unittest.TestCase):
         expected = {report["source_url"] for report in report_data["reports"]}
         self.assertEqual(expected, copied)
         self.assertEqual(10, len(report_data["reports"]))
+        self.assertTrue((self.output / "summary-utils.js").is_file())
         self.assertEqual("market_intel_pages.daily_summaries.v1", json.loads(
             (self.output / "data/daily_summaries.json").read_text()
         )["schema_version"])

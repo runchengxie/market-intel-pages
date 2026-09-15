@@ -4,16 +4,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#f5f2eb">
-    <meta name="description" content="市场晨报与晚报的静态阅读页。">
-    <title>市场简报 · Market Intel</title>
+    <meta name="description" content="Quant Market Intel：晨报与晚报之间值得留意的市场变化。">
+    <title>Quant 市场情报 · Quant Market Intel</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="summary-utils.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
     <header class="topbar">
-      <a class="wordmark" href="#top" aria-label="Market Intel 首页">
+      <a class="wordmark" href="#top" aria-label="Quant Market Intel 首页">
         <span class="mark" aria-hidden="true">M</span>
-        <span>MARKET INTEL</span>
+        <span>QUANT MARKET INTEL</span>
       </a>
       <span class="topbar-note">市场观察 · 每日更新</span>
     </header>
@@ -21,8 +22,8 @@
     <main id="top" class="layout">
       <aside class="sidebar" aria-label="报告导航">
         <div class="eyebrow">DAILY BRIEFING</div>
-        <h1>市场简报</h1>
-        <p class="intro">把每天的重要变化，放在一个安静、清晰的地方。</p>
+        <h1>Quant 市场情报</h1>
+        <p class="intro">每天读完晨报和前一晚的晚报，只留下值得记住的几句。</p>
         <div class="filter-label">报告类型</div>
         <div class="filters" role="group" aria-label="按报告类型筛选">
           <button class="filter is-active" data-kind="all" type="button" aria-pressed="true">全部</button>
@@ -30,7 +31,9 @@
           <button class="filter" data-kind="evening" type="button" aria-pressed="false">晚报</button>
         </div>
         <label class="date-label" for="date-filter">查看日期</label>
-        <input id="date-filter" type="date">
+        <select id="date-filter" aria-label="选择最近五个交易日">
+          <option value="">最近报告</option>
+        </select>
         <button id="clear-date" class="clear-date" type="button">清除日期筛选</button>
         <div class="sidebar-foot">
           <span class="status-dot" aria-hidden="true"></span>
@@ -44,8 +47,22 @@
             <div class="eyebrow" id="section-kicker">LATEST EDITION</div>
             <h2 id="section-title">最新报告</h2>
           </div>
-          <span class="demo-badge">本地生成 · 最新至 9 月 14 日</span>
+          <span class="demo-badge">网页展示最近 5 个交易日</span>
         </div>
+        <section class="daily-notes" aria-labelledby="notes-title" aria-live="polite">
+          <div class="notes-heading">
+            <div>
+              <div class="eyebrow">DAILY NOTES</div>
+              <h3 id="notes-title">最近几天的市场简评</h3>
+            </div>
+            <span class="notes-source">晨报 + 前一晚晚报</span>
+          </div>
+          <div id="daily-summary-list" class="daily-summary-list"></div>
+          <div id="summary-empty" class="summary-empty" hidden>
+            <span class="empty-mark" aria-hidden="true">—</span>
+            <p>暂无简评</p>
+          </div>
+        </section>
         <div id="report-list" class="report-list"></div>
         <div id="empty-state" class="empty-state" hidden>
           <span class="empty-mark" aria-hidden="true">—</span>
@@ -58,7 +75,7 @@
       </section>
     </main>
     <footer class="footer">
-      <span>MARKET INTEL</span>
+      <span>QUANT MARKET INTEL</span>
       <span>市场信息仅供研究参考</span>
     </footer>
   </body>

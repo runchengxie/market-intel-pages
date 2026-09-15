@@ -1,27 +1,31 @@
-# Market Intel Pages
+# Quant Market Intel
 
-A public, static, read-only report viewer for market-intel outputs. It currently
-contains local reports through 2026-09-14.
+A static, read-only viewer for short daily market notes and their source reports. The public page and tracked report snapshot contain only the five most recent report dates. The complete source archive stays on the local machine outside this public repository.
 
-## Preview locally
+## Local archive and public snapshot
 
-From this directory, run:
+When new report files are ready, add them to `data/reports.json` and `reports/`, then run:
 
 ```bash
-python3 -m http.server 8000
+python3 scripts/sync_public_snapshot.py \
+  --archive-dir /home/richard/code/.research-data/quant-market-intel-archive
+```
+
+The command merges all reports and summaries into the specified local archive first, verifies their Markdown sources, then updates the tracked files to the five most recent report dates. Keep the archive path outside this repository; the repository is public. Existing public Git history is not rewritten, so previously pushed reports remain accessible through older commits.
+
+To preview the current public snapshot locally:
+
+```bash
+python3 scripts/build_site.py --output /tmp/quant-market-intel-site
+python3 -m http.server 8000 --directory /tmp/quant-market-intel-site
 ```
 
 Then open <http://localhost:8000>.
 
 ## Data contract
 
-`data/reports.json` is the index consumed by the page. It contains a
-`reports` array. Each report has `id`, `date`, `kind` (`morning` or `evening`),
-`title`, `summary`, `sections`, and an optional `source_url` pointing to its
-full Markdown copy under `reports/`. A section has a `title` and `paragraphs`.
-All report text is inserted as text, never interpreted as HTML.
+`data/reports.json` contains a `reports` array. Each report has `id`, `date`, `kind` (`morning` or `evening`), `title`, `summary`, `sections`, and an optional `source_url` pointing to its Markdown copy under `reports/`.
 
-The Pages workflow publishes the viewer, index, and Markdown copies. Update
-these report files when new local outputs are ready. Do not add raw collection
-data, run manifests, local file paths, or credentials to this public repository.
-The viewer does not fetch data from market providers or contain credentials.
+`data/daily_summaries.json` contains a `summaries` array. Each summary has a report date, one short paragraph, the source morning/evening report IDs, a generation timestamp, a model label, and a prompt version. The page displays up to five report dates and renders report text as text, never HTML.
+
+The GitHub Pages workflow runs `scripts/build_site.py` and publishes only the files referenced by the current five-day snapshot. It does not fetch market data or contain credentials. Until MiniMax generation is configured, daily notes are reviewed static records.
