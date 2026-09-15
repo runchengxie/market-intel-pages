@@ -47,6 +47,12 @@ function renderReport(report) {
     }
     body.append(sectionElement);
   }
+  if (report.source_url) {
+    const source = makeElement("a", "source-link", "查看完整原文（Markdown）");
+    source.href = report.source_url;
+    source.setAttribute("download", "");
+    body.append(source);
+  }
   details.append(summary, body);
   article.append(details);
   return article;

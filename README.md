@@ -1,8 +1,7 @@
 # Market Intel Pages
 
-A static, read-only report viewer for market-intel outputs. The current data is
-synthetic demo content; do not publish production reports until their public
-release scope has been reviewed.
+A public, static, read-only report viewer for market-intel outputs. It currently
+contains the latest available local reports for 2026-09-10 and 2026-09-11.
 
 ## Preview locally
 
@@ -16,12 +15,13 @@ Then open <http://localhost:8000>.
 
 ## Data contract
 
-`data/reports.json` is the only input consumed by the page. It contains a
+`data/reports.json` is the index consumed by the page. It contains a
 `reports` array. Each report has `id`, `date`, `kind` (`morning` or `evening`),
-`title`, `summary`, and `sections`. A section has a `title` and `paragraphs`.
+`title`, `summary`, `sections`, and an optional `source_url` pointing to its
+full Markdown copy under `reports/`. A section has a `title` and `paragraphs`.
 All report text is inserted as text, never interpreted as HTML.
 
-The planned publisher can transform local report artifacts into this small
-static contract. It should publish only explicitly approved sections and their
-associated images. The viewer does not fetch data from market providers or
-contain credentials.
+The Pages workflow publishes the viewer, index, and Markdown copies. Update
+these report files when new local outputs are ready. Do not add raw collection
+data, run manifests, local file paths, or credentials to this public repository.
+The viewer does not fetch data from market providers or contain credentials.
