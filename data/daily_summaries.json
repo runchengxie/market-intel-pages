@@ -1,0 +1,14 @@
+{
+  "schema_version": "market_intel_pages.daily_summaries.v1",
+  "summaries": [
+    {
+      "date": "2026-09-14",
+      "text": "A股个股面还行，指数没跟上，成交也偏弱。隔夜半导体明显转弱，SMH跌4.75%、AMD跌4.4%，日韩芯片股也普遍回落，科技硬件先看卖压能不能缓下来。",
+      "morning_report_id": "2026-09-14-morning",
+      "evening_report_id": "2026-09-14-evening",
+      "generated_at": "2026-09-16T00:00:00+08:00",
+      "model": "chatgpt-reviewed",
+      "prompt_version": "daily-note-v1"
+    }
+  ]
+}
