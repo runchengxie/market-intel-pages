@@ -35,19 +35,22 @@ jobs:
         id: pages
         uses: actions/configure-pages@v5
       - name: Build site artifact
-        run: python3 scripts/build_site.py --output _site
+        env:
+          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+        run: python3 scripts/build_site.py --output "$SITE_OUTPUT"
       - name: Generate latest daily note
         env:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
+          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
         run: |
           force_flag=""
           if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
-          python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output _site/data/daily_summaries.json $force_flag
+          python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: _site
+          path: ${{ runner.temp }}/market-intel-pages-site
       - name: Deploy site
         id: deployment
         uses: actions/deploy-pages@v4
