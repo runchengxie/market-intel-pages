@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force_summary:
+        description: Regenerate the latest daily note even if one already exists
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -26,13 +32,18 @@ jobs:
       - name: Check out site
         uses: actions/checkout@v6
       - name: Configure Pages
+        id: pages
         uses: actions/configure-pages@v5
-      - name: Prepare site artifact
+      - name: Build site artifact
+        run: python3 scripts/build_site.py --output _site
+      - name: Generate latest daily note
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
         run: |
-          mkdir -p _site/data _site/reports
-          cp index.html app.js styles.css _site/
-          cp -R data/. _site/data/
-          cp -R reports/. _site/reports/
+          force_flag=""
+          if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
+          python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output _site/data/daily_summaries.json $force_flag
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:

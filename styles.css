@@ -154,6 +154,42 @@ button, input { font: inherit; }
   font-size: 10px;
   letter-spacing: .04em;
 }
+.daily-notes { margin-bottom: 27px; }
+.notes-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  margin: 0 0 13px;
+}
+.notes-heading h3 {
+  margin: 7px 0 0;
+  font-family: "Noto Serif SC", Georgia, serif;
+  font-size: 17px;
+  font-weight: 500;
+}
+.notes-source { color: var(--muted); font-size: 10px; }
+.daily-summary-list { display: grid; gap: 9px; }
+.daily-note-card {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: baseline;
+  gap: 17px;
+  padding: 15px 18px;
+  background: var(--green-pale);
+  border-left: 2px solid var(--green);
+}
+.daily-note-date { color: var(--green); font-size: 11px; white-space: nowrap; }
+.daily-note-text { margin: 0; color: #343b35; font-size: 13px; line-height: 1.8; }
+.summary-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 54px;
+  padding: 10px 16px;
+  color: var(--muted);
+  background: rgb(255 254 250 / 65%);
+}
+.summary-empty p { margin: 0; font-size: 12px; }
 
 .report-list { display: grid; gap: 16px; }
 .report-card {
@@ -201,7 +237,7 @@ button, input { font: inherit; }
   color: var(--muted);
   text-align: center;
 }
-.empty-state[hidden], .load-error[hidden] { display: none; }
+.empty-state[hidden], .load-error[hidden], .summary-empty[hidden] { display: none; }
 .empty-mark { color: var(--green); font: 32px Georgia, serif; }
 .empty-state h3 { margin: 13px 0 8px; color: var(--ink); font-size: 18px; }
 .empty-state p, .load-error { font-size: 12px; }
@@ -234,6 +270,9 @@ button, input { font: inherit; }
   .sidebar-foot { position: static; margin-top: 18px; }
   .content-head { margin-bottom: 15px; }
   .content-head h2 { font-size: 20px; }
+  .notes-heading { align-items: start; }
+  .notes-source { max-width: 95px; text-align: right; line-height: 1.6; }
+  .daily-note-card { grid-template-columns: 1fr; gap: 6px; padding: 13px 15px; }
   .report-card { padding: 19px 18px; }
   .report-title { font-size: 17px; }
 }
