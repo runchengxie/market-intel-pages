@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { selectVisibleSummaries, selectVisibleReports } = require("../summary-utils.js");
-const { selectVisibleInsights } = require("../summary-utils.js");
+const { selectVisibleInsights, isHealthDelayed } = require("../summary-utils.js");
 
 function report(date, kind) {
   return { id: `${date}-${kind}`, date, kind };
@@ -85,4 +85,46 @@ test("selected date and kind filter apply together", () => {
     selectVisibleReports(reports, "2026-09-14", "morning").map((item) => item.id),
     ["2026-09-14-morning"],
   );
+});
+
+function health(overrides = {}) {
+  return {
+    status: "calendar_unverified",
+    latest_target_date: "2026-09-16",
+    latest_source_generated_at: "2026-09-19T15:00:00+08:00",
+    expected_date: null,
+    max_age_hours: 72,
+    ...overrides,
+  };
+}
+
+test("a backfilled report becomes stale when its market date exceeds the age limit", () => {
+  const reportHealth = health();
+  assert.equal(isHealthDelayed(reportHealth, Date.parse("2026-09-19T15:00:00+08:00")), false);
+  assert.equal(isHealthDelayed(reportHealth, Date.parse("2026-09-20T08:00:00+08:00")), true);
+});
+
+test("target-date age uses the end of the Beijing calendar day", () => {
+  assert.equal(isHealthDelayed(health(), Date.parse("2026-09-19T23:59:59.999+08:00")), false);
+  assert.equal(isHealthDelayed(health(), Date.parse("2026-09-20T00:00:00+08:00")), true);
+  assert.equal(isHealthDelayed(health(), Date.parse("2026-09-19T16:00:00Z")), true);
+});
+
+test("source age still marks a report stale even if its target date is recent", () => {
+  const reportHealth = health({
+    latest_target_date: "2026-09-19",
+    latest_source_generated_at: "2026-09-16T07:00:00+08:00",
+  });
+  assert.equal(isHealthDelayed(reportHealth, Date.parse("2026-09-19T08:00:00+08:00")), true);
+});
+
+test("server-reported gaps remain visible when report timestamps are recent", () => {
+  for (const status of ["stale", "behind", "missing", "invalid_timestamp"]) {
+    assert.equal(isHealthDelayed(health({ status }), Date.parse("2026-09-19T15:00:00+08:00")), true);
+  }
+});
+
+test("an explicit expected date keeps the backend calendar-based freshness rule", () => {
+  const reportHealth = health({ status: "current", expected_date: "2026-09-16" });
+  assert.equal(isHealthDelayed(reportHealth, Date.parse("2026-09-20T08:00:00+08:00")), false);
 });

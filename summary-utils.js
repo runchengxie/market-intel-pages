@@ -37,7 +37,17 @@ function selectVisibleInsights(insights, reports, selectedDate) {
       && insight.source_report_ids.every((id) => ids.has(id)));
 }
 
-const summaryUtils = { selectVisibleSummaries, selectVisibleReports, selectVisibleInsights };
+function isHealthDelayed(health, now = Date.now()) {
+  const elapsed = (now - Date.parse(health.latest_source_generated_at)) / 3600000;
+  // Match pipeline_health's target-day fallback in Beijing, independent of the browser timezone.
+  const targetEnd = Date.parse(`${health.latest_target_date}T23:59:59.999+08:00`);
+  const targetAge = (now - targetEnd) / 3600000;
+  return ["stale", "behind", "missing", "invalid_timestamp"].includes(health.status)
+    || (Number.isFinite(elapsed) && elapsed > health.max_age_hours)
+    || (!health.expected_date && Number.isFinite(targetAge) && targetAge > health.max_age_hours);
+}
+
+const summaryUtils = { selectVisibleSummaries, selectVisibleReports, selectVisibleInsights, isHealthDelayed };
 if (typeof module !== "undefined" && module.exports) {
   module.exports = summaryUtils;
 } else {

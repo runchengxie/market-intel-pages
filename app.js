@@ -43,6 +43,9 @@ function renderReport(report) {
   );
   article.append(head, makeElement("h3", "report-title", report.title));
   article.append(makeElement("p", "report-summary", report.summary));
+  if (report.generation_mode === "backfill") {
+    article.append(makeElement("p", "replay-label", "补发报告：按该日行情重新整理，生成时间见原文。"));
+  }
 
   const details = makeElement("details", "report-details");
   const summary = makeElement("summary", "details-toggle", "展开报告内容");
@@ -154,7 +157,7 @@ function renderInsight(note) {
   const meta = `信息截至 ${timestampLabel(note.as_of)} · 解读生成 ${timestampLabel(note.generated_at)}（北京时间）`;
   card.append(makeElement("p", "insight-meta", meta));
   if (note.generation_mode === "retrospective") {
-    card.append(makeElement("p", "replay-label", "历史材料回放：按当时信息重建解读，不计作当日预测记录。"));
+    card.append(makeElement("p", "replay-label", "历史材料回放：基于归档或补发报告生成，保留实际生成时间。"));
   }
   const columns = makeElement("div", "insight-columns");
   for (const [key, title] of [["changes", "值得留意的变化"], ["tensions", "还没得到确认的地方"]]) {
@@ -183,7 +186,7 @@ function renderInsight(note) {
     }
     verification.append(row);
   });
-  verification.append(makeElement("p", "insight-meta", "条件核对不等于收益预测；原判断保留，后续结果另记。"));
+  verification.append(makeElement("p", "insight-meta", "保留原判断，另记后续条件核对结果。"));
   card.append(verification);
   if (note.quality_warnings.length) {
     const quality = makeElement("details", "quality-notes");
@@ -214,9 +217,7 @@ function renderHealth(health) {
     box.classList.add("is-delayed");
     return;
   }
-  const elapsed = (Date.now() - new Date(health.latest_source_generated_at).getTime()) / 3600000;
-  const delayed = ["stale", "behind", "missing", "invalid_timestamp"].includes(health.status)
-    || (Number.isFinite(elapsed) && elapsed > health.max_age_hours);
+  const delayed = window.marketIntelUtils.isHealthDelayed(health);
   box.classList.toggle("is-delayed", delayed);
   box.textContent = `数据目标 ${health.latest_target_date ?? "未提供"} · 原报告生成 ${timestampLabel(health.latest_source_generated_at)}（北京时间）。`
     + (delayed ? " 已较长时间未更新或有数据缺口，请结合交易日历核对。" : "")
