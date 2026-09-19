@@ -23,6 +23,21 @@ except ImportError:
 SCHEMA = "market_intel_pages.insights.v1"
 PROMPT_VERSION = "market-insight-v1"
 DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "minimax": "MiniMax-M2.7"}
+VALIDATION_ERROR_CODES = {
+    "invalid analysis schema": "analysis_schema_invalid",
+    "invalid claim count": "analysis_claim_count_invalid",
+    "invalid claim": "analysis_claim_invalid",
+    "invalid watchpoint count": "analysis_watchpoint_count_invalid",
+    "watch condition must use a cited baseline metric": "analysis_watchpoint_evidence_invalid",
+    "number not supported by cited evidence": "analysis_number_unsupported",
+    "commentary too long": "analysis_length_exceeded",
+}
+
+
+def validation_error_code(error: ValueError) -> str:
+    """Return a fixed public code without exposing model output or server prose."""
+    message = str(error)
+    return VALIDATION_ERROR_CODES.get(message, "analysis_validation_failed")
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -182,6 +197,7 @@ def _update_history(
         ).encode()
     ).hexdigest()
     generation["target_date"] = morning["date"]
+    generation["analysis_attempts"] = 1
     existing = _cached_record(history, context, fingerprint, prompt_hash, provider, model)
     if existing and not force:
         generation["status"] = "cached"
@@ -217,6 +233,8 @@ def _update_history(
             generation.update(status="unavailable", error_type=type(exc).__name__)
             if isinstance(exc, HTTPError):
                 generation["diagnostics"] = getattr(exc, "diagnostics", {"http_status": exc.code})
+            elif isinstance(exc, ValueError):
+                generation["error_code"] = validation_error_code(exc)
     return history
 
 
