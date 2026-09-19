@@ -8,6 +8,7 @@ import os
 from datetime import datetime
 from pathlib import Path
 from urllib.request import urlopen
+from urllib.error import HTTPError
 
 try:
     from .generate_daily_summary import CHINA_TZ, select_source_pair
@@ -164,6 +165,8 @@ def run(reports_path: Path, output_path: Path, *, provider="gemini", model=None,
                 generation["status"] = "generated"
             except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
                 generation.update(status="unavailable", error_type=type(exc).__name__)
+                if isinstance(exc, HTTPError):
+                    generation["diagnostics"] = getattr(exc, "diagnostics", {"http_status": exc.code})
     dates = sorted({r["date"] for r in reports}, reverse=True)[:5]
     latest = {}
     for row in sorted(history, key=lambda r: (r["generated_at"], r["id"])):

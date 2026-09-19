@@ -10,7 +10,7 @@
 - 09-19 的恢复回执：daily_market、minute_market、current_contract 对 09-18 健康；report_datasets 为 not_installed；morning_model 为 disabled_by_configuration，morning_report 为 disabled_dependency；evening_report 为 waiting_source_window。
 - 禁用 morning_model 是部署仓库中的显式配置。恢复它涉及现有产品和模型职责，不能把它当作一个遗忘启动的任务。这次不改变该配置，也不调用带 --notify 的恢复入口。
 - 现行数据目录的晨报产物中，09-18 的 morning_manifest.json 为零字节，且没有对应 Markdown。上游 morning_pipeline.sh 使用直接重定向写 manifest，失败时会先清空文件。需要在部署 owner 单独修复为临时文件生成、校验、原子替换，并排查该次生产命令失败原因；网站导入器会拒收缺内容或缺时间的报告。
-- GitHub 仓库没有模型 Secret；已检查的项目环境文件未发现 Gemini Key。原有简评是人工审核样例，不能据此认为在线 MiniMax 已经运行。
+- 初次盘点时 GitHub 仓库没有模型 Secret；09-19 已由用户配置 GEMINI_API_KEY，真实调用正在验收。原有简评是人工审核样例，不能据此认为在线 MiniMax 已经运行。
 
 ## 方案比较
 
@@ -83,7 +83,7 @@ python3 scripts/build_site.py --output /path/to/site-artifact
 
 ## Gemini 与对比评估
 
-仓库 Secret：`GEMINI_API_KEY`；可选变量 `GEMINI_MODEL`、`INSIGHT_PROVIDER=gemini|minimax`。默认模型是可配置的 `gemini-2.5-flash`，不把模型名写进浏览器。切换 MiniMax 时使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。提供方 429/5xx/连接错误最多三次尝试；认证失败不重试。所有失败只记录错误类型，不把服务端正文或密钥写入网页。
+仓库 Secret：`GEMINI_API_KEY`；可选变量 `GEMINI_MODEL`、`INSIGHT_PROVIDER=gemini|minimax`。默认模型是可配置的 `gemini-2.5-flash`，不把模型名写进浏览器。切换 MiniMax 时使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。提供方 429/5xx/连接错误最多三次尝试；认证失败不重试。失败只记录错误类型、HTTP 状态码及白名单中的 API 错误代码，不把请求 URL、服务端正文或密钥写入网页。
 
 模型结构化输出能力： https://ai.google.dev/gemini-api/docs/structured-output
 

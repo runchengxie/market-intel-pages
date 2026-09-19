@@ -30,6 +30,47 @@ ANALYSIS_SCHEMA = {
 }
 
 
+def _safe_http_error(exc: HTTPError) -> HTTPError:
+    """Expose fixed diagnostic codes, never URLs, server prose, or metadata."""
+    diagnostics = {"http_status": exc.code}
+    statuses = {"INVALID_ARGUMENT", "UNAUTHENTICATED", "PERMISSION_DENIED", "NOT_FOUND",
+                "RESOURCE_EXHAUSTED", "FAILED_PRECONDITION", "INTERNAL", "UNAVAILABLE"}
+    reasons = {"API_KEY_INVALID", "API_KEY_EXPIRED", "API_KEY_SERVICE_BLOCKED",
+               "API_KEY_HTTP_REFERRER_BLOCKED", "API_KEY_IP_ADDRESS_BLOCKED",
+               "API_KEY_ANDROID_APP_BLOCKED", "API_KEY_IOS_APP_BLOCKED",
+               "SERVICE_DISABLED", "BILLING_DISABLED", "CONSUMER_INVALID", "RATE_LIMIT_EXCEEDED"}
+    try:
+        payload = json.loads(exc.read(65537))
+        error = payload.get("error", {}) if isinstance(payload, dict) else {}
+        if isinstance(error, dict):
+            status = error.get("status")
+            if isinstance(status, str) and status in statuses:
+                diagnostics["api_status"] = status
+            details = error.get("details", [])
+            for detail in details if isinstance(details, list) else []:
+                reason = detail.get("reason") if isinstance(detail, dict) else None
+                if isinstance(reason, str) and reason in reasons:
+                    diagnostics["reason"] = reason
+                    break
+            message = error.get("message", "")
+            if isinstance(message, str):
+                lowered = message.lower()
+                for fragment, code in (("user location is not supported", "unsupported_region"),
+                                       ("responsejsonschema", "request_schema_rejected"),
+                                       ("api key not valid", "invalid_api_key")):
+                    if fragment in lowered and "reason" not in diagnostics:
+                        diagnostics["category"] = code
+                        break
+    except (OSError, ValueError):
+        pass
+    finally:
+        exc.close()
+    safe = HTTPError("", exc.code, "provider request failed", {}, None)
+    safe.diagnostics = diagnostics
+    safe.close()
+    return safe
+
+
 def generate(context: dict, prompt: str, provider: str, model: str, api_key: str) -> dict:
     user = json.dumps(context, ensure_ascii=False)
     if len(user) > 120000:
@@ -61,9 +102,9 @@ def generate(context: dict, prompt: str, provider: str, model: str, api_key: str
             payload = json.loads(raw)
             break
         except HTTPError as exc:
-            exc.close()
             if attempt == 2 or (exc.code != 429 and not 500 <= exc.code < 600):
-                raise
+                raise _safe_http_error(exc) from None
+            exc.close()
         except (URLError, TimeoutError):
             if attempt == 2:
                 raise
