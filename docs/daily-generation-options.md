@@ -165,6 +165,6 @@ python3 scripts/compare_models.py \
 
 本地 `--archive-dir` 以追加方式保存 `insights`、`outcomes` 和 `report_revisions`。解读归档还保存报告快照与核验来源，使离开公开窗口的旧观点能够继续核对。报告修订保留旧版本，结果变化另存回执。
 
-Actions 上传的解读与结果 artifact 保留 90 天，作为中转备份使用。09-19 首条真实解读的 artifact 已下载至服务器私有归档的 `actions-ledgers/35420008327/`，归档根目录为 `/home/richard/code/.research-data/quant-market-intel-archive/`。后续 artifact 的持续同步仍需接入生产调度。
+Actions 上传的解读与结果 artifact 保留 90 天，作为中转备份使用。生产发布器会在部署成功后下载 artifact，写入 `/home/richard/code/.research-data/quant-market-intel-archive/pages_ledgers/`，并用 `archive-receipt.json` 核对文件哈希。当前已归档 9 月 19 日的多次发布回执，Actions 只作为中转来源。
 
 早期讨论参考了 [MaiBot](https://github.com/Mai-with-u/MaiBot) 在自然表达和长期交互方面的思路。当前项目只实现报告来源、解读版本和条件结果的长期保存。主题检索、相似案例与反例召回、独立风格偏好，以及异常事件点评仍属后续方向。
