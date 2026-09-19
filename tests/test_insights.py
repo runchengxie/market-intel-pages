@@ -5,6 +5,7 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 from scripts.insight_contract import build_context, validate_analysis, evaluate_watchpoints, source_hash
 from scripts.generate_insights import run, _valid_history
@@ -100,6 +101,20 @@ class InsightContractTests(unittest.TestCase):
 
 
 class GenerationTests(unittest.TestCase):
+    def test_http_failure_publishes_safe_status_without_exception_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory)
+            rp = p / "reports.json"
+            rp.write_text(json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": sources()}))
+            def denied(*args):
+                error = HTTPError("", 403, "private response", {}, None)
+                error.diagnostics = {"http_status": 403, "api_status": "PERMISSION_DENIED"}
+                raise error
+            result = run(rp, p / "insights.json", api_key="secret", generator=denied)
+            self.assertEqual(403, result["generation"]["diagnostics"]["http_status"])
+            self.assertNotIn("private response", json.dumps(result))
+            self.assertNotIn("secret", json.dumps(result))
+
     def test_replacement_keeps_verifying_the_original_archived_condition(self):
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
