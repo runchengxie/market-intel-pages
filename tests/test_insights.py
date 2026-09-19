@@ -249,6 +249,23 @@ class GenerationTests(unittest.TestCase):
             self.assertEqual("unavailable", result["generation"]["status"])
             self.assertEqual([], result["insights"])
 
+    def test_validation_failure_reports_fixed_code_without_model_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = Path(directory)
+            rp, ip = p / "reports.json", p / "insights.json"
+            rp.write_text(
+                json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": sources()})
+            )
+
+            def invalid(*args):
+                raise ValueError("number not supported by cited evidence: secret model prose")
+
+            result = run(rp, ip, api_key="test", generator=invalid)
+            generation = result["generation"]
+            self.assertEqual("analysis_validation_failed", generation["error_code"])
+            self.assertNotIn("secret model prose", json.dumps(generation))
+            self.assertEqual(1, generation["analysis_attempts"])
+
 
 if __name__ == "__main__":
     unittest.main()
