@@ -62,7 +62,7 @@ python3 scripts/sync_public_snapshot.py \
 | 一段每日简评 | `scripts/generate_daily_summary.py` | `MINIMAX_API_KEY`，可选 `MINIMAX_MODEL` |
 | 带来源的市场解读 | `scripts/generate_insights.py` | 默认使用 `GEMINI_API_KEY`，可选 `GEMINI_MODEL` 和 `INSIGHT_PROVIDER` |
 
-结构化解读默认模型为 `gemini-3.8-flash`。截至 2026-09-19，仓库已配置 `GEMINI_API_KEY`，并成功生成一条基于 09-14 材料的历史回放。仓库原有短简评标记为 `chatgpt-reviewed`，不能据此判断 MiniMax 在线调用是否成功。
+结构化解读默认模型为 `gemini-3.8-flash`。截至 2026-09-19，仓库已配置 `GEMINI_API_KEY`，并成功生成一条基于 09-18 材料的历史回放。仓库原有短简评仍标记为 `chatgpt-reviewed`，不能据此判断 MiniMax 在线调用是否成功。
 
 将 `INSIGHT_PROVIDER` 设为 `minimax` 可切换结构化解读的提供方，使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。密钥通过本地进程环境或 GitHub Actions Secret 提供，浏览器只读取生成结果。
 
@@ -80,7 +80,7 @@ python3 scripts/generate_insights.py \
 
 GitHub Actions 在 PR 中执行检查，在 `main` 更新或手动触发时发布。发布流程会读取已部署的近期生成记录，生成新的简评与解读，再上传 Pages 产物。手动输入 `force_summary` 和 `force_insights` 分别控制两种内容的重新生成。
 
-Actions 中的解读与核验记录另存为保留 90 天的 artifact。长期记录需要持续导出到私有归档，具体安排见维护说明。
+Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产发布器会在部署完成后下载 ledger，写入仓库外的私有归档并核对文件哈希，具体安排见维护说明。
 
 ## 文件与数据
 
