@@ -32,7 +32,7 @@ The GitHub Pages workflow runs `scripts/build_site.py` and publishes only the fi
 
 ## Evidence-linked commentary and daily operations
 
-The page also displays structured market commentary, paragraph-level source evidence, source timestamps, missing-data notes and observable conditions checked against a later evening report. Configure the repository secret `GEMINI_API_KEY` to enable generation. Optional repository variables: `GEMINI_MODEL` (default `gemini-2.5-flash`) and `INSIGHT_PROVIDER` (`gemini` or `minimax`). MiniMax uses its corresponding key/model settings. Provider failures leave reports available and show the commentary state explicitly.
+The page also displays structured market commentary, paragraph-level source evidence, source timestamps, missing-data notes and observable conditions checked against a later evening report. Configure the repository secret `GEMINI_API_KEY` to enable generation. Optional repository variables: `GEMINI_MODEL` (default `gemini-3.8-flash`) and `INSIGHT_PROVIDER` (`gemini` or `minimax`). MiniMax uses its corresponding key/model settings. Provider failures leave reports available and show the commentary state explicitly.
 
 `data/insights.json` uses `market_intel_pages.insights.v1`. Source hashes, prompt content/version and model identity govern cache reuse. Subsequent outcomes never replace the original commentary. Generated historical samples are labelled as replay. Local runs can persist immutable revisions outside the public repository with `--archive-dir`; Actions uploads a 90-day ledger artifact, which must be exported to permanent private storage for long-term retention.
 
