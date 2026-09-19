@@ -8,15 +8,17 @@ import shutil
 from pathlib import Path
 
 try:
-    from .pipeline_health import health_report
-    from .generate_insights import SCHEMA as INSIGHT_SCHEMA, _valid_history
-    from .insight_contract import evaluate_watchpoints
     from .generate_daily_summary import current_summaries
+    from .generate_insights import SCHEMA as INSIGHT_SCHEMA
+    from .generate_insights import _valid_history
+    from .insight_contract import evaluate_watchpoints
+    from .pipeline_health import health_report
 except ImportError:
-    from pipeline_health import health_report
-    from generate_insights import SCHEMA as INSIGHT_SCHEMA, _valid_history
-    from insight_contract import evaluate_watchpoints
     from generate_daily_summary import current_summaries
+    from generate_insights import SCHEMA as INSIGHT_SCHEMA
+    from generate_insights import _valid_history
+    from insight_contract import evaluate_watchpoints
+    from pipeline_health import health_report
 
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
@@ -35,7 +37,7 @@ def _read_index(path: Path, schema: str, key: str) -> tuple[dict, list[dict]]:
     return payload, payload[key]
 
 
-def _validate(report_data: dict, reports: list[dict], summaries: list[dict]) -> None:
+def _validate(reports: list[dict], summaries: list[dict]) -> None:
     by_id = {report.get("id"): report for report in reports}
     for summary in summaries:
         morning = by_id.get(summary.get("morning_report_id"))
@@ -58,7 +60,7 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
     summaries_path = (summaries_path or root / "data/daily_summaries.json").resolve()
     report_data, reports = _read_index(root / "data/reports.json", REPORT_SCHEMA, "reports")
     summary_data, summaries = _read_index(summaries_path, SUMMARY_SCHEMA, "summaries")
-    _validate(report_data, reports, summaries)
+    _validate(reports, summaries)
 
     if output == root or output.is_relative_to(root):
         raise ValueError("build output must be outside the repository")
@@ -72,21 +74,34 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
         shutil.copy2(root / filename, output / filename)
     shutil.copy2(root / "data/reports.json", output / "data/reports.json")
     summary_data["summaries"] = current_summaries(reports, summaries)
-    (output / "data/daily_summaries.json").write_text(json.dumps(summary_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (output / "data/daily_summaries.json").write_text(
+        json.dumps(summary_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     health = health_report(report_data)
-    (output / "data/health.json").write_text(json.dumps(health, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (output / "data/health.json").write_text(
+        json.dumps(health, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     insight_path = root / "data/insights.json"
-    insights = {"schema_version": INSIGHT_SCHEMA, "generation": {"status": "not_configured"}, "insights": [], "outcomes": []}
+    insights = {
+        "schema_version": INSIGHT_SCHEMA,
+        "generation": {"status": "not_configured"},
+        "insights": [],
+        "outcomes": [],
+    }
     if insight_path.exists():
         candidate = json.loads(insight_path.read_text(encoding="utf-8"))
         if candidate.get("schema_version") != INSIGHT_SCHEMA:
             raise ValueError("unsupported insight index")
         insights = {**candidate, "insights": _valid_history(candidate.get("insights", []), reports)}
         insights["outcomes"] = evaluate_watchpoints(insights["insights"], reports)
-    (output / "data/insights.json").write_text(json.dumps(insights, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    (output / "data/insights.json").write_text(
+        json.dumps(insights, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
 
     for report in reports:
         source_url = report.get("source_url")
+        if not isinstance(source_url, str):
+            raise ValueError("report source_url must be a string")
         source = (root / source_url).resolve()
         if not source.is_relative_to((root / "reports").resolve()) or not source.is_file():
             raise ValueError(f"report Markdown is missing or unsafe: {source_url}")

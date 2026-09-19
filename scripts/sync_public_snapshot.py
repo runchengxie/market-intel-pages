@@ -7,7 +7,6 @@ import json
 import shutil
 from pathlib import Path
 
-
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 PUBLIC_SESSION_COUNT = 5
@@ -52,8 +51,7 @@ def _merge_by_id(existing: list[dict], incoming: list[dict], key: str) -> list[d
 
 def _merge_summaries(existing: list[dict], incoming: list[dict]) -> list[dict]:
     merged = {
-        (record.get("morning_report_id"), record.get("evening_report_id")): record
-        for record in existing
+        (record.get("morning_report_id"), record.get("evening_report_id")): record for record in existing
     }
     for record in incoming:
         pair = (record.get("morning_report_id"), record.get("evening_report_id"))
@@ -111,7 +109,10 @@ def sync_snapshot(root: Path, archive_dir: Path) -> None:
 
     all_report_ids = {report["id"] for report in all_reports}
     for summary in all_summaries:
-        if summary.get("morning_report_id") not in all_report_ids or summary.get("evening_report_id") not in all_report_ids:
+        if (
+            summary.get("morning_report_id") not in all_report_ids
+            or summary.get("evening_report_id") not in all_report_ids
+        ):
             raise ValueError("summary source report is missing from local archive")
 
     archive_report_index = {
@@ -135,6 +136,21 @@ def sync_snapshot(root: Path, archive_dir: Path) -> None:
         if not archived_markdown.is_file():
             raise ValueError(f"archived report Markdown is missing: {report['source_url']}")
 
+    _publish_snapshot(
+        root, archive_dir, all_reports, all_summaries, incoming_report_index, incoming_summary_index
+    )
+
+
+def _publish_snapshot(
+    root: Path,
+    archive_dir: Path,
+    all_reports: list[dict],
+    all_summaries: list[dict],
+    incoming_report_index: dict,
+    incoming_summary_index: dict,
+) -> None:
+    report_index_path = root / "data/reports.json"
+    summary_index_path = root / "data/daily_summaries.json"
     session_dates = sorted(
         {report["date"] for report in all_reports},
         reverse=True,
@@ -143,7 +159,8 @@ def sync_snapshot(root: Path, archive_dir: Path) -> None:
     public_reports = [report for report in all_reports if report.get("date") in public_dates]
     public_ids = {report["id"] for report in public_reports}
     public_summaries = [
-        summary for summary in all_summaries
+        summary
+        for summary in all_summaries
         if summary.get("date") in public_dates
         and summary.get("morning_report_id") in public_ids
         and summary.get("evening_report_id") in public_ids
@@ -180,7 +197,9 @@ def sync_snapshot(root: Path, archive_dir: Path) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="repository root")
-    parser.add_argument("--archive-dir", type=Path, required=True, help="full local archive outside the repository")
+    parser.add_argument(
+        "--archive-dir", type=Path, required=True, help="full local archive outside the repository"
+    )
     args = parser.parse_args()
     sync_snapshot(args.root, args.archive_dir)
     print("Archived all reports locally; public snapshot contains at most five trading dates.")

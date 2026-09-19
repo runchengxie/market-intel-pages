@@ -1,12 +1,16 @@
-import unittest
 import json
 import tempfile
+import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.generate_daily_summary import generate_summary, run, validate_summary, summary_source_hash
-
-from scripts.generate_daily_summary import select_source_pair
+from scripts.generate_daily_summary import (
+    generate_summary,
+    run,
+    select_source_pair,
+    summary_source_hash,
+    validate_summary,
+)
 
 
 def report(report_id, date, kind, generated_at):
@@ -41,7 +45,9 @@ class SourcePairTests(unittest.TestCase):
 
 class SummaryValidationTests(unittest.TestCase):
     def test_removes_think_block(self):
-        self.assertEqual("盘面偏弱，继续观察。", validate_summary("<think>hidden</think> 盘面偏弱，继续观察。"))
+        self.assertEqual(
+            "盘面偏弱，继续观察。", validate_summary("<think>hidden</think> 盘面偏弱，继续观察。")
+        )
 
     def test_rejects_heading_list_empty_and_overlong_output(self):
         for value in ("# 今日", "- 条目", "", "盘" * 121):
@@ -77,8 +83,13 @@ class GenerationHistoryTests(unittest.TestCase):
             evening = report("e", "2026-09-14", "evening", "2026-09-14 19:00")
             morning = report("m", "2026-09-14", "morning", "2026-09-15 07:00")
             rp.write_text(json.dumps({"reports": [evening, morning]}))
-            local = {"date": "2026-09-14", "text": "已校验内容", "morning_report_id": "m", "evening_report_id": "e",
-                     "source_hash": summary_source_hash(morning, evening)}
+            local = {
+                "date": "2026-09-14",
+                "text": "已校验内容",
+                "morning_report_id": "m",
+                "evening_report_id": "e",
+                "source_hash": summary_source_hash(morning, evening),
+            }
             sp.write_text(json.dumps({"summaries": [local]}))
             remote = {key: value for key, value in local.items() if key != "source_hash"}
             remote["text"] = "旧的未校验内容"
@@ -91,8 +102,10 @@ class GenerationHistoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             rp, sp = root / "reports.json", root / "summaries.json"
-            rows = [report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
-                    report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            rows = [
+                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                report("m", "2026-09-14", "morning", "2026-09-15 07:00"),
+            ]
             rows[0]["sections"][0]["paragraphs"].append("上涨率 56.3%")
             rp.write_text(json.dumps({"reports": rows}))
             sp.write_text(json.dumps({"summaries": []}))
@@ -106,8 +119,10 @@ class GenerationHistoryTests(unittest.TestCase):
     def test_source_revision_invalidates_cached_note(self, generate):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            reports = [report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
-                       report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            reports = [
+                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                report("m", "2026-09-14", "morning", "2026-09-15 07:00"),
+            ]
             rp, sp = root / "reports.json", root / "summaries.json"
             rp.write_text(json.dumps({"reports": reports}))
             sp.write_text(json.dumps({"summaries": []}))
@@ -121,9 +136,16 @@ class GenerationHistoryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             rp, sp = root / "reports.json", root / "summaries.json"
-            rp.write_text(json.dumps({"reports": [
-                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
-                report("m", "2026-09-14", "morning", "2026-09-15 07:00")]}))
+            rp.write_text(
+                json.dumps(
+                    {
+                        "reports": [
+                            report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                            report("m", "2026-09-14", "morning", "2026-09-15 07:00"),
+                        ]
+                    }
+                )
+            )
             sp.write_text(json.dumps({"summaries": []}))
             run(rp, sp, sp, "key", model="old")
             self.assertEqual("generated summary", run(rp, sp, sp, "key", model="new"))
@@ -131,12 +153,21 @@ class GenerationHistoryTests(unittest.TestCase):
     def test_missing_key_preserves_history_without_adding_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            reports = [report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"),
-                       report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
-                       report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
-                       report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
-            history = [{"date": "2026-09-13", "text": "existing", "morning_report_id": "old-m",
-                        "evening_report_id": "old-e", "source_hash": summary_source_hash(reports[1], reports[0])}]
+            reports = [
+                report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"),
+                report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
+                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                report("m", "2026-09-14", "morning", "2026-09-15 07:00"),
+            ]
+            history = [
+                {
+                    "date": "2026-09-13",
+                    "text": "existing",
+                    "morning_report_id": "old-m",
+                    "evening_report_id": "old-e",
+                    "source_hash": summary_source_hash(reports[1], reports[0]),
+                }
+            ]
             (root / "reports.json").write_text(json.dumps({"reports": reports}))
             (root / "summaries.json").write_text(json.dumps({"summaries": history}))
             output = root / "out.json"
@@ -148,12 +179,16 @@ class GenerationHistoryTests(unittest.TestCase):
     def test_success_adds_pair_at_most_once(self, generate):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            reports = [report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
-                       report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            reports = [
+                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                report("m", "2026-09-14", "morning", "2026-09-15 07:00"),
+            ]
             (root / "reports.json").write_text(json.dumps({"reports": reports}))
             (root / "summaries.json").write_text(json.dumps({"summaries": []}))
             output = root / "out.json"
-            self.assertEqual("generated summary", run(root / "reports.json", root / "summaries.json", output, "key"))
+            self.assertEqual(
+                "generated summary", run(root / "reports.json", root / "summaries.json", output, "key")
+            )
             data = json.loads(output.read_text())["summaries"]
             self.assertEqual("m", data[0]["morning_report_id"])
             self.assertEqual("e", data[0]["evening_report_id"])
@@ -170,23 +205,43 @@ class GenerationHistoryTests(unittest.TestCase):
                 return False
 
             def read(self):
-                return json.dumps({"schema_version": "market_intel_pages.daily_summaries.v1", "summaries": [
-                    {"date": "2026-09-13", "text": "previous", "morning_report_id": "old-m", "evening_report_id": "old-e",
-                     "source_hash": summary_source_hash(report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
-                                                        report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"))}
-                ]}).encode()
+                return json.dumps(
+                    {
+                        "schema_version": "market_intel_pages.daily_summaries.v1",
+                        "summaries": [
+                            {
+                                "date": "2026-09-13",
+                                "text": "previous",
+                                "morning_report_id": "old-m",
+                                "evening_report_id": "old-e",
+                                "source_hash": summary_source_hash(
+                                    report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
+                                    report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"),
+                                ),
+                            }
+                        ],
+                    }
+                ).encode()
 
         open_url.return_value = Response()
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            reports = [report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"),
-                       report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
-                       report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
-                       report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            reports = [
+                report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"),
+                report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
+                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                report("m", "2026-09-14", "morning", "2026-09-15 07:00"),
+            ]
             (root / "reports.json").write_text(json.dumps({"reports": reports}))
             (root / "summaries.json").write_text(json.dumps({"summaries": []}))
             output = root / "out.json"
-            run(root / "reports.json", root / "summaries.json", output, None, history_url="https://pages.invalid/data/daily_summaries.json")
+            run(
+                root / "reports.json",
+                root / "summaries.json",
+                output,
+                None,
+                history_url="https://pages.invalid/data/daily_summaries.json",
+            )
             self.assertEqual("previous", json.loads(output.read_text())["summaries"][0]["text"])
 
 
