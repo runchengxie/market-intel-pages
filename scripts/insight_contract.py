@@ -181,45 +181,58 @@ def validate_analysis(payload: dict, context: dict) -> dict:
     return payload
 
 
+def _next_evening(note: dict, reports: list[dict]) -> dict | None:
+    cutoff = datetime.fromisoformat(note["as_of"])
+    candidates = [
+        row
+        for row in reports
+        if row.get("kind") == "evening"
+        and row["date"] > note["date"]
+        and (generated := report_generated_at(row)) is not None
+        and generated > cutoff
+    ]
+    return min(candidates, key=lambda row: (row["date"], report_generated_at(row))) if candidates else None
+
+
+def _watchpoint_outcome(note_id: str, index: int, point: dict, later: dict | None) -> dict:
+    result = {
+        "insight_id": note_id,
+        "watchpoint_index": index,
+        "status": "pending",
+        "report_id": None,
+        "observed_date": None,
+        "observed_value": None,
+        "evidence_ids": [],
+        "evidence": [],
+        "source_hash": None,
+    }
+    if later is None:
+        return result
+    result.update(
+        status="unverifiable",
+        report_id=later["id"],
+        observed_date=later["date"],
+        source_hash=source_hash([later]),
+    )
+    metric = extract_metrics(later).get(point["metric"])
+    if metric is None:
+        return result
+    satisfied = OPERATORS[point["operator"]](metric["value"], point["threshold"])
+    result.update(
+        status="met" if satisfied else "not_met",
+        observed_value=metric["value"],
+        evidence_ids=metric["evidence_ids"],
+        evidence=[item for item in evidence_for([later]) if item["id"] in metric["evidence_ids"]],
+    )
+    return result
+
+
 def evaluate_watchpoints(insights: list[dict], reports: list[dict]) -> list[dict]:
     outcomes = []
     for note in insights:
-        cutoff = datetime.fromisoformat(note["as_of"])
-        candidates = [
-            row
-            for row in reports
-            if row.get("kind") == "evening"
-            and row["date"] > note["date"]
-            and (generated := report_generated_at(row)) is not None
-            and generated > cutoff
-        ]
-        later = (
-            min(candidates, key=lambda row: (row["date"], report_generated_at(row))) if candidates else None
+        later = _next_evening(note, reports)
+        outcomes.extend(
+            _watchpoint_outcome(note["id"], index, point, later)
+            for index, point in enumerate(note["analysis"]["watchpoints"])
         )
-        observed = extract_metrics(later) if later else {}
-        for i, point in enumerate(note["analysis"]["watchpoints"]):
-            metric = observed.get(point["metric"])
-            status = (
-                "pending"
-                if later is None
-                else "unverifiable"
-                if metric is None
-                else (
-                    "met" if OPERATORS[point["operator"]](metric["value"], point["threshold"]) else "not_met"
-                )
-            )
-            row = {
-                "insight_id": note["id"],
-                "watchpoint_index": i,
-                "status": status,
-                "report_id": later["id"] if later else None,
-                "observed_date": later["date"] if later else None,
-                "observed_value": metric["value"] if metric else None,
-                "evidence_ids": metric["evidence_ids"] if metric else [],
-                "evidence": [e for e in evidence_for([later]) if metric and e["id"] in metric["evidence_ids"]]
-                if later
-                else [],
-                "source_hash": source_hash([later]) if later else None,
-            }
-            outcomes.append(row)
     return outcomes

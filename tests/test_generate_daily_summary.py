@@ -38,6 +38,11 @@ class SourcePairTests(unittest.TestCase):
         later = report("e", "2026-09-14", "evening", "2026-09-15 19:00")
         self.assertIsNone(select_source_pair([morning, later]))
 
+    def test_pairs_reports_generated_within_the_same_second(self):
+        evening = report("e", "2026-09-18", "evening", "2026-09-19 15:00:00.100001")
+        morning = report("m", "2026-09-18", "morning", "2026-09-19 15:00:00.100002")
+        self.assertEqual((morning, evening), select_source_pair([evening, morning]))
+
     def test_requires_both_halves(self):
         morning = report("m", "2026-09-14", "morning", "2026-09-15 07:00")
         self.assertIsNone(select_source_pair([morning]))

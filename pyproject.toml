@@ -33,6 +33,7 @@ include = ["scripts", "tools"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--cov=scripts --cov-branch --cov-report=term-missing --cov-fail-under=85"
 
 [tool.coverage.run]

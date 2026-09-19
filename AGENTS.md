@@ -29,13 +29,20 @@
 根据修改范围执行相关检查，涉及共享数据契约或发布流程时执行完整检查：
 
 ```bash
-python3 -m unittest discover -s tests
+python3 -m pip install --group dev
+ruff check scripts tests tools
+ruff format --check scripts tests tools
+ty check
+vulture scripts tests tools --min-confidence 80
+python3 -m pytest
 node --test tests/*.cjs
 node --check app.js
 python3 scripts/build_site.py --output /tmp/quant-market-intel-check
+pip-audit --strict
+python3 tools/audit_structure.py --output /tmp/market-intel-structure.json
 ```
 
-构建会重新创建指定的输出目录，应使用仓库外的专用目录。提交前执行 `git diff --check`，界面改动补充浏览器检查。
+构建会重新创建指定的输出目录，应使用仓库外的专用目录。提交前执行 `git diff --check`，界面改动补充浏览器检查。保持行与分支联合覆盖率不低于 85%，Ruff McCabe 复杂度不高于 10，不通过添加忽略项绕过问题。结构报告只覆盖静态可解析的直接调用，不视作完整运行时调用图。
 
 README 说明现有功能与常用操作，`docs/daily-generation-options.md` 说明上游交接、运行记录和未完成事项。完成旧计划后更新其状态，保留必要决策背景，删除重复实施步骤。记录运行日期与证据，避免把计划写成已上线能力。
 

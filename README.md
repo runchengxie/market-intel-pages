@@ -10,7 +10,7 @@ Quant 市场情报是一个静态报告阅读网站，展示近期晨晚报、�
 - 将晨报与此前最近的一份晚报配对，生成一段每日简评。报告目标日期可以与生成日期不同，配对时同时检查日期和时间。
 - 根据配对报告及截止时间内最近五个报告日期的材料生成市场解读，展示变化、分歧、观察条件和逐条来源。
 - 校验解读中的引用和数字，并用后续首份符合条件的晚报核对观察条件。原解读和后续结果分别记录。
-- 显示原报告时间、数据缺项和生成状态。晚于材料截止时间三小时生成的解读标为历史回放。
+- 显示原报告时间、数据缺项和生成状态。补发材料及晚于材料截止时间三小时生成的解读标为历史回放。
 - 从明确允许公开的 manifest 导入报告，预览变更后再写入公开快照和私有归档。
 
 窗口按实际存在的报告日期计算。某日只有晚报也会占用一个日期，五个日期的上限不代表最近五个交易日的数据已经齐全。
@@ -99,17 +99,26 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。长期�
 
 每日简评使用 `market_intel_pages.daily_summaries.v1`，记录目标日期、正文、晨晚报 ID、生成时间、模型和提示词版本。结构化解读使用 `market_intel_pages.insights.v1`，另记录材料截止时间、内容哈希、段落证据、观察条件与核验结果。
 
-构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，按原报告时间计算数据年龄。上游未提供交易日历目标时，只给出默认 72 小时的过期提醒。报告与模型正文通过文本节点展示。
+构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，分别计算原报告时间和目标数据日期的年龄，避免补发旧数据掩盖延迟。未提供交易日历目标时，标记 `calendar_unverified`，并保留默认 72 小时的过期提醒。报告与模型正文通过文本节点展示。
 
 ## 检查与维护
 
 ```bash
-python3 -m unittest discover -s tests
+python3 -m pip install --group dev
+ruff check scripts tests tools
+ruff format --check scripts tests tools
+ty check
+vulture scripts tests tools --min-confidence 80
+python3 -m pytest
 node --test tests/*.cjs
 node --check app.js
 python3 scripts/build_site.py --output /tmp/quant-market-intel-check
+pip-audit --strict
+python3 tools/audit_structure.py --output /tmp/market-intel-structure.json
 ```
 
-提交前还应运行 `git diff --check`。页面展示有改动时，检查默认日期、日期切换、晨晚报筛选、缺少简评和来源展开等状态。
+开发工具版本固定在 `pyproject.toml`。CI 使用 Python 3.11 和 Node.js 24，检查类型、格式、未使用代码、依赖漏洞和 85% 的行与分支联合覆盖率门槛。Ruff 的 McCabe 复杂度上限为 10，另输出 Radon 报告与 AST、模块依赖和静态直接调用清单。不同工具对布尔表达式和推导式的计数不同，数值应在同一工具内比较。
+
+提交前还应运行 `git diff --check`。页面展示有改动时，检查默认日期、日期切换、晨晚报筛选、缺少简评和来源展开等状态。本轮事实、质量指标和遗留项见[维护检查记录](docs/maintenance-audit-2026-09-19.md)。
 
 维护约定见 [AGENTS.md](AGENTS.md)。09-15 的[设计记录](docs/superpowers/specs/2026-09-15-quant-market-intel-pages-design.md)、[网站实施记录](docs/superpowers/plans/2026-09-15-quant-market-intel-pages.md)与 [MiniMax 实施记录](docs/superpowers/plans/2026-09-15-quant-market-intel-minimax.md)保留早期决策背景，当前操作以本页和每日生成说明为准。

@@ -22,7 +22,9 @@ CHINA_TZ = timezone(timedelta(hours=8))
 def report_generated_at(report: dict) -> datetime | None:
     for section in report.get("sections", []):
         for paragraph in section.get("paragraphs", []):
-            match = re.match(r"生成时间[:：]\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?)", paragraph)
+            match = re.match(
+                r"生成时间[:：]\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?)", paragraph
+            )
             if match:
                 return datetime.fromisoformat(match.group(1).replace(" ", "T") + "+08:00")
     return None
