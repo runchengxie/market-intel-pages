@@ -6,7 +6,6 @@ from pathlib import Path
 from scripts.build_site import build_site
 from scripts.sync_public_snapshot import sync_snapshot
 
-
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 
@@ -23,26 +22,38 @@ def create_site(root: Path, session_count: int = 6) -> None:
         for kind in ("morning", "evening"):
             report_id = f"{date}-{kind}"
             source_url = f"reports/{report_id}.md"
-            reports.append({
-                "id": report_id,
-                "date": date,
-                "kind": kind,
-                "title": report_id,
-                "summary": "sample",
-                "sections": [],
-                "source_url": source_url,
-            })
+            reports.append(
+                {
+                    "id": report_id,
+                    "date": date,
+                    "kind": kind,
+                    "title": report_id,
+                    "summary": "sample",
+                    "sections": [],
+                    "source_url": source_url,
+                }
+            )
             (root / source_url).write_text(f"# {report_id}\n", encoding="utf-8")
 
-    (root / "data/reports.json").write_text(json.dumps({
-        "schema_version": REPORT_SCHEMA,
-        "generated_at": "2026-09-16T08:00:00+08:00",
-        "reports": reports,
-    }), encoding="utf-8")
-    (root / "data/daily_summaries.json").write_text(json.dumps({
-        "schema_version": SUMMARY_SCHEMA,
-        "summaries": [],
-    }), encoding="utf-8")
+    (root / "data/reports.json").write_text(
+        json.dumps(
+            {
+                "schema_version": REPORT_SCHEMA,
+                "generated_at": "2026-09-16T08:00:00+08:00",
+                "reports": reports,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (root / "data/daily_summaries.json").write_text(
+        json.dumps(
+            {
+                "schema_version": SUMMARY_SCHEMA,
+                "summaries": [],
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 class BuildSiteTests(unittest.TestCase):
@@ -51,8 +62,10 @@ class BuildSiteTests(unittest.TestCase):
         build_site(self.root, self.output)
         health = json.loads((self.output / "data/health.json").read_text())
         self.assertEqual("missing", health["status"])
-        self.assertEqual("market_intel_pages.insights.v1", json.loads(
-            (self.output / "data/insights.json").read_text())["schema_version"])
+        self.assertEqual(
+            "market_intel_pages.insights.v1",
+            json.loads((self.output / "data/insights.json").read_text())["schema_version"],
+        )
 
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -86,28 +99,38 @@ class BuildSiteTests(unittest.TestCase):
     def test_sync_preserves_distinct_summary_source_pairs(self) -> None:
         summaries = []
         for evening_id in ("2026-09-05-evening", "2026-09-06-evening"):
-            summaries.append({
-                "date": "2026-09-06",
-                "text": f"note from {evening_id}",
-                "morning_report_id": "2026-09-06-morning",
-                "evening_report_id": evening_id,
-                "generated_at": "2026-09-07T07:00:00+08:00",
-                "model": "test",
-                "prompt_version": "daily-note-v1",
-            })
-        (self.root / "data/daily_summaries.json").write_text(json.dumps({
-            "schema_version": SUMMARY_SCHEMA,
-            "summaries": summaries,
-        }), encoding="utf-8")
+            summaries.append(
+                {
+                    "date": "2026-09-06",
+                    "text": f"note from {evening_id}",
+                    "morning_report_id": "2026-09-06-morning",
+                    "evening_report_id": evening_id,
+                    "generated_at": "2026-09-07T07:00:00+08:00",
+                    "model": "test",
+                    "prompt_version": "daily-note-v1",
+                }
+            )
+        (self.root / "data/daily_summaries.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": SUMMARY_SCHEMA,
+                    "summaries": summaries,
+                }
+            ),
+            encoding="utf-8",
+        )
 
         sync_snapshot(self.root, self.archive)
 
         local = json.loads((self.archive / "data/daily_summaries.json").read_text())
         pairs = {(row["morning_report_id"], row["evening_report_id"]) for row in local["summaries"]}
-        self.assertEqual({
-            ("2026-09-06-morning", "2026-09-05-evening"),
-            ("2026-09-06-morning", "2026-09-06-evening"),
-        }, pairs)
+        self.assertEqual(
+            {
+                ("2026-09-06-morning", "2026-09-05-evening"),
+                ("2026-09-06-morning", "2026-09-06-evening"),
+            },
+            pairs,
+        )
 
     def test_sync_rejects_archive_inside_public_repository(self) -> None:
         with self.assertRaisesRegex(ValueError, "outside the repository"):
@@ -137,23 +160,31 @@ class BuildSiteTests(unittest.TestCase):
         self.assertEqual(expected, copied)
         self.assertEqual(10, len(report_data["reports"]))
         self.assertTrue((self.output / "summary-utils.js").is_file())
-        self.assertEqual("market_intel_pages.daily_summaries.v1", json.loads(
-            (self.output / "data/daily_summaries.json").read_text()
-        )["schema_version"])
+        self.assertEqual(
+            "market_intel_pages.daily_summaries.v1",
+            json.loads((self.output / "data/daily_summaries.json").read_text())["schema_version"],
+        )
 
     def test_build_rejects_summary_with_unknown_source(self) -> None:
-        (self.root / "data/daily_summaries.json").write_text(json.dumps({
-            "schema_version": SUMMARY_SCHEMA,
-            "summaries": [{
-                "date": "2026-09-06",
-                "text": "sample",
-                "morning_report_id": "missing-morning",
-                "evening_report_id": "2026-09-06-evening",
-                "generated_at": "2026-09-07T07:00:00+08:00",
-                "model": "test",
-                "prompt_version": "daily-note-v1",
-            }],
-        }), encoding="utf-8")
+        (self.root / "data/daily_summaries.json").write_text(
+            json.dumps(
+                {
+                    "schema_version": SUMMARY_SCHEMA,
+                    "summaries": [
+                        {
+                            "date": "2026-09-06",
+                            "text": "sample",
+                            "morning_report_id": "missing-morning",
+                            "evening_report_id": "2026-09-06-evening",
+                            "generated_at": "2026-09-07T07:00:00+08:00",
+                            "model": "test",
+                            "prompt_version": "daily-note-v1",
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
         with self.assertRaisesRegex(ValueError, "source report"):
             build_site(self.root, self.output, self.root / "data/daily_summaries.json")
 

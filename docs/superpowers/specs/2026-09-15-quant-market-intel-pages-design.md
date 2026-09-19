@@ -1,72 +1,48 @@
-# Quant Market Intel Pages Design
+# Quant Market Intel 网站设计记录
 
-## Goal
+设计日期：2026-09-15。状态核对：2026-09-19。
 
-Turn the existing market report viewer into a concise daily market-intelligence page. Each daily note should synthesize the latest morning report and the immediately preceding evening report into one short, natural paragraph. Keep the full report archive on the local machine, while publishing only the five most recent trading days to the website. Align the product name with the Quant product family.
+本文保留网站早期的产品决策。简评、五日期快照、本地归档和 Pages 构建已在 PR #5、#6 中实现。PR #7 至 #9 又加入来源引用、条件核验和 Gemini 生成。当前功能与操作见 [README](../../../README.md)，本文不作为待执行计划。
 
-## Current state
+## 当时要解决的问题
 
-- The repository is a static GitHub Pages site. Its current branding is “Market Intel” / “市场简报”.
-- `data/reports.json` contains the report index and report bodies; full Markdown files are also copied into the deployed site.
-- The current Pages workflow only copies repository files into the deployment artifact. It does not fetch reports, call a model, or apply retention.
-- The current index is 32,810 bytes, the four linked Markdown files total 22,899 bytes, and the whole checkout is about 672 KB.
-- At two reports per day, the observed averages project to about 10.2 MB/year for index plus Markdown (roughly 9.7 MiB). With 30% growth headroom and the current site shell, expect about 13–14 MB/year. Daily summary records add little. This estimate uses four reports, so treat it as a planning estimate, not a guaranteed ceiling.
-- The GitHub repository is public, so tracked report files and Git history are public. Full local archive data must be stored outside the repository; the current public snapshot can contain only the recent five trading days.
-- The 2026-09-14 pair demonstrates the desired timing: the evening edition and the next morning's edition share a report date. The morning report was generated at 07:03 on 2026-09-15 and carries the 2026-09-14 target date.
+早期网站主要展示晨晚报正文。希望读者打开页面就能看到简短的市场判断，同时能回看依据。完整材料长期保存在本地，公开页面仅保留近期报告。
 
-## User experience
+产品名称统一为 Quant Market Intel，中文名称为 Quant 市场情报。最初曾提议把仓库改名为 `quant-market-intel-pages`，这一设置变更没有执行。仓库仍名为 `market-intel-pages`，公开地址为 <https://runchengxie.github.io/market-intel-pages/>。
 
-- Rename the product branding to “Quant Market Intel” / “Quant 市场情报”. Use `quant-market-intel-pages` as the intended repository name so it is recognizable within the Quant product family.
-- By default, show concise daily notes for the five most recent trading days, newest first. Each note is one paragraph and associated with its report date.
-- Show source morning/evening reports for those five trading days, with details remaining expandable. The date selector only offers dates in this public five-day window.
-- Retain the complete archive locally outside the repository, at a path supplied to the local archive/snapshot command. Never copy that archive into the public Pages artifact.
-- Keep the existing report-type navigation within the public five-day window.
-- Show a clear “暂无简评” state when a valid morning/evening pair is unavailable; do not fabricate a note from only one half of the intended input window.
-- Keep all reports locally without an automatic expiry. Publish only the latest five distinct report dates, counting a date even if it currently has only an evening report.
-- Do not rewrite existing public Git history. Older reports already pushed remain accessible through prior public commits; future deployments and current repository snapshots expose only the latest five trading dates.
+## 保留的产品决策
 
-## Pairing and summary generation
+- 默认显示近期每日简评，按日期从新到旧排列。读者可按日期和晨晚报类型查看原报告。
+- 公开窗口最多包含五个不同的报告日期。某日只有一份报告也计入窗口，日期选择器只提供窗口内的日期。
+- 完整报告保存在仓库外的本地归档中，不设置自动过期时间。
+- 缺少有效晨晚报配对时显示暂无简评。模型调用失败时仍展示原报告，已有解读保留其原始日期。
+- 正文和模型内容通过文本节点展示，完整 Markdown 原文可单独查看。
+- 公开 Git 历史保持原样。收窄当前快照后，曾经公开提交的旧报告仍可通过历史提交访问。
 
-- Pair a morning report with the latest evening report whose report date is the same as or earlier than the morning report's target date. Use report timestamps as a tie-breaker if multiple candidates exist. This handles weekends and holidays without assuming that the previous calendar date has a report.
-- Generate one paragraph of roughly 40–80 Chinese characters, with no title, bullet list, or boilerplate. Prefer the consequential overnight change, cross-market strength/weakness, and one relevant uncertainty or watch point.
-- Preserve only claims supported by the two reports. Do not add price targets, trade instructions, catalysts, or causal explanations that are absent from the inputs. Retain cautious wording when data is stale, degraded, or contradictory.
-- Prototype the prompt against the existing 2026-09-14 report pair using ChatGPT-assisted generation and save the result as a reviewed fixture. Once the style and factual checks are accepted, automate generation with MiniMax in the publishing workflow. The API key must be a GitHub Actions secret and must never enter browser code or committed files.
-- If model generation fails, publish the reports and show “暂无简评”; the report deployment itself should not fail. Do not silently reuse yesterday's commentary as today's.
+## 配对与简评风格
 
-### First style sample
+简评先选择最新有效晨报，再选报告目标日期不晚于该晨报、生成时间早于该晨报的最近一份晚报。这允许跨周末和休市日配对。
 
-Using the 2026-09-14 evening report and the following morning report:
+09-14 的样例可以说明目标日期与生成时间的区别：晚报在 09-14 生成，配对晨报在 09-15 07:03 生成，两份报告都使用 09-14 作为目标日期。
+
+原定简评约 40 至 80 个中文字，一段说清主要变化、市场间的强弱和需要继续观察的地方。只使用报告已有事实，保留材料中的缺项与不确定性。
+
+第一份人工审核样例：
 
 > A股个股面还行，指数没跟上，成交也偏弱。隔夜半导体明显转弱，SMH跌4.75%、AMD跌4.4%，日韩芯片股也普遍回落，科技硬件先看卖压能不能缓下来。
 
-This is a prompt-calibration sample, not a deterministic template. The model should vary wording naturally while preserving the facts and uncertainty from the paired reports.
+这段用于校准表达风格，数据中标记为 `chatgpt-reviewed`，不代表 MiniMax 实际生成结果。后续模型输出可以自然变化，事实仍需对应配对材料。
 
-## Data model and publishing
+## 归档与发布设计
 
-- Add a daily-summary record with a stable date, generated text, the source morning and evening report IDs, generation timestamp, and model/prompt version.
-- A local snapshot command merges current report files into an archive directory outside the repository, then writes the latest five distinct report-date snapshot back to `data/reports.json`, `data/daily_summaries.json`, and `reports/` for publication. It must archive and verify files before removing older report files from the repository worktree.
-- Build the Pages artifact from that five-day public snapshot and copy only Markdown files referenced by the snapshot.
-- The current repository has no report-ingestion or model-calling workflow. The first implementation should work from committed report records and add a publishing-time generation step only after the MiniMax secret is configured. The site must remain usable with summaries absent.
+本地同步命令先合并完整报告及简评，核对 Markdown 后，再生成最近五个报告日期的公开快照。构建脚本只复制该快照引用的 Markdown 文件，Pages 上传仓库外的构建目录。
 
-## Rename and deployment implications
+每日简评保存目标日期、正文、晨晚报 ID、生成时间、模型和提示词版本。后续结构化解读增加了材料哈希、段落证据、信息截止时间、观察条件及独立核验结果，详见[维护说明](../../daily-generation-options.md)。
 
-- Update page title, metadata, wordmark, README, and workflow references to the Quant Market Intel name.
-- Rename the GitHub repository to `quant-market-intel-pages` as a repository setting change after the code change is reviewed. Confirm GitHub's old-URL redirect and update local remotes after the rename.
-- Keep the existing GitHub Pages deployment target unless the repository rename requires a Pages setting adjustment; verify the published URL after the rename.
+模型密钥由生成进程读取。网页只消费静态结果，模型服务不可用时保留可读取的报告与历史记录。
 
-## Acceptance criteria
+## 当时的容量估算
 
-1. The first page view presents up to five short daily commentaries for the most recent trading days, newest first, each built from the correct morning/evening pair and visibly associated with its report date.
-2. A weekend/holiday with no same-day evening report uses the most recent preceding evening report; absence of either source produces no generated paragraph.
-3. Commentary includes no factual claim absent from its source pair and has no browser-visible model credentials.
-4. The public artifact and current tracked report snapshot contain no more than the latest five trading dates; all older source reports remain in the local archive outside the repository.
-5. Existing report filters, date selection, original report content, and safe text rendering continue to work.
-6. The page and repository documentation use the Quant Market Intel branding; the renamed Pages deployment loads successfully.
-7. Model failure leaves the rest of the report viewer available and does not carry forward stale generated text.
-8. The date selector offers only dates in the public five-day window; older reports remain available in the local archive.
+09-15 盘点时，报告索引为 32,810 字节，四份 Markdown 共 22,899 字节，整个检出约 672 KB。按每天两份报告估算，索引与 Markdown 每年约增加 10.2 MB。计入 30% 余量与页面文件后，约为 13 至 14 MB。
 
-## Open implementation detail
-
-The MiniMax endpoint and model default have been checked against the provider's current official API documentation. The remaining runtime setup is the GitHub Actions `MINIMAX_API_KEY` secret. Until it is configured, the user-reviewed daily summary is stored as static data and the site degrades cleanly when none exists.
-
-The estimated annual volume is modest, but the user prefers local full-history retention and a short public page. Existing public Git history is not rewritten; deleting old data from the current branch and Pages cannot remove copies already present in earlier public commits.
+估算仅来自四份早期样例，未计入后续结构化解读与修订记录，可用于理解当时的容量决策，不作为存储上限。采用本地全量归档和短期公开窗口，主要出于用户对保存与展示方式的偏好。

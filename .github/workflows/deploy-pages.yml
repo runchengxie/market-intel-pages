@@ -29,12 +29,45 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - name: Validate contracts and rendering helpers
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+      - name: Install development checks
         run: |
-          python3 -m unittest discover -s tests
+          python -m pip install --upgrade pip
+          python -m pip install --group dev
+      - name: Lint, format, types, and unused code
+        run: |
+          ruff check scripts tests tools
+          ruff format --check scripts tests tools
+          ty check
+          vulture scripts tests tools --min-confidence 80
+      - name: Test contracts and rendering helpers
+        run: |
+          python -m pytest --cov-report=xml
           node --test tests/*.cjs
           node --check app.js
-          python3 scripts/build_site.py --output "${{ runner.temp }}/market-intel-check"
+          node --check summary-utils.js
+          python scripts/build_site.py --output "${{ runner.temp }}/market-intel-check"
+      - name: Audit dependencies and structure
+        run: |
+          pip-audit --strict --format json --output "${{ runner.temp }}/dependency-audit.json"
+          radon cc scripts -s -a
+          radon raw scripts -s
+          python tools/audit_structure.py --output "${{ runner.temp }}/structure.json"
+      - name: Preserve quality reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-reports
+          path: |
+            coverage.xml
+            ${{ runner.temp }}/dependency-audit.json
+            ${{ runner.temp }}/structure.json
+          if-no-files-found: ignore
   deploy:
     if: github.event_name != 'pull_request'
     needs: checks
