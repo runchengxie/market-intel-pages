@@ -66,6 +66,13 @@ def read_object(path: Path, label: str) -> dict:
     return value
 
 
+def validate_output_subdirectories(output_dir: Path) -> None:
+    for name in (".private-batches", "public"):
+        child = output_dir / name
+        if child.is_symlink() or child.resolve().parent != output_dir:
+            raise ValueError("output child directories must stay inside output and cannot be symlinks")
+
+
 def validate_paths(owner_cli: Path, data_root: Path, snapshot_root: Path, output_dir: Path) -> None:
     if not owner_cli.is_absolute() or not owner_cli.is_file() or not os.access(owner_cli, os.X_OK):
         raise ValueError("owner CLI must be an absolute executable path")
@@ -79,6 +86,7 @@ def validate_paths(owner_cli: Path, data_root: Path, snapshot_root: Path, output
     )
     if output.is_relative_to(repo) or repo.is_relative_to(output) or foreign_checkout:
         raise ValueError("output directory must be outside Git repositories")
+    validate_output_subdirectories(output)
 
 
 def validate_morning_inputs(data_root: Path, snapshot_root: Path, date: str) -> None:
@@ -157,7 +165,7 @@ def public_markdown(text: str, date: str, kind: str, generation_mode: str) -> st
     text = re.sub(r"(?m)^生成时间([:：])", r"原稿生成时间\1", text)
     text = re.sub(r"(?m)^# ", "## ", text)
     title = "收盘复盘" if kind == "evening" else "亚洲市场盘前 / 美股市场盘后"
-    timestamp = datetime.now(CHINA_TZ).strftime("%Y-%m-%d %H:%M:%S")
+    timestamp = datetime.now(CHINA_TZ).replace(tzinfo=None).isoformat(sep=" ", timespec="microseconds")
     notice = "本报告按计划生成，生成时间为本次实际运行时间。"
     if generation_mode == "backfill":
         notice = "本报告为历史数据补发，生成时间是本次重建时间，不代表当时已发布。"
@@ -170,6 +178,7 @@ def public_markdown(text: str, date: str, kind: str, generation_mode: str) -> st
 
 
 def publish_batch(output_dir: Path, stage: Path, texts: dict[str, str], date: str) -> Path:
+    validate_output_subdirectories(output_dir)
     public_stage = stage / "public"
     public_stage.mkdir()
     relative = Path("public") / stage.name

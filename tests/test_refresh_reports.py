@@ -128,7 +128,7 @@ class RefreshReportsTests(unittest.TestCase):
             generated = next(
                 line.removeprefix("生成时间: ") for line in text.splitlines() if line.startswith("生成时间: ")
             )
-            timestamp = datetime.strptime(generated, "%Y-%m-%d %H:%M:%S")
+            timestamp = datetime.strptime(generated, "%Y-%m-%d %H:%M:%S.%f")
             now = datetime.now(timezone(timedelta(hours=8))).replace(tzinfo=None)
             self.assertLess(abs((now - timestamp).total_seconds()), 15)
         old_markdown = self.public_files()
@@ -151,6 +151,34 @@ class RefreshReportsTests(unittest.TestCase):
             self.assertEqual(str(self.snapshots), call["env"]["CROSS_MARKET_SNAPSHOT_ROOT"])
             self.assertTrue(Path(call["env"]["A_SHARE_OUTPUT_DIR"]).is_relative_to(self.output))
         self.assertTrue(list(self.output.glob(".private-batches/**/*.stderr.log")))
+
+    def test_public_timestamps_preserve_actual_microseconds_within_one_second(self):
+        earlier = datetime(2026, 9, 19, 15, 30, 0, 123456, tzinfo=timezone(timedelta(hours=8)))
+        later = earlier.replace(microsecond=234567)
+        with patch.object(self.module, "datetime") as clock:
+            clock.now.side_effect = [earlier, later]
+            evening = self.module.public_markdown("## 20260918 盘后点评", "2026-09-18", "evening", "backfill")
+            morning = self.module.public_markdown("# 盘前（2026-09-18）", "2026-09-18", "morning", "backfill")
+        self.assertIn("生成时间: 2026-09-19 15:30:00.123456", evening)
+        self.assertIn("生成时间: 2026-09-19 15:30:00.234567", morning)
+
+    def test_output_rejects_private_and_public_symlinks_before_running_owner(self):
+        cases = [(".private-batches", False), (".private-batches", True), ("public", False), ("public", True)]
+        for index, (name, dangling) in enumerate(cases):
+            with self.subTest(name=name, dangling=dangling):
+                foreign = self.base / f"foreign-repo-{index}"
+                (foreign / ".git").mkdir(parents=True)
+                self.output = self.base / f"out-{index}"
+                self.output.mkdir()
+                calls = self.base / "calls.jsonl"
+                calls.unlink(missing_ok=True)
+                target = self.base / f"missing-target-{index}" if dangling else foreign
+                (self.output / name).symlink_to(target, target_is_directory=True)
+                with self.assertRaisesRegex(ValueError, "output"):
+                    self.run_refresh()
+                self.assertFalse(calls.exists())
+                self.assertEqual([".git"], sorted(path.name for path in foreign.iterdir()))
+                self.assertFalse((self.output / "manifest.json").exists())
 
     def test_failed_second_kind_preserves_last_good_manifest_and_markdown(self):
         manifest = self.run_refresh().read_bytes()
