@@ -10,7 +10,7 @@
 - 09-19 的恢复回执：daily_market、minute_market、current_contract 对 09-18 健康；report_datasets 为 not_installed；morning_model 为 disabled_by_configuration，morning_report 为 disabled_dependency；evening_report 为 waiting_source_window。
 - 禁用 morning_model 是部署仓库中的显式配置。恢复它涉及现有产品和模型职责，不能把它当作一个遗忘启动的任务。这次不改变该配置，也不调用带 --notify 的恢复入口。
 - 现行数据目录的晨报产物中，09-18 的 morning_manifest.json 为零字节，且没有对应 Markdown。上游 morning_pipeline.sh 使用直接重定向写 manifest，失败时会先清空文件。需要在部署 owner 单独修复为临时文件生成、校验、原子替换，并排查该次生产命令失败原因；网站导入器会拒收缺内容或缺时间的报告。
-- 初次盘点时 GitHub 仓库没有模型 Secret；09-19 已由用户配置 GEMINI_API_KEY，真实调用正在验收。原有简评是人工审核样例，不能据此认为在线 MiniMax 已经运行。
+- 初次盘点时 GitHub 仓库没有模型 Secret；09-19 已由用户配置 GEMINI_API_KEY。首轮 gemini-2.5-flash 实际返回 404 NOT_FOUND，切换 gemini-3.8-flash 后已生成并发布一条基于 09-14 材料的历史回放，引用和数字校验通过。运行回执：https://github.com/runchengxie/market-intel-pages/actions/runs/35420008327 。原有简评是人工审核样例，不能据此认为在线 MiniMax 已经运行。
 
 ## 方案比较
 
@@ -83,7 +83,7 @@ python3 scripts/build_site.py --output /path/to/site-artifact
 
 ## Gemini 与对比评估
 
-仓库 Secret：`GEMINI_API_KEY`；可选变量 `GEMINI_MODEL`、`INSIGHT_PROVIDER=gemini|minimax`。默认模型是可配置的 `gemini-2.5-flash`，不把模型名写进浏览器。切换 MiniMax 时使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。提供方 429/5xx/连接错误最多三次尝试；认证失败不重试。失败只记录错误类型、HTTP 状态码及白名单中的 API 错误代码，不把请求 URL、服务端正文或密钥写入网页。
+仓库 Secret：`GEMINI_API_KEY`；可选变量 `GEMINI_MODEL`、`INSIGHT_PROVIDER=gemini|minimax`。默认模型是已通过真实调用验证的 `gemini-3.8-flash`，可用变量覆盖；浏览器不发起模型调用。切换 MiniMax 时使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。提供方 429/5xx/连接错误最多三次尝试；认证失败不重试。失败只记录错误类型、HTTP 状态码及白名单中的 API 错误代码，不把请求 URL、服务端正文或密钥写入网页。
 
 模型结构化输出能力： https://ai.google.dev/gemini-api/docs/structured-output
 
@@ -107,5 +107,7 @@ https://github.com/Mai-with-u/MaiBot
 本地 `--archive-dir` 保存不可覆盖的 insights、outcomes、report_revisions。报告修订保留旧版本；结果更新另存回执。网页只保留当前窗口内可引用证据，私有全量记录不进入 Pages。
 
 Actions 额外上传版本与结果 artifact，保留 90 天。这是中转备份，不是永久档案；若使用云端生成，应在到期前下载到私有全量归档。对长期运行，更推荐本地生成并直接写永久归档，然后让 Pages 消费经过审核的快照。
+
+09-19 首条真实解读的 artifact 已下载到服务器私有归档 `actions-ledgers/35420008327/`，位于 `/home/richard/code/.research-data/quant-market-intel-archive/` 下。后续 artifact 的持续同步仍需纳入生产调度，单次下载不等于已建立永久自动同步。
 
 下一阶段可增加主题/事件/观点/结果的结构化表、按时间和来源检索、相似案例与反例各自召回。风格偏好单独存储，不从聊天用语自动更新事实或投资立场。数字概率只有在定义事件、预测窗口和校准方法之后才引入。异常事件点评另设去重、冷却和来源确认，不与每日准点产出混成一个无限运行的 agent。

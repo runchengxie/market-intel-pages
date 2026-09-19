@@ -1,6 +1,6 @@
 {
   "schema_version": "market_intel_pages.insights.v1",
-  "generation": {"status": "not_configured", "provider": "gemini", "model": "gemini-2.5-flash"},
+  "generation": {"status": "not_configured", "provider": "gemini", "model": "gemini-3.8-flash"},
   "insights": [],
   "outcomes": []
 }

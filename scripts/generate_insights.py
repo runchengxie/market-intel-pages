@@ -21,7 +21,7 @@ except ImportError:
 
 SCHEMA = "market_intel_pages.insights.v1"
 PROMPT_VERSION = "market-insight-v1"
-DEFAULT_MODELS = {"gemini": "gemini-2.5-flash", "minimax": "MiniMax-M2.7"}
+DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "minimax": "MiniMax-M2.7"}
 
 
 def write_json(path: Path, payload: dict) -> None:
