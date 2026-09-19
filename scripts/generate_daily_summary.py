@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -117,21 +118,41 @@ def _load_published_history(url: str | None) -> list[dict]:
         return []
 
 
+def summary_source_hash(morning: dict, evening: dict) -> str:
+    return hashlib.sha256(json.dumps([morning, evening], ensure_ascii=False,
+                                    sort_keys=True).encode()).hexdigest()
+
+
+def current_summaries(reports: list[dict], history: list[dict]) -> list[dict]:
+    by_id = {row["id"]: row for row in reports}
+    valid = []
+    for row in history:
+        morning = by_id.get(row.get("morning_report_id"))
+        evening = by_id.get(row.get("evening_report_id"))
+        if morning and evening and row.get("source_hash") == summary_source_hash(morning, evening):
+            valid.append(row)
+    return valid
+
+
 def run(reports_path: Path, summaries_path: Path, output_path: Path, api_key: str | None,
         model: str = "MiniMax-M2.7", force: bool = False, history_url: str | None = None) -> str:
     reports = _read_index(reports_path).get("reports", [])
-    history = _read_index(summaries_path).get("summaries", [])
-    published_history = _load_published_history(history_url)
+    history = current_summaries(reports, _read_index(summaries_path).get("summaries", []))
+    published_history = current_summaries(reports, _load_published_history(history_url))
     merged = {(row.get("morning_report_id"), row.get("evening_report_id")): row for row in history}
     merged.update({(row.get("morning_report_id"), row.get("evening_report_id")): row for row in published_history})
-    history = list(merged.values())
+    history = current_summaries(reports, list(merged.values()))
     pair = select_source_pair(reports)
     status = "no eligible source pair"
     if pair and api_key:
         morning, evening = pair
         pair_ids = (morning["id"], evening["id"])
+        fingerprint = hashlib.sha256(json.dumps(
+            {"sources": [morning, evening], "model": model, "prompt_version": PROMPT_VERSION,
+             "prompt": (Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md").read_text(encoding="utf-8")},
+            ensure_ascii=False, sort_keys=True).encode()).hexdigest()
         existing = next((item for item in history if (item.get("morning_report_id"), item.get("evening_report_id")) == pair_ids), None)
-        if existing and not force:
+        if existing and existing.get("fingerprint") == fingerprint and not force:
             status = "reused existing summary"
         else:
             try:
@@ -142,6 +163,8 @@ def run(reports_path: Path, summaries_path: Path, output_path: Path, api_key: st
                     "morning_report_id": morning["id"], "evening_report_id": evening["id"],
                     "generated_at": datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
                     "model": model, "prompt_version": PROMPT_VERSION,
+                    "fingerprint": fingerprint,
+                    "source_hash": summary_source_hash(morning, evening),
                 }
                 history = [item for item in history if (item.get("morning_report_id"), item.get("evening_report_id")) != pair_ids]
                 history.append(record)

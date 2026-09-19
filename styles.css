@@ -280,3 +280,36 @@ button, input { font: inherit; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
 }
+/* Evidence-led market journal. */
+.data-health { margin: 0 0 24px; padding: 14px 18px; border: 1px solid #d2dcd2; border-radius: 10px; background: #edf3ec; color: #344b3c; font-size: 13px; line-height: 1.8; }
+.data-health.is-delayed { background: #fcf3e3; border-color: #e7cf9f; color: #785529; }
+.market-insights { margin-bottom: 32px; }
+.insight-status, .insight-meta { color: #6a706a; font-size: 12px; line-height: 1.8; }
+.insight-status { margin: 12px 0 18px; }
+.insight-card { margin: 0 0 20px; padding: 26px; border: 1px solid #d8dcd4; border-radius: 14px; background: #fffef9; }
+.insight-overview { font-size: 20px; line-height: 1.7; font-weight: 600; color: #273b32; margin: 12px 0; }
+.insight-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin: 22px 0; }
+.insight-section h4, .verification h4 { margin: 0 0 12px; color: #354b3e; font-size: 14px; }
+.insight-section p { line-height: 1.9; font-size: 14px; margin-bottom: 8px; }
+.evidence-details { color: #59665c; font-size: 12px; margin: 6px 0 16px; }
+.evidence-details summary, .quality-notes summary { cursor: pointer; padding: 5px 0; }
+.evidence-item { margin-top: 10px; border-left: 2px solid #c6d2bf; padding: 4px 12px; }
+.evidence-item p { font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.evidence-label { color: #737b72; font-size: 11px; overflow-wrap: anywhere; }
+.verification { border-top: 1px solid #e2e5dd; padding-top: 20px; }
+.watchpoint { padding: 12px 0; }
+.watch-question { margin: 8px 0 4px; font-size: 14px; }
+.watch-condition { color: #535f55; font-size: 13px; margin: 0; }
+.outcome-badge { display: inline-block; padding: 3px 8px; border-radius: 5px; background: #efeee7; color: #5a6159; font-size: 11px; }
+.outcome-badge.met { background: #e8f0e6; color: #36573a; }
+.outcome-badge.not_met, .outcome-badge.unverifiable { background: #f7ecd8; color: #846333; }
+.quality-notes { border-top: 1px solid #e2e5dd; padding-top: 12px; font-size: 12px; color: #786346; }
+.quality-notes p { line-height: 1.8; overflow-wrap: anywhere; }
+.replay-label { background: #f1eee6; padding: 8px 12px; font-size: 12px; color: #76664f; line-height: 1.8; }
+@media (max-width: 700px) {
+  .insight-columns { grid-template-columns: 1fr; gap: 10px; }
+  .insight-card { padding: 18px; }
+  .insight-overview { font-size: 18px; }
+  .market-insights .notes-heading { align-items: flex-start; flex-direction: column; gap: 8px; }
+  .market-insights .notes-source { max-width: none; text-align: left; }
+}

@@ -8,7 +8,8 @@
       "evening_report_id": "2026-09-14-evening",
       "generated_at": "2026-09-16T00:26:00+08:00",
       "model": "chatgpt-reviewed",
-      "prompt_version": "daily-note-v1"
+      "prompt_version": "daily-note-v1",
+      "source_hash": "736e69890d5495d6c4e33d05fe399ce6ae08e8a443eb1b2a791da83dec43c964"
     }
   ]
 }

@@ -1,6 +1,9 @@
 const state = {
   reports: [],
   summaries: [],
+  insights: [],
+  outcomes: [],
+  generation: {},
   kind: "all",
   date: "",
 };
@@ -31,6 +34,7 @@ function dateLabel(value) {
 
 function renderReport(report) {
   const article = makeElement("article", "report-card");
+  article.id = report.id;
   const head = makeElement("div", "report-meta");
   const kind = report.kind === "morning" ? "晨报" : "晚报";
   head.append(
@@ -51,7 +55,7 @@ function renderReport(report) {
     }
     body.append(sectionElement);
   }
-  if (report.source_url) {
+  if (/^reports\/[a-zA-Z0-9._-]+\.md$/.test(report.source_url ?? "")) {
     const source = makeElement("a", "source-link", "查看完整原文（Markdown）");
     source.href = report.source_url;
     source.setAttribute("download", "");
@@ -99,6 +103,7 @@ function populateDateFilter() {
 function render() {
   const reports = visibleReports();
   renderDailySummaries();
+  renderInsights();
   reportList.replaceChildren(...reports.map(renderReport));
   emptyState.hidden = reports.length !== 0;
   document.querySelector("#section-title").textContent = state.date
@@ -113,6 +118,119 @@ function render() {
     : state.kind === "all" ? "LATEST EDITION" : "DAILY EDITION";
 }
 
+function timestampLabel(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "时间未提供";
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit",
+  }).format(date);
+}
+
+function evidenceDetails(refs, evidence) {
+  const details = makeElement("details", "evidence-details");
+  details.append(makeElement("summary", "", "查看依据"));
+  for (const ref of refs ?? []) {
+    const item = evidence.find((entry) => entry.id === ref);
+    if (!item) continue;
+    const box = makeElement("div", "evidence-item");
+    box.append(makeElement("span", "evidence-label", `${item.report_id} · ${item.section}`),
+      makeElement("p", "", item.text));
+    const report = state.reports.find((row) => row.id === item.report_id);
+    if (report && /^reports\/[a-zA-Z0-9._-]+\.md$/.test(report.source_url ?? "")) {
+      const source = makeElement("a", "source-link", "原报告");
+      source.href = report.source_url;
+      box.append(source);
+    }
+    details.append(box);
+  }
+  return details;
+}
+
+function renderInsight(note) {
+  const card = makeElement("article", "insight-card");
+  card.append(makeElement("div", "daily-note-date", dateLabel(note.date)),
+    makeElement("p", "insight-overview", note.analysis.overview.text),
+    evidenceDetails(note.analysis.overview.evidence_ids, note.evidence));
+  const meta = `信息截至 ${timestampLabel(note.as_of)} · 解读生成 ${timestampLabel(note.generated_at)}（北京时间）`;
+  card.append(makeElement("p", "insight-meta", meta));
+  if (note.generation_mode === "retrospective") {
+    card.append(makeElement("p", "replay-label", "历史材料回放：按当时信息重建解读，不计作当日预测记录。"));
+  }
+  const columns = makeElement("div", "insight-columns");
+  for (const [key, title] of [["changes", "值得留意的变化"], ["tensions", "还没得到确认的地方"]]) {
+    const section = makeElement("section", "insight-section");
+    section.append(makeElement("h4", "", title));
+    for (const claim of note.analysis[key]) {
+      section.append(makeElement("p", "", claim.text), evidenceDetails(claim.evidence_ids, note.evidence));
+    }
+    columns.append(section);
+  }
+  card.append(columns);
+  const verification = makeElement("section", "verification");
+  verification.append(makeElement("h4", "", "留给下一份晚报的问题"));
+  const labels = { pending: "待验证", met: "条件满足", not_met: "条件未满足", unverifiable: "数据不足，无法验证" };
+  if (!note.analysis.watchpoints.length) verification.append(makeElement("p", "", "当前材料没有可直接核对的指标。"));
+  note.analysis.watchpoints.forEach((point, index) => {
+    const metric = note.metrics[point.metric];
+    const outcome = state.outcomes.find((item) => item.insight_id === note.id && item.watchpoint_index === index);
+    const row = makeElement("div", "watchpoint");
+    row.append(makeElement("span", `outcome-badge ${outcome?.status ?? "pending"}`, labels[outcome?.status ?? "pending"]),
+      makeElement("p", "watch-question", point.question),
+      makeElement("p", "watch-condition", `${metric.label} ${point.operator} ${point.threshold}${metric.unit}`));
+    if (outcome?.report_id) {
+      row.append(makeElement("p", "insight-meta", `核对 ${outcome.observed_date} 晚报${outcome.observed_value !== null ? `：${outcome.observed_value}${metric.unit}` : ""}`));
+      if (outcome.evidence?.length) row.append(evidenceDetails(outcome.evidence_ids, outcome.evidence));
+    }
+    verification.append(row);
+  });
+  verification.append(makeElement("p", "insight-meta", "条件核对不等于收益预测；原判断保留，后续结果另记。"));
+  card.append(verification);
+  if (note.quality_warnings.length) {
+    const quality = makeElement("details", "quality-notes");
+    quality.append(makeElement("summary", "", `数据缺项与限制（${note.quality_warnings.length}）`));
+    for (const warning of note.quality_warnings) quality.append(makeElement("p", "", warning));
+    card.append(quality);
+  }
+  return card;
+}
+
+function renderInsights() {
+  const notes = window.marketIntelUtils.selectVisibleInsights(state.insights, state.reports, state.date);
+  document.querySelector("#insight-list").replaceChildren(...notes.map(renderInsight));
+  const messages = {
+    not_configured: "深度解读尚未启用，原始报告与简评可继续查看。",
+    no_source_pair: "晨晚报材料尚未齐备，暂不生成深度解读。",
+    unavailable: "本期深度解读暂时无法生成，已保留可核对的历史记录。",
+    load_failed: "深度解读暂时无法读取，原始报告可继续查看。",
+  };
+  document.querySelector("#insight-status").textContent = messages[state.generation.status]
+    ?? (notes.length ? "解读是基于下列材料的判断，展开依据可核对原文。" : "所选日期暂无深度解读。");
+}
+
+function renderHealth(health) {
+  const box = document.querySelector("#data-health");
+  if (!health) {
+    box.textContent = "数据时效暂时无法核对，请查看原报告生成时间。";
+    box.classList.add("is-delayed");
+    return;
+  }
+  const elapsed = (Date.now() - new Date(health.latest_source_generated_at).getTime()) / 3600000;
+  const delayed = ["stale", "behind", "missing", "invalid_timestamp"].includes(health.status)
+    || (Number.isFinite(elapsed) && elapsed > health.max_age_hours);
+  box.classList.toggle("is-delayed", delayed);
+  box.textContent = `数据目标 ${health.latest_target_date ?? "未提供"} · 原报告生成 ${timestampLabel(health.latest_source_generated_at)}（北京时间）。`
+    + (delayed ? " 已较长时间未更新或有数据缺口，请结合交易日历核对。" : "")
+    + (!health.pair_available ? " 晨晚报配对尚不完整。" : "");
+}
+
+async function optionalIndex(path, schema) {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) throw new Error("optional index unavailable");
+  const payload = await response.json();
+  if (payload.schema_version !== schema) throw new Error("unsupported optional index");
+  return payload;
+}
+
 async function loadReports() {
   try {
     const response = await fetch("data/reports.json", { cache: "no-store" });
@@ -122,6 +240,18 @@ async function loadReports() {
       throw new Error("unsupported report index");
     }
     state.reports = [...data.reports].sort((a, b) => b.date.localeCompare(a.date));
+    const [insights, health] = await Promise.allSettled([
+      optionalIndex("data/insights.json", "market_intel_pages.insights.v1"),
+      optionalIndex("data/health.json", "market_intel_pages.health.v1"),
+    ]);
+    if (insights.status === "fulfilled" && Array.isArray(insights.value.insights)) {
+      state.insights = insights.value.insights;
+      state.outcomes = insights.value.outcomes ?? [];
+      state.generation = insights.value.generation ?? {};
+    } else {
+      state.generation = { status: "load_failed" };
+    }
+    renderHealth(health.status === "fulfilled" ? health.value : null);
     try {
       const summaryResponse = await fetch("data/daily_summaries.json", { cache: "no-store" });
       if (summaryResponse.ok) {

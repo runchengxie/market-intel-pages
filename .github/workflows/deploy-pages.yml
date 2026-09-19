@@ -1,6 +1,7 @@
 name: Deploy GitHub Pages
 
 on:
+  pull_request:
   push:
     branches: [main]
   workflow_dispatch:
@@ -10,16 +11,33 @@ on:
         required: false
         default: false
         type: boolean
+      force_insights:
+        description: Regenerate evidence-linked commentary
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: github-pages
+  group: github-pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate contracts and rendering helpers
+        run: |
+          python3 -m unittest discover -s tests
+          node --test tests/*.cjs
+          node --check app.js
+          python3 scripts/build_site.py --output "${{ runner.temp }}/market-intel-check"
   deploy:
+    if: github.event_name != 'pull_request'
+    needs: checks
     permissions:
       contents: read
       pages: write
@@ -47,6 +65,27 @@ jobs:
           force_flag=""
           if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
           python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
+      - name: Generate evidence-linked commentary
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
+          INSIGHT_PROVIDER: ${{ vars.INSIGHT_PROVIDER || 'gemini' }}
+          FORCE_INSIGHTS: ${{ inputs.force_insights }}
+          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+          LEDGER_OUTPUT: ${{ runner.temp }}/market-intel-ledger
+        run: |
+          force_flag=""
+          if [ "$FORCE_INSIGHTS" = "true" ]; then force_flag="--force"; fi
+          python3 scripts/generate_insights.py --reports data/reports.json --history data/insights.json --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag
+      - name: Preserve commentary revisions and verification receipts
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-intel-ledger-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/market-intel-ledger
+          if-no-files-found: ignore
+          retention-days: 90
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
