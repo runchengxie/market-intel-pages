@@ -30,7 +30,14 @@ function selectVisibleReports(reports, selectedDate, kind) {
     });
 }
 
-const summaryUtils = { selectVisibleSummaries, selectVisibleReports };
+function selectVisibleInsights(insights, reports, selectedDate) {
+  const ids = new Set(reports.map((report) => report.id));
+  return selectVisibleSummaries(insights, reports, selectedDate)
+    .filter((insight) => Array.isArray(insight.source_report_ids)
+      && insight.source_report_ids.every((id) => ids.has(id)));
+}
+
+const summaryUtils = { selectVisibleSummaries, selectVisibleReports, selectVisibleInsights };
 if (typeof module !== "undefined" && module.exports) {
   module.exports = summaryUtils;
 } else {

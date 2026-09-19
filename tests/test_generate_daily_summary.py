@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import patch
 
-from scripts.generate_daily_summary import generate_summary, run, validate_summary
+from scripts.generate_daily_summary import generate_summary, run, validate_summary, summary_source_hash
 
 from scripts.generate_daily_summary import select_source_pair
 
@@ -69,6 +69,65 @@ class SummaryValidationTests(unittest.TestCase):
 
 
 class GenerationHistoryTests(unittest.TestCase):
+    @patch("scripts.generate_daily_summary._load_published_history")
+    def test_unpinned_remote_history_cannot_replace_verified_local_note(self, published):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rp, sp = root / "reports.json", root / "summaries.json"
+            evening = report("e", "2026-09-14", "evening", "2026-09-14 19:00")
+            morning = report("m", "2026-09-14", "morning", "2026-09-15 07:00")
+            rp.write_text(json.dumps({"reports": [evening, morning]}))
+            local = {"date": "2026-09-14", "text": "已校验内容", "morning_report_id": "m", "evening_report_id": "e",
+                     "source_hash": summary_source_hash(morning, evening)}
+            sp.write_text(json.dumps({"summaries": [local]}))
+            remote = {key: value for key, value in local.items() if key != "source_hash"}
+            remote["text"] = "旧的未校验内容"
+            published.return_value = [remote]
+            run(rp, sp, sp, None, history_url="https://pages.invalid/history.json")
+            self.assertEqual("已校验内容", json.loads(sp.read_text(encoding="utf-8"))["summaries"][0]["text"])
+
+    @patch("scripts.generate_daily_summary.generate_summary", return_value="上涨率 56.3%。")
+    def test_revised_source_removes_old_note_when_provider_is_unavailable(self, generate):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rp, sp = root / "reports.json", root / "summaries.json"
+            rows = [report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                    report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            rows[0]["sections"][0]["paragraphs"].append("上涨率 56.3%")
+            rp.write_text(json.dumps({"reports": rows}))
+            sp.write_text(json.dumps({"summaries": []}))
+            run(rp, sp, sp, "key")
+            rows[0]["sections"][0]["paragraphs"][-1] = "上涨率 30.0%"
+            rp.write_text(json.dumps({"reports": rows}))
+            run(rp, sp, sp, None)
+            self.assertEqual([], json.loads(sp.read_text(encoding="utf-8"))["summaries"])
+
+    @patch("scripts.generate_daily_summary.generate_summary", return_value="观察成交变化。")
+    def test_source_revision_invalidates_cached_note(self, generate):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = [report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                       report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
+            rp, sp = root / "reports.json", root / "summaries.json"
+            rp.write_text(json.dumps({"reports": reports}))
+            sp.write_text(json.dumps({"summaries": []}))
+            run(rp, sp, sp, "key")
+            reports[0]["sections"][0]["paragraphs"].append("上涨率 56.3%")
+            rp.write_text(json.dumps({"reports": reports}))
+            self.assertEqual("generated summary", run(rp, sp, sp, "key"))
+
+    @patch("scripts.generate_daily_summary.generate_summary", return_value="观察成交变化。")
+    def test_model_change_invalidates_cached_note(self, generate):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rp, sp = root / "reports.json", root / "summaries.json"
+            rp.write_text(json.dumps({"reports": [
+                report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
+                report("m", "2026-09-14", "morning", "2026-09-15 07:00")]}))
+            sp.write_text(json.dumps({"summaries": []}))
+            run(rp, sp, sp, "key", model="old")
+            self.assertEqual("generated summary", run(rp, sp, sp, "key", model="new"))
+
     def test_missing_key_preserves_history_without_adding_summary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -77,7 +136,7 @@ class GenerationHistoryTests(unittest.TestCase):
                        report("e", "2026-09-14", "evening", "2026-09-14 19:00"),
                        report("m", "2026-09-14", "morning", "2026-09-15 07:00")]
             history = [{"date": "2026-09-13", "text": "existing", "morning_report_id": "old-m",
-                        "evening_report_id": "old-e"}]
+                        "evening_report_id": "old-e", "source_hash": summary_source_hash(reports[1], reports[0])}]
             (root / "reports.json").write_text(json.dumps({"reports": reports}))
             (root / "summaries.json").write_text(json.dumps({"summaries": history}))
             output = root / "out.json"
@@ -112,7 +171,9 @@ class GenerationHistoryTests(unittest.TestCase):
 
             def read(self):
                 return json.dumps({"schema_version": "market_intel_pages.daily_summaries.v1", "summaries": [
-                    {"date": "2026-09-13", "text": "previous", "morning_report_id": "old-m", "evening_report_id": "old-e"}
+                    {"date": "2026-09-13", "text": "previous", "morning_report_id": "old-m", "evening_report_id": "old-e",
+                     "source_hash": summary_source_hash(report("old-m", "2026-09-13", "morning", "2026-09-14 07:00"),
+                                                        report("old-e", "2026-09-12", "evening", "2026-09-12 19:00"))}
                 ]}).encode()
 
         open_url.return_value = Response()

@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { selectVisibleSummaries, selectVisibleReports } = require("../summary-utils.js");
+const { selectVisibleInsights } = require("../summary-utils.js");
 
 function report(date, kind) {
   return { id: `${date}-${kind}`, date, kind };
@@ -14,6 +15,15 @@ function note(date, eveningDate = date) {
     evening_report_id: `${eveningDate}-evening`,
   };
 }
+
+test("insight navigation excludes missing source reports", () => {
+  const reports = [report("2026-09-14", "morning"), report("2026-09-14", "evening")];
+  const records = [
+    { ...note("2026-09-14"), source_report_ids: ["2026-09-14-morning", "2026-09-14-evening"] },
+    { ...note("2026-09-14"), source_report_ids: ["missing"] },
+  ];
+  assert.deepEqual(selectVisibleInsights(records, reports, ""), [records[0]]);
+});
 
 test("default view returns summaries for at most five latest report dates", () => {
   const reports = [];

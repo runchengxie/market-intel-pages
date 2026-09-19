@@ -1,0 +1,200 @@
+"""Generate evidence-linked commentary; preserve revisions in a private archive."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from datetime import datetime
+from pathlib import Path
+from urllib.request import urlopen
+
+try:
+    from .generate_daily_summary import CHINA_TZ, select_source_pair
+    from .insight_contract import build_context, evaluate_watchpoints, validate_analysis, source_hash
+    from .insight_provider import generate
+except ImportError:
+    from generate_daily_summary import CHINA_TZ, select_source_pair
+    from insight_contract import build_context, evaluate_watchpoints, validate_analysis, source_hash
+    from insight_provider import generate
+
+SCHEMA = "market_intel_pages.insights.v1"
+PROMPT_VERSION = "market-insight-v1"
+DEFAULT_MODELS = {"gemini": "gemini-2.5-flash", "minimax": "MiniMax-M2.7"}
+
+
+def write_json(path: Path, payload: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def archive_once(archive: Path, category: str, record: dict) -> None:
+    raw = json.dumps(record, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    digest = hashlib.sha256(raw.encode()).hexdigest()
+    path = archive / category / f"{digest}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8") as file:
+            file.write(raw)
+    except FileExistsError:
+        if path.read_text(encoding="utf-8") != raw:
+            raise ValueError("archive hash collision")
+
+
+def _history(path: Path | None) -> list[dict]:
+    if path is None or not path.exists():
+        return []
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if payload.get("schema_version") != SCHEMA or not isinstance(payload.get("insights"), list):
+        raise ValueError("invalid insight history")
+    return payload["insights"]
+
+
+def _valid_history(history: list[dict], reports: list[dict]) -> list[dict]:
+    by_id = {r["id"]: r for r in reports}
+    valid = []
+    for record in history:
+        try:
+            original_hashes = record.get("source_hashes", {})
+            selected = [r for r in reports if r["id"] in original_hashes] if original_hashes else reports
+            context = build_context(selected, by_id[record["morning_report_id"]], by_id[record["evening_report_id"]])
+            changed = any(source_hash([r]) != original_hashes[r["id"]] for r in selected) if original_hashes else record["source_hash"] != context["source_hash"]
+            if (changed or record["as_of"] != context["as_of"]
+                    or record["date"] != context["date"]):
+                continue
+            validate_analysis(record["analysis"], context)
+            # Reconstruct trusted evidence from current sources, not cached remote text.
+            valid.append({**record, "evidence": context["evidence"], "metrics": context["metrics"],
+                          "source_report_ids": context["source_report_ids"],
+                          "quality_warnings": context["quality_warnings"]})
+        except (KeyError, ValueError, TypeError, AttributeError):
+            continue
+    return valid
+
+
+def archive_verification(archive: Path, reports: list[dict]) -> None:
+    """Keep checking every saved opinion, including replaced and expired ones."""
+    index_path = archive / "verification_sources.json"
+    previous = json.loads(index_path.read_text(encoding="utf-8")).get("reports", []) if index_path.exists() else []
+    merged = {row["id"]: row for row in previous}
+    merged.update({row["id"]: row for row in reports})
+    archive_once(archive, "report_snapshots", {"reports": reports})
+    write_json(index_path, {"schema_version": "market_intel_pages.reports.v1", "reports": list(merged.values())})
+    originals = {}
+    for path in (archive / "insights").glob("*.json"):
+        note = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            validate_analysis(note["analysis"], note)
+            if note["id"] not in originals or len(note["evidence"]) > len(originals[note["id"]]["evidence"]):
+                originals[note["id"]] = note
+        except (ValueError, KeyError, TypeError, AttributeError):
+            continue
+    for outcome in evaluate_watchpoints(list(originals.values()), list(merged.values())):
+        if outcome["status"] != "pending":
+            archive_once(archive, "outcomes", outcome)
+
+
+def run(reports_path: Path, output_path: Path, *, provider="gemini", model=None, api_key=None,
+        history_path=None, archive_dir=None, force=False, generator=generate, history_url=None) -> dict:
+    if provider not in DEFAULT_MODELS:
+        raise ValueError("unsupported provider")
+    model = model or DEFAULT_MODELS[provider]
+    data = json.loads(reports_path.read_text(encoding="utf-8"))
+    if data.get("schema_version") != "market_intel_pages.reports.v1" or not isinstance(data.get("reports"), list):
+        raise ValueError("invalid report index")
+    reports = data["reports"]
+    if archive_dir:
+        archive_dir = Path(archive_dir).resolve()
+        if archive_dir.is_relative_to(Path(__file__).resolve().parent.parent):
+            raise ValueError("archive must be outside the public repository")
+    history = _history(history_path or output_path)
+    history_warning = None
+    if history_url:
+        if not history_url.startswith("https://"):
+            raise ValueError("history URL must use HTTPS")
+        try:
+            with urlopen(history_url, timeout=10) as response:
+                published = json.loads(response.read(2_000_000))
+            if published.get("schema_version") == SCHEMA and isinstance(published.get("insights"), list):
+                history.extend(published["insights"])
+        except (OSError, ValueError, AttributeError):
+            history_warning = "published_history_unavailable"
+    if archive_dir:
+        for record in history:
+            archive_once(archive_dir, "insights", record)
+    history = _valid_history(history, reports)
+    history = list({r["id"]: r for r in history}.values())
+    pair = select_source_pair(reports)
+    now = datetime.now(CHINA_TZ).isoformat(timespec="seconds")
+    generation = {"status": "no_source_pair", "provider": provider, "model": model, "checked_at": now}
+    if history_warning:
+        generation["history_warning"] = history_warning
+    if pair:
+        morning, evening = pair
+        context = build_context(reports, morning, evening)
+        prompt = (Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md").read_text(encoding="utf-8")
+        prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()
+        fingerprint = hashlib.sha256(json.dumps({"source_hash": context["source_hash"], "prompt": prompt,
+                                               "provider": provider, "model": model, "version": PROMPT_VERSION},
+                                              sort_keys=True).encode()).hexdigest()
+        generation["target_date"] = morning["date"]
+        existing = next((r for r in history if r.get("fingerprint") == fingerprint or (
+            r.get("morning_report_id") == morning["id"] and r.get("evening_report_id") == evening["id"]
+            and r.get("provider") == provider and r.get("model") == model
+            and r.get("prompt_hash") == prompt_hash and r.get("prompt_version") == PROMPT_VERSION
+            and set(context["source_report_ids"]) == set(r["source_report_ids"]))), None)
+        if existing and not force:
+            generation["status"] = "cached"
+        elif not api_key:
+            generation["status"] = "not_configured"
+        else:
+            try:
+                analysis = validate_analysis(generator(context, prompt, provider, model, api_key), context)
+                identity = hashlib.sha256(json.dumps([fingerprint, analysis, now], sort_keys=True).encode()).hexdigest()[:24]
+                record = {**context, "id": identity, "generated_at": now,
+                          "generation_mode": "retrospective" if (
+                              datetime.fromisoformat(now) - datetime.fromisoformat(context["as_of"])).total_seconds() > 3 * 3600 else "daily",
+                          "provider": provider, "model": model, "prompt_version": PROMPT_VERSION,
+                          "prompt_hash": prompt_hash, "fingerprint": fingerprint, "analysis": analysis}
+                if archive_dir:
+                    archive_once(archive_dir, "insights", record)
+                history = [r for r in history if r["date"] != record["date"]] + [record]
+                generation["status"] = "generated"
+            except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+                generation.update(status="unavailable", error_type=type(exc).__name__)
+    dates = sorted({r["date"] for r in reports}, reverse=True)[:5]
+    latest = {}
+    for row in sorted(history, key=lambda r: (r["generated_at"], r["id"])):
+        if row["date"] in dates:
+            latest[row["date"]] = row
+    insights = sorted(latest.values(), key=lambda r: r["date"], reverse=True)
+    outcomes = evaluate_watchpoints(insights, reports)
+    if archive_dir:
+        archive_verification(archive_dir, reports)
+    result = {"schema_version": SCHEMA, "generation": generation, "insights": insights, "outcomes": outcomes}
+    write_json(output_path, result)
+    return result
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--reports", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--history", type=Path)
+    parser.add_argument("--history-url")
+    parser.add_argument("--archive-dir", type=Path)
+    parser.add_argument("--provider", choices=DEFAULT_MODELS, default=os.environ.get("INSIGHT_PROVIDER", "gemini"))
+    parser.add_argument("--model")
+    parser.add_argument("--force", action="store_true")
+    args = parser.parse_args()
+    prefix = args.provider.upper()
+    result = run(args.reports, args.output, provider=args.provider,
+                 model=args.model or os.environ.get(f"{prefix}_MODEL"), api_key=os.environ.get(f"{prefix}_API_KEY"),
+                 history_path=args.history, history_url=args.history_url, archive_dir=args.archive_dir, force=args.force)
+    print(json.dumps(result["generation"], ensure_ascii=False))
+
+
+if __name__ == "__main__":
+    main()

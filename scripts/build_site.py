@@ -7,6 +7,17 @@ import json
 import shutil
 from pathlib import Path
 
+try:
+    from .pipeline_health import health_report
+    from .generate_insights import SCHEMA as INSIGHT_SCHEMA, _valid_history
+    from .insight_contract import evaluate_watchpoints
+    from .generate_daily_summary import current_summaries
+except ImportError:
+    from pipeline_health import health_report
+    from generate_insights import SCHEMA as INSIGHT_SCHEMA, _valid_history
+    from insight_contract import evaluate_watchpoints
+    from generate_daily_summary import current_summaries
+
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
@@ -51,6 +62,8 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
 
     if output == root or output.is_relative_to(root):
         raise ValueError("build output must be outside the repository")
+    if root.is_relative_to(output) or output == output.parent:
+        raise ValueError("build output must not contain the repository")
     if output.exists():
         shutil.rmtree(output)
     (output / "data").mkdir(parents=True)
@@ -58,7 +71,19 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
     for filename in STATIC_FILES:
         shutil.copy2(root / filename, output / filename)
     shutil.copy2(root / "data/reports.json", output / "data/reports.json")
-    shutil.copy2(summaries_path, output / "data/daily_summaries.json")
+    summary_data["summaries"] = current_summaries(reports, summaries)
+    (output / "data/daily_summaries.json").write_text(json.dumps(summary_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    health = health_report(report_data)
+    (output / "data/health.json").write_text(json.dumps(health, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    insight_path = root / "data/insights.json"
+    insights = {"schema_version": INSIGHT_SCHEMA, "generation": {"status": "not_configured"}, "insights": [], "outcomes": []}
+    if insight_path.exists():
+        candidate = json.loads(insight_path.read_text(encoding="utf-8"))
+        if candidate.get("schema_version") != INSIGHT_SCHEMA:
+            raise ValueError("unsupported insight index")
+        insights = {**candidate, "insights": _valid_history(candidate.get("insights", []), reports)}
+        insights["outcomes"] = evaluate_watchpoints(insights["insights"], reports)
+    (output / "data/insights.json").write_text(json.dumps(insights, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
     for report in reports:
         source_url = report.get("source_url")

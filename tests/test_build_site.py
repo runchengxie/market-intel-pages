@@ -46,6 +46,14 @@ def create_site(root: Path, session_count: int = 6) -> None:
 
 
 class BuildSiteTests(unittest.TestCase):
+    def test_build_emits_health_and_optional_insights(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        build_site(self.root, self.output)
+        health = json.loads((self.output / "data/health.json").read_text())
+        self.assertEqual("missing", health["status"])
+        self.assertEqual("market_intel_pages.insights.v1", json.loads(
+            (self.output / "data/insights.json").read_text())["schema_version"])
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
         self.directory = Path(self.temp.name)
