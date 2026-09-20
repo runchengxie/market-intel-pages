@@ -7,3 +7,7 @@ _site/
 .coverage*
 coverage.xml
 htmlcov/
+
+.env
+.env.*
+!.env.example
