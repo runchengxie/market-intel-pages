@@ -13,7 +13,7 @@ SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 def create_site(root: Path, session_count: int = 6) -> None:
     (root / "data").mkdir(parents=True)
     (root / "reports").mkdir()
-    for name in ("index.html", "app.js", "styles.css", "summary-utils.js"):
+    for name in ("index.html", "app.js", "styles.css", "summary-utils.js", "theme-utils.js"):
         (root / name).write_text(name, encoding="utf-8")
 
     reports = []
