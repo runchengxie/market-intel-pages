@@ -318,7 +318,11 @@ def run(
 
 
 def _environment_api_keys(prefix: str) -> list[str]:
-    names = (f"{prefix}_API_KEY", f"{prefix}_API_KEY_2", f"{prefix}_API_KEY_3")
+    names = (
+        (f"{prefix}_API_KEY", f"{prefix}_API_KEY_2", f"{prefix}_API_KEY_3")
+        if prefix == "GEMINI"
+        else (f"{prefix}_API_KEY",)
+    )
     return [value for name in names if (value := os.environ.get(name))]
 
 
