@@ -54,6 +54,10 @@ def _validate(reports: list[dict], summaries: list[dict]) -> None:
         raise ValueError("public report snapshot exceeds five trading dates")
 
 
+def _copy_daily_report(root: Path, output: Path) -> None:
+    _copy_daily_report(root, output)
+
+
 def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
     root = root.resolve()
     output = output.resolve()
@@ -73,6 +77,7 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
     for filename in STATIC_FILES:
         shutil.copy2(root / filename, output / filename)
     shutil.copy2(root / "data/reports.json", output / "data/reports.json")
+    _copy_daily_report(root, output)
     summary_data["summaries"] = current_summaries(reports, summaries)
     (output / "data/daily_summaries.json").write_text(
         json.dumps(summary_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
