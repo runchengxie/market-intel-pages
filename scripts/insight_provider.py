@@ -134,7 +134,7 @@ def _request(context: dict, prompt: str, provider: str, model: str, api_key: str
         }
         headers = {"x-goog-api-key": api_key}
     elif provider == "minimax":
-        endpoint = "https://api.minimaxi.com/v1/chat/completions"
+        endpoint = "https://api.minimax.io/v1/chat/completions"
         body = {
             "model": model,
             "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": user}],

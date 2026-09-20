@@ -15,7 +15,7 @@ from urllib.request import Request, urlopen
 
 SCHEMA = "market_intel_pages.daily_summaries.v1"
 PROMPT_VERSION = "daily-commentary-v1"
-ENDPOINT = "https://api.minimaxi.com/v1/chat/completions"
+ENDPOINT = "https://api.minimax.io/v1/chat/completions"
 CHINA_TZ = timezone(timedelta(hours=8))
 
 
