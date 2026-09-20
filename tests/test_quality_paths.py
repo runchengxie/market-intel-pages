@@ -117,6 +117,15 @@ def test_provider_failures_are_bounded_and_do_not_expose_response(provider, fail
     assert "secret" not in str(caught.value)
 
 
+def test_deepseek_uses_json_object_mode():
+    payload = {"choices": [{"finish_reason": "stop", "message": {"content": '{"ok": true}'}}]}
+    with patch("scripts.insight_provider.urlopen", return_value=Response(payload)) as opened:
+        assert generate({}, "prompt", "deepseek", "deepseek-chat", "key") == {"ok": True}
+    request = opened.call_args.args[0]
+    assert "api.deepseek.com" in request.full_url
+    assert json.loads(request.data)["response_format"] == {"type": "json_object"}
+
+
 @pytest.mark.parametrize("finish", ["stop", "length"])
 def test_minimax_decodes_fences_and_rejects_truncated_output(finish):
     payload = {
@@ -244,7 +253,7 @@ def test_generation_and_comparison_clis_without_credentials(site, tmp_path):
     assert json.loads(insights.read_text())["generation"]["status"] in {"not_configured", "no_source_pair"}
     comparison = tmp_path / "comparison"
     invoke("compare_models.py", ["--reports", reports, "--output-dir", comparison])
-    assert len(json.loads((comparison / "comparison.json").read_text())["runs"]) == 2
+    assert len(json.loads((comparison / "comparison.json").read_text())["runs"]) == 3
 
 
 def test_import_cli_preview_never_changes_the_public_snapshot(site, tmp_path):

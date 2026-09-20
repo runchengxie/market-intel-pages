@@ -60,11 +60,21 @@ python3 scripts/sync_public_snapshot.py \
 | 内容 | 脚本 | 配置 |
 |---|---|---|
 | 一段每日简评 | `scripts/generate_daily_summary.py` | `MINIMAX_API_KEY`，可选 `MINIMAX_MODEL` |
-| 带来源的市场解读 | `scripts/generate_insights.py` | 默认使用 `GEMINI_API_KEY`，可选 `GEMINI_MODEL` 和 `INSIGHT_PROVIDER` |
+| 带来源的市场解读 | `scripts/generate_insights.py` | 默认使用 Gemini，也支持 `deepseek`，密钥通过对应环境变量提供 |
 
-结构化解读默认模型为 `gemini-3.8-flash`。截至 2026-09-19，仓库已配置 `GEMINI_API_KEY`，并成功生成一条基于 09-18 材料的历史回放。仓库原有短简评仍标记为 `chatgpt-reviewed`，不能据此判断 MiniMax 在线调用是否成功。
+结构化解读默认模型为 `gemini-3.8-flash`，也可以将 `INSIGHT_PROVIDER` 设为 `deepseek` 并使用 `DEEPSEEK_API_KEY`。截至 2026-09-19，仓库已配置 `GEMINI_API_KEY`，并成功生成一条基于 09-18 材料的历史回放。仓库原有短简评仍标记为 `chatgpt-reviewed`，不能据此判断 MiniMax 在线调用是否成功。
 
 将 `INSIGHT_PROVIDER` 设为 `minimax` 可切换结构化解读的提供方，使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。密钥通过本地进程环境或 GitHub Actions Secret 提供，浏览器只读取生成结果。
+
+本地模型环境可以复制 `.env.example` 为 `.env`，再加载后运行：
+
+```bash
+cp .env.example .env
+set -a; . ./.env; set +a
+python3 scripts/generate_insights.py --reports data/reports.json --output /tmp/insights.json --provider deepseek --force
+```
+
+网页支持跟随系统、浅色和深色主题，右上角按钮会记住选择。
 
 本地生成示例：
 

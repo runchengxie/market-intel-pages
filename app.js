@@ -300,4 +300,20 @@ document.querySelector("#clear-date").addEventListener("click", () => {
   render();
 });
 
+const themeToggle = document.querySelector("#theme-toggle");
+const savedTheme = window.localStorage.getItem("market-intel-theme") ?? "system";
+let activeTheme = window.marketIntelTheme.applyTheme(savedTheme);
+function updateThemeButton() {
+  const labels = { system: "系统", light: "浅色", dark: "深色" };
+  themeToggle.textContent = `主题：${labels[activeTheme]}`;
+  themeToggle.setAttribute("aria-label", `切换主题，当前为${labels[activeTheme]}`);
+}
+updateThemeButton();
+themeToggle.addEventListener("click", () => {
+  activeTheme = window.marketIntelTheme.nextTheme(activeTheme);
+  window.marketIntelTheme.applyTheme(activeTheme);
+  window.localStorage.setItem("market-intel-theme", activeTheme);
+  updateThemeButton();
+});
+
 loadReports();
