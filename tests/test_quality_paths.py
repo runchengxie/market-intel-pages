@@ -118,6 +118,15 @@ def test_provider_failures_are_bounded_and_do_not_expose_response(provider, fail
 
 
 @pytest.mark.parametrize("finish", ["stop", "length"])
+def test_deepseek_uses_json_object_mode():
+    payload = {"choices": [{"finish_reason": "stop", "message": {"content": '{"ok": true}'}}]}
+    with patch("scripts.insight_provider.urlopen", return_value=Response(payload)) as opened:
+        assert generate({}, "prompt", "deepseek", "deepseek-chat", "key") == {"ok": True}
+    request = opened.call_args.args[0]
+    assert "api.deepseek.com" in request.full_url
+    assert json.loads(request.data)["response_format"] == {"type": "json_object"}
+
+
 def test_minimax_decodes_fences_and_rejects_truncated_output(finish):
     payload = {
         "choices": [

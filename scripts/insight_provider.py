@@ -133,14 +133,16 @@ def _request(context: dict, prompt: str, provider: str, model: str, api_key: str
             },
         }
         headers = {"x-goog-api-key": api_key}
-    elif provider == "minimax":
-        endpoint = "https://api.minimax.io/v1/chat/completions"
+    elif provider in {"minimax", "deepseek"}:
+        endpoint = "https://api.minimax.io/v1/chat/completions" if provider == "minimax" else "https://api.deepseek.com/chat/completions"
         body = {
             "model": model,
             "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": user}],
             "temperature": 0.3,
-            "max_completion_tokens": 8192,
+            "max_tokens": 8192,
         }
+        if provider == "deepseek":
+            body["response_format"] = {"type": "json_object"}
         headers = {"Authorization": f"Bearer {api_key}"}
     else:
         raise ValueError("unsupported provider")

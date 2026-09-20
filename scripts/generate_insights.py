@@ -22,7 +22,7 @@ except ImportError:
 
 SCHEMA = "market_intel_pages.insights.v1"
 PROMPT_VERSION = "market-insight-v1"
-DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "minimax": "MiniMax-M2.7"}
+DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "minimax": "MiniMax-M2.7", "deepseek": "deepseek-chat"}
 VALIDATION_ERROR_CODES = {
     "invalid analysis schema": "analysis_schema_invalid",
     "invalid claim count": "analysis_claim_count_invalid",
