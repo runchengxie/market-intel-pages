@@ -166,6 +166,18 @@ def _cached_record(
     )
 
 
+def _generate_with_fallback(generator, context, prompt, provider, model, api_keys):
+    last_error = None
+    for api_key in api_keys:
+        try:
+            return validate_analysis(generator(context, prompt, provider, model, api_key), context)
+        except (OSError, ValueError, KeyError, IndexError, TypeError) as exc:
+            last_error = exc
+    if last_error is not None:
+        raise last_error
+    raise ValueError("no API keys configured")
+
+
 def _update_history(
     reports: list[dict],
     pair: tuple[dict, dict],
@@ -197,15 +209,16 @@ def _update_history(
         ).encode()
     ).hexdigest()
     generation["target_date"] = morning["date"]
-    generation["analysis_attempts"] = 1
+    api_keys = [api_key] if isinstance(api_key, str) else [key for key in (api_key or []) if key]
+    generation["analysis_attempts"] = len(api_keys)
     existing = _cached_record(history, context, fingerprint, prompt_hash, provider, model)
     if existing and not force:
         generation["status"] = "cached"
-    elif not api_key:
+    elif not api_keys:
         generation["status"] = "not_configured"
     else:
         try:
-            analysis = validate_analysis(generator(context, prompt, provider, model, api_key), context)
+            analysis = _generate_with_fallback(generator, context, prompt, provider, model, api_keys)
             identity = hashlib.sha256(
                 json.dumps([fingerprint, analysis, now], sort_keys=True).encode()
             ).hexdigest()[:24]
@@ -304,6 +317,11 @@ def run(
     return result
 
 
+def _environment_api_keys(prefix: str) -> list[str]:
+    names = (f"{prefix}_API_KEY", f"{prefix}_API_KEY_2", f"{prefix}_API_KEY_3")
+    return [value for name in names if (value := os.environ.get(name))]
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reports", type=Path, required=True)
@@ -323,7 +341,7 @@ def main():
         args.output,
         provider=args.provider,
         model=args.model or os.environ.get(f"{prefix}_MODEL"),
-        api_key=os.environ.get(f"{prefix}_API_KEY"),
+        api_key=_environment_api_keys(prefix),
         history_path=args.history,
         history_url=args.history_url,
         archive_dir=args.archive_dir,
