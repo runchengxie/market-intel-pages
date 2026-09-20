@@ -55,7 +55,9 @@ def _validate(reports: list[dict], summaries: list[dict]) -> None:
 
 
 def _copy_daily_report(root: Path, output: Path) -> None:
-    _copy_daily_report(root, output)
+    daily_report = root / "data/market_daily_report.json"
+    if daily_report.exists():
+        shutil.copy2(daily_report, output / "data/market_daily_report.json")
 
 
 def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
