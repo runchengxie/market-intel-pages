@@ -284,6 +284,11 @@ button, input { font: inherit; }
 .data-health { margin: 0 0 24px; padding: 14px 18px; border: 1px solid #d2dcd2; border-radius: 10px; background: #edf3ec; color: #344b3c; font-size: 13px; line-height: 1.8; }
 .data-health.is-delayed { background: #fcf3e3; border-color: #e7cf9f; color: #785529; }
 .market-insights { margin-bottom: 32px; }
+.market-daily { margin-bottom: 32px; }
+.market-daily-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.market-daily-card { padding: 16px; border: 1px solid var(--panel-line, var(--line)); border-radius: 12px; background: var(--panel, var(--card)); }
+.market-daily-value { margin: 0 0 8px; font-size: 16px; font-weight: 650; line-height: 1.5; }
+.market-daily-lag { display: block; margin-top: 7px; font-size: 12px; color: var(--muted); }
 .insight-status, .insight-meta { color: #6a706a; font-size: 12px; line-height: 1.8; }
 .insight-status { margin: 12px 0 18px; }
 .insight-card { margin: 0 0 20px; padding: 26px; border: 1px solid #d8dcd4; border-radius: 14px; background: #fffef9; }

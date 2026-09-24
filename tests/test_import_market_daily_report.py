@@ -43,3 +43,51 @@ def test_import_report_rejects_credentials(tmp_path):
     source.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="credentials"):
         import_report(source, tmp_path / "site")
+
+
+def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
+    payload = _payload()
+    payload.update(
+        as_of="2026-09-24T01:00:00+00:00",
+        generated_at="2026-09-24T01:00:00+00:00",
+        run_id="daily-2026-09-23",
+        claims=[],
+        facts=[
+            {
+                "id": "treasury.10y.change_bp",
+                "value": -5.0,
+                "unit": "basis_points",
+                "source_url": "https://fred.stlouisfed.org/series/DGS10",
+                "observation_date": "2026-09-23",
+            },
+            {
+                "id": "macro.cpi_yoy",
+                "value": 3.4,
+                "unit": "percent_yoy",
+                "source_url": "https://fred.stlouisfed.org/series/CPIAUCNS",
+                "observation_date": "2026-08-01",
+            },
+        ],
+        quality_summary={"status": "degraded"},
+        missing_sources=["quotes", "research"],
+    )
+    source = tmp_path / "daily_report.json"
+    source.write_text(json.dumps(payload), encoding="utf-8")
+
+    assert import_report(source, tmp_path / "site") == "2026-09-23"
+    markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
+    assert "10 年期美债收益率日变动：-5.00 bp" in markdown
+    assert "CPI 同比：3.40%" in markdown
+    assert "观测日 2026-08-01" in markdown
+    assert "https://fred.stlouisfed.org/series/CPIAUCNS" in markdown
+    assert "指数行情" in markdown
+
+
+def test_import_report_rejects_fixture_status(tmp_path):
+    payload = _payload()
+    payload["quality_summary"]["status"] = "fixture"
+    source = tmp_path / "daily_report.json"
+    source.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="fixture"):
+        import_report(source, tmp_path / "site")
