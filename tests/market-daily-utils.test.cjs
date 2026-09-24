@@ -33,3 +33,24 @@ test("market daily hides fixture and invalid source data", () => {
   assert.equal(summarizeMarketDaily({ schema_version: "1.0", quality_summary: { status: "fixture" }, facts: [] }), null);
   assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-23", facts: [{ id: "macro.cpi_yoy", value: "3.4", source_url: "javascript:alert(1)" }] }), null);
 });
+
+test("market daily shows reviewed index returns, Treasury rates and cited explanations", () => {
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-23",
+    as_of: "2026-09-24T08:30:00+00:00", quality_summary: { status: "ok" },
+    missing_sources: [],
+    facts: [
+      { id: "index.spx.change_percent", value: -0.8, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/amp/Business/example" },
+      { id: "treasury.10y.change_bp", value: 15, quality: "ok", observation_date: "2026-09-23", source_url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve" },
+    ],
+    events: [{ id: "reviewed.1", source_url: "https://abcnews.com/amp/Business/example" }],
+    claims: [{ claim: "美联社认为美债收益率上升带来压力。", evidence_ids: ["reviewed.1"], sources: ["https://abcnews.com/amp/Business/example"] }],
+  });
+  assert.equal(summary.rows[0].text, "标普 500 日涨跌 -0.80%");
+  assert.equal(summary.rows[0].sourceLabel, "报道来源");
+  assert.equal(summary.rows[1].text, "10 年期美债收益率日变动 15.00 bp");
+  assert.equal(summary.rows[1].sourceLabel, "美国财政部原始数据");
+  assert.equal(summary.claims[0].text, "美联社认为美债收益率上升带来压力。");
+  assert.deepEqual(summary.gaps, []);
+  assert.match(formatMarketDailyStatus(summary), /次日核实更新/);
+});

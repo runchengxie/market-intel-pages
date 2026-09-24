@@ -19,16 +19,18 @@ function renderMarketDaily(payload) {
   const summary = window.marketDailyUtils.summarizeMarketDaily(payload);
   const status = document.querySelector("#market-daily-status");
   const list = document.querySelector("#market-daily-list");
+  const claimList = document.querySelector("#market-daily-claims");
   if (!summary) {
     status.textContent = "美股宏观日报尚未发布，或数据未通过校验。";
     list.replaceChildren();
+    claimList.replaceChildren();
     return;
   }
   status.textContent = window.marketDailyUtils.formatMarketDailyStatus(summary);
   list.replaceChildren(...summary.rows.map((row) => {
     const card = makeElement("article", "market-daily-card");
     card.append(makeElement("p", "market-daily-value", row.text));
-    const source = makeElement("a", "source-link", `观测日 ${row.observationDate} · FRED 原始数据`);
+    const source = makeElement("a", "source-link", `观测日 ${row.observationDate} · ${row.sourceLabel}`);
     source.href = row.sourceUrl;
     source.target = "_blank";
     source.rel = "noopener noreferrer";
@@ -36,6 +38,18 @@ function renderMarketDaily(payload) {
     if (row.quality === "lagged") card.append(makeElement("span", "market-daily-lag", "当日数据未公布"));
     list.append(card);
     return card;
+  }));
+  claimList.replaceChildren(...summary.claims.map((claim) => {
+    const item = makeElement("article", "market-daily-card");
+    item.append(makeElement("p", "market-daily-explanation", claim.text));
+    claim.sourceUrls.forEach((url, index) => {
+      const source = makeElement("a", "source-link", `核实来源 ${index + 1}`);
+      source.href = url;
+      source.target = "_blank";
+      source.rel = "noopener noreferrer";
+      item.append(source);
+    });
+    return item;
   }));
 }
 

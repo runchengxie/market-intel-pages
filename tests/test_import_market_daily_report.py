@@ -1,17 +1,26 @@
+import hashlib
 import json
 
 import pytest
 
-from scripts.import_market_daily_report import import_report
+from scripts.import_market_daily_report import _normalize, import_report
 
 
 def _payload():
     return {
         "schema_version": "1.0",
-        "as_of": "2026-09-19T01:00:00+00:00",
-        "generated_at": "2026-09-19T01:00:00+00:00",
+        "as_of": "2026-09-20T01:00:00+00:00",
+        "generated_at": "2026-09-20T01:00:00+00:00",
         "run_id": "daily-2026-09-19",
-        "facts": [{"id": "index.spx.change_percent", "value": 0.16}],
+        "facts": [
+            {
+                "id": "index.spx.change_percent",
+                "value": 0.16,
+                "quality": "reviewed",
+                "source_url": "https://example.test/report",
+                "observation_date": "2026-09-19",
+            }
+        ],
         "events": [],
         "claims": [
             {
@@ -26,11 +35,34 @@ def _payload():
     }
 
 
-def test_import_report_writes_public_json_and_markdown(tmp_path):
+def _source(tmp_path, payload):
+    payload["content_hash"] = None
+    payload["content_hash"] = hashlib.sha256(
+        json.dumps(_normalize(payload), default=str, sort_keys=True, ensure_ascii=False).encode()
+    ).hexdigest()
     source = tmp_path / "daily_report.json"
-    source.write_text(json.dumps(_payload()), encoding="utf-8")
+    source.write_text(json.dumps(payload), encoding="utf-8")
+    manifest = tmp_path / "publication.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.0",
+                "publication": "public",
+                "report_file": source.name,
+                "report_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                "run_id": payload["run_id"],
+                "content_hash": payload["content_hash"],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return source, manifest
+
+
+def test_import_report_writes_public_json_and_markdown(tmp_path):
+    source, manifest = _source(tmp_path, _payload())
     output = tmp_path / "site"
-    result = import_report(source, output)
+    result = import_report(source, output, manifest)
     assert result == "2026-09-19"
     assert (output / "data/market_daily_report.json").exists()
     assert "SPX rose" in (output / "reports/2026-09-19-market-daily.md").read_text()
@@ -39,10 +71,9 @@ def test_import_report_writes_public_json_and_markdown(tmp_path):
 def test_import_report_rejects_credentials(tmp_path):
     payload = _payload()
     payload["claims"][0]["claim"] = "API_KEY leaked"
-    source = tmp_path / "daily_report.json"
-    source.write_text(json.dumps(payload), encoding="utf-8")
+    source, manifest = _source(tmp_path, payload)
     with pytest.raises(ValueError, match="credentials"):
-        import_report(source, tmp_path / "site")
+        import_report(source, tmp_path / "site", manifest)
 
 
 def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
@@ -71,10 +102,9 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
         quality_summary={"status": "degraded"},
         missing_sources=["quotes", "research", "rates_lag"],
     )
-    source = tmp_path / "daily_report.json"
-    source.write_text(json.dumps(payload), encoding="utf-8")
+    source, manifest = _source(tmp_path, payload)
 
-    assert import_report(source, tmp_path / "site") == "2026-09-23"
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
     markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
     assert "10 年期美债收益率日变动：-5.00 bp" in markdown
     assert "CPI 同比：3.40%" in markdown
@@ -87,8 +117,103 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
 def test_import_report_rejects_fixture_status(tmp_path):
     payload = _payload()
     payload["quality_summary"]["status"] = "fixture"
-    source = tmp_path / "daily_report.json"
-    source.write_text(json.dumps(payload), encoding="utf-8")
+    source, manifest = _source(tmp_path, payload)
 
     with pytest.raises(ValueError, match="fixture"):
-        import_report(source, tmp_path / "site")
+        import_report(source, tmp_path / "site", manifest)
+
+
+def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
+    payload = _payload()
+    payload.update(
+        as_of="2026-09-24T08:30:00+00:00",
+        generated_at="2026-09-24T08:30:00+00:00",
+        run_id="daily-2026-09-23",
+        facts=[
+            {
+                "id": "treasury.10y.change_bp",
+                "value": 15.0,
+                "unit": "basis_points",
+                "quality": "ok",
+                "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
+                "observation_date": "2026-09-23",
+            },
+            {
+                "id": "index.spx.change_percent",
+                "value": -0.8,
+                "unit": "percent",
+                "quality": "reviewed",
+                "source_url": "https://abcnews.com/amp/Business/example",
+                "observation_date": "2026-09-23",
+            },
+        ],
+        claims=[
+            {
+                "claim": "经核实的解释",
+                "evidence_ids": ["index.spx.change_percent"],
+                "sources": ["https://abcnews.com/amp/Business/example"],
+            }
+        ],
+    )
+    source, manifest = _source(tmp_path, payload)
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
+    markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
+    assert "标普 500 日涨跌：-0.80%" in markdown
+    assert "10 年期美债收益率日变动：15.00 bp" in markdown
+    assert "美国财政部" in markdown
+
+
+def test_import_requires_matching_public_manifest_and_omits_private_fields(tmp_path):
+    payload = _payload()
+    payload["private_research_draft"] = "never publish this"
+    payload["facts"][0]["private_passage"] = "not public"
+    payload["events"] = [
+        {
+            "id": "reviewed.event.1",
+            "title": "unreviewed private draft title",
+            "actual": "unreviewed private draft actual",
+            "source_url": "https://example.test/report",
+        }
+    ]
+    payload["claims"][0]["evidence_ids"].append("reviewed.event.1")
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    assert import_report(source, output, manifest) == "2026-09-19"
+    public = (output / "data/market_daily_report.json").read_text()
+    assert "private_research_draft" not in public
+    assert "private_passage" not in public
+    assert "unreviewed private draft title" not in public
+    assert "unreviewed private draft actual" not in public
+    assert json.loads(public)["events"] == [{"id": "reviewed.event.1"}]
+    bad = json.loads(manifest.read_text())
+    bad["publication"] = "private"
+    manifest.write_text(json.dumps(bad))
+    with pytest.raises(ValueError, match="public manifest"):
+        import_report(source, output, manifest)
+
+
+def test_import_rejects_rehashed_file_with_invalid_content_hash(tmp_path):
+    source, manifest = _source(tmp_path, _payload())
+    payload = json.loads(source.read_text())
+    payload["claims"][0]["claim"] = "changed without content hash"
+    source.write_text(json.dumps(payload))
+    publication = json.loads(manifest.read_text())
+    publication["report_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    manifest.write_text(json.dumps(publication))
+    with pytest.raises(ValueError, match="content hash"):
+        import_report(source, tmp_path / "site", manifest)
+
+
+def test_import_accepts_private_snapshot_filename_bound_by_public_manifest(tmp_path):
+    source, manifest = _source(tmp_path, _payload())
+    snapshot = tmp_path / "input.json"
+    snapshot.write_bytes(source.read_bytes())
+    assert import_report(snapshot, tmp_path / "site", manifest) == "2026-09-19"
+
+
+def test_import_rejects_duplicate_evidence_ids(tmp_path):
+    payload = _payload()
+    payload["facts"].append(dict(payload["facts"][0]))
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="duplicate"):
+        import_report(source, tmp_path / "site", manifest)
