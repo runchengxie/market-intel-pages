@@ -57,6 +57,15 @@ def test_valid_public_chart_is_accepted():
     assert validate_public_chart(payload, expected_id="2026-09-18-morning") == payload
 
 
+def test_valid_integer_point_keeps_its_verified_content_hash():
+    payload = public_chart()
+    payload["charts"][0]["points"][0]["value"] = 100
+    payload = rehash(payload)
+    validated = validate_public_chart(payload)
+    assert validated == payload
+    assert validate_public_chart(validated) == payload
+
+
 @pytest.mark.parametrize(
     "change,message",
     [

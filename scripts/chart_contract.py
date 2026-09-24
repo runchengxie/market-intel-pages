@@ -76,7 +76,7 @@ def _validate_point(point: object, report_date: date) -> dict:
         raise ValueError("observation_date cannot follow report date")
     return {
         "label": _text(point["label"], "label"),
-        "value": float(value),
+        "value": value,
         "unit": _text(point["unit"], "unit"),
         "observation_date": observed.isoformat(),
         "source_label": _text(point["source_label"], "source_label"),

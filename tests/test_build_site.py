@@ -276,35 +276,48 @@ def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "site"
     build_site(root, output)
+    index_data = json.loads((output / "data/reports.json").read_text(encoding="utf-8"))
+    report_id = index_data["reports"][0]["id"]
     index = (output / "index.html").read_text(encoding="utf-8")
     assert "REPORT ARCHIVE" in index
-    assert "/market-intel-pages/reports/2026-09-23-morning/" in index
-    assert (output / "reports/2026-09-18-evening/index.html").is_file()
-    assert (output / "reports/2026-09-23-market-daily.md").is_file()
-    assert (output / "reports/2026-09-23-market-daily.txt").is_file()
+    assert f"/market-intel-pages/reports/{report_id}/" in index
+    assert (output / f"reports/{report_id}/index.html").is_file()
+    market = json.loads((output / "data/market_daily_report.json").read_text(encoding="utf-8"))
+    market_date = market["run_id"].removeprefix("daily-")
+    assert (output / f"reports/{market_date}-market-daily.md").is_file()
+    assert (output / f"reports/{market_date}-market-daily.txt").is_file()
 
 
 def test_refresh_astro_uses_latest_generated_snapshot(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "site"
     build_site(root, output)
-    report = output / "reports/2026-09-23-market-daily.md"
+    report_id = json.loads((output / "data/reports.json").read_text(encoding="utf-8"))["reports"][0]["id"]
+    report = output / f"reports/{report_id}.md"
     report.write_text(report.read_text(encoding="utf-8") + "\n发布后解读标记\n", encoding="utf-8")
     refresh_astro(root, output)
-    assert "发布后解读标记" in (output / "index.html").read_text(encoding="utf-8")
+    assert "发布后解读标记" in (output / f"reports/{report_id}/index.html").read_text(encoding="utf-8")
 
 
 def test_reviewed_chart_renders_static_values_only_on_matching_report(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
     output = tmp_path / "site"
     build_site(root, output)
-    chart = output / "data/charts/2026-09-18-morning.json"
+    reports = json.loads((output / "data/reports.json").read_text(encoding="utf-8"))["reports"]
+    report_id = reports[0]["id"]
+    other_id = reports[1]["id"]
+    chart = output / f"data/charts/{report_id}.json"
     chart.parent.mkdir(parents=True)
-    chart.write_text(json.dumps(public_chart(), ensure_ascii=False), encoding="utf-8")
+    payload = public_chart()
+    payload["report_id"] = report_id
+    payload["date"] = reports[0]["date"]
+    payload["kind"] = reports[0]["kind"]
+    payload["charts"][0]["points"][0]["observation_date"] = reports[0]["date"]
+    chart.write_text(json.dumps(rehash(payload), ensure_ascii=False), encoding="utf-8")
     refresh_astro(root, output)
-    matching = (output / "reports/2026-09-18-morning/index.html").read_text(encoding="utf-8")
-    other = (output / "reports/2026-09-23-morning/index.html").read_text(encoding="utf-8")
-    self_contained = ("上涨家数", "2026-09-18", "https://example.test/source")
+    matching = (output / f"reports/{report_id}/index.html").read_text(encoding="utf-8")
+    other = (output / f"reports/{other_id}/index.html").read_text(encoding="utf-8")
+    self_contained = ("上涨家数", reports[0]["date"], "https://example.test/source")
     for text in self_contained:
         assert text in matching
     assert "astro-island" in matching
