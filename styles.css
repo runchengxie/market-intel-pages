@@ -297,6 +297,8 @@ button, input { font: inherit; }
 .market-daily-files { display: flex; flex-wrap: wrap; gap: 9px; margin: 0 0 16px; }
 .market-daily-file { padding: 8px 12px; border: 1px solid var(--panel-line); border-radius: 6px; color: var(--accent); background: var(--panel); font-size: 12px; text-decoration: none; }
 .market-daily-file:hover { border-color: var(--accent); }
+.market-daily-files button.market-daily-file { font: inherit; font-size: 12px; cursor: pointer; }
+.market-daily-files button.market-daily-file:disabled { cursor: wait; opacity: .7; }
 .market-daily-charts { display: grid; gap: 14px; margin-bottom: 16px; }
 .market-daily-chart { min-width: 0; margin: 0; padding: 18px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel); }
 .market-daily-chart-title { margin-bottom: 15px; color: var(--ink); font-size: 14px; font-weight: 650; }

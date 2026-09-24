@@ -37,6 +37,23 @@ function renderMarketDaily(payload) {
     if (suffix === "txt") link.setAttribute("download", "");
     return link;
   }));
+  const chartSvg = window.marketDailyUtils.buildMarketDailyChartSvg(summary);
+  if (chartSvg) {
+    const button = makeElement("button", "market-daily-file", "下载图表 PNG");
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await downloadMarketDailyChartPng(chartSvg, summary.date);
+        button.textContent = "下载图表 PNG";
+      } catch {
+        button.textContent = "图片生成失败，请使用文字版";
+      } finally {
+        button.disabled = false;
+      }
+    });
+    files.append(button);
+  }
   charts.replaceChildren(...window.marketDailyUtils.buildMarketDailyCharts(summary).map((chart) => {
     const figure = makeElement("figure", "market-daily-chart");
     figure.append(makeElement("figcaption", "market-daily-chart-title", `${chart.title}（${chart.unit}）`));
@@ -91,6 +108,40 @@ function renderMarketDaily(payload) {
     });
     return group;
   }));
+}
+
+async function downloadMarketDailyChartPng(svg, date) {
+  const sourceUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+  try {
+    const picture = new Image();
+    await new Promise((resolve, reject) => {
+      picture.onload = resolve;
+      picture.onerror = reject;
+      picture.src = sourceUrl;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = picture.width * 2;
+    canvas.height = picture.height * 2;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas unavailable");
+    context.scale(2, 2);
+    context.drawImage(picture, 0, 0);
+    const png = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!png) throw new Error("PNG export unavailable");
+    const downloadUrl = URL.createObjectURL(png);
+    try {
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `${date}-market-daily-charts.png`;
+      document.body.append(link);
+      link.click();
+      link.remove();
+    } finally {
+      setTimeout(() => URL.revokeObjectURL(downloadUrl), 60_000);
+    }
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
 }
 
 function makeElement(tag, className, text) {

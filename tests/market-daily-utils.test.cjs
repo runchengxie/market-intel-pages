@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { summarizeMarketDaily, formatMarketDailyStatus, buildMarketDailyCharts } = require("../market-daily-utils.js");
+const { summarizeMarketDaily, formatMarketDailyStatus, buildMarketDailyCharts, buildMarketDailyChartSvg } = require("../market-daily-utils.js");
 
 test("market daily keeps the observation date and lagged yield state", () => {
   const summary = summarizeMarketDaily({
@@ -33,6 +33,7 @@ test("market daily status calls a report date a report date, including missing s
 test("market daily hides fixture and invalid source data", () => {
   assert.equal(summarizeMarketDaily({ schema_version: "1.0", quality_summary: { status: "fixture" }, facts: [] }), null);
   assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-23", facts: [{ id: "macro.cpi_yoy", value: "3.4", source_url: "javascript:alert(1)" }] }), null);
+  assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-23", facts: [{ id: "index.spx.change_percent", value: 1, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://[bad]/close" }] }), null);
 });
 
 test("market daily shows reviewed index returns, Treasury rates and cited explanations", () => {
@@ -98,4 +99,35 @@ test("market daily charts keep signed values and source dates in separate units"
   assert.equal(charts[1].rows[0].valueText, "+14.00 bp");
   assert.equal(charts[1].rows[0].observationDate, "2026-09-23");
   assert.match(charts[1].rows[0].sourceUrl, /^https:\/\/home\.treasury\.gov\//);
+});
+
+test("chart image uses reviewed report-date facts with dates, units and source hosts", () => {
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-23", facts: [
+      { id: "index.spx.change_percent", value: -0.8, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/Business/close" },
+      { id: "index.dow.change_percent", value: 0.4, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/Business/close" },
+      { id: "treasury.10y.change_bp", value: 15, quality: "ok", observation_date: "2026-09-23", source_url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve" },
+      { id: "treasury.2y.change_bp", value: 14, quality: "lagged", observation_date: "2026-09-22", source_url: "https://fred.stlouisfed.org/series/DGS2" },
+    ],
+  });
+  const svg = buildMarketDailyChartSvg?.(summary) ?? "";
+  assert.match(svg, /<svg[^>]*width="960"/);
+  assert.match(svg, /2026-09-23 美东交易日/);
+  assert.match(svg, /标普 500/);
+  assert.match(svg, /-0\.80%/);
+  assert.match(svg, /\+0\.40%/);
+  assert.match(svg, /\+15\.00 bp/);
+  assert.match(svg, /观测日 2026-09-23/);
+  assert.match(svg, /abcnews\.com/);
+  assert.match(svg, /home\.treasury\.gov/);
+  assert.doesNotMatch(svg, /2026-09-22|FRED 原始数据|<script>/);
+});
+
+test("chart image has no invented marks when no report-date chart facts exist", () => {
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-23", facts: [
+      { id: "treasury.10y.change_bp", value: 15, quality: "lagged", observation_date: "2026-09-22", source_url: "https://fred.stlouisfed.org/series/DGS10" },
+    ],
+  });
+  assert.equal(buildMarketDailyChartSvg?.(summary) ?? null, null);
 });
