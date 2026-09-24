@@ -93,6 +93,16 @@ class BuildSiteTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "public"):
             build_site(self.root, self.output)
 
+    def test_failed_build_preserves_previous_artifact(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        build_site(self.root, self.output)
+        (self.output / "index.html").write_text("published artifact", encoding="utf-8")
+        (self.root / "data/charts").mkdir()
+        (self.root / "data/charts/2026-09-02-morning.json").write_text('{"publication":"candidate"}')
+        with self.assertRaises(ValueError):
+            build_site(self.root, self.output)
+        self.assertEqual("published artifact", (self.output / "index.html").read_text(encoding="utf-8"))
+
     def test_build_emits_health_and_optional_insights(self) -> None:
         sync_snapshot(self.root, self.archive)
         build_site(self.root, self.output)
@@ -260,3 +270,15 @@ class BuildSiteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "site"
+    build_site(root, output)
+    index = (output / "index.html").read_text(encoding="utf-8")
+    assert "REPORT ARCHIVE" in index
+    assert "/market-intel-pages/reports/2026-09-23-morning/" in index
+    assert (output / "reports/2026-09-18-evening/index.html").is_file()
+    assert (output / "reports/2026-09-23-market-daily.md").is_file()
+    assert (output / "reports/2026-09-23-market-daily.txt").is_file()

@@ -24,14 +24,16 @@ Pages 部署成功只说明网站构建和发布完成。数据是否及时，�
 
 ## 本地预览
 
-构建脚本只使用 Python 标准库。下面的输出目录专用于预览，构建时会重新创建，请勿指向已有业务数据的目录。
+构建脚本先用 Python 标准库审核公开快照，再调用 Astro 生成首页和逐期静态页。需要 Node.js 24 与锁定依赖。下面的输出目录专用于预览，构建时会重新创建，请勿指向已有业务数据的目录。
 
 ```bash
-python3 scripts/build_site.py --output /tmp/quant-market-intel-site
-python3 -m http.server 8000 --directory /tmp/quant-market-intel-site
+npm ci
+preview_root=$(mktemp -d /tmp/qmi-preview.XXXXXX)
+python3 scripts/build_site.py --output "$preview_root/market-intel-pages"
+python3 -m http.server 8000 --directory "$preview_root"
 ```
 
-打开 <http://localhost:8000>。构建目录必须位于仓库外。
+打开 <http://localhost:8000/market-intel-pages/>。构建产物内链接按 GitHub Pages `/market-intel-pages/` 生成，构建目录必须位于仓库外。直接检查静态 HTML 可运行 `npm run build`，其 `dist/` 仅供开发验证。
 
 ## 导入与归档
 
@@ -100,7 +102,9 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 
 | 路径 | 用途 |
 |---|---|
-| `index.html`、`app.js`、`report-markdown.js`、`summary-utils.js`、`market-daily-utils.js`、`styles.css` | 页面结构、报告表格与列表渲染、展示逻辑和样式 |
+| `src/pages/`、`src/components/`、`src/lib/`、`src/styles/` | Astro 首页、逐期静态正文、六图状态与安全 Markdown 渲染 |
+| `index.html`、`app.js`、`report-markdown.js`、`summary-utils.js`、`market-daily-utils.js`、`styles.css` | 迁移期间保留的旧页面回退材料，不再作为正式构建的首页 |
+| `data/charts/` | 仅收录逐点审核后 `publication: public` 的按期六图 JSON；无批准文件时静态页显示缺项 |
 | `data/reports.json`、`reports/` | 公开报告索引、正文与 Markdown 原文 |
 | `data/daily_summaries.json` | 每日简评及配对来源 |
 | `data/insights.json` | 带来源的解读、生成状态和观察条件结果 |
@@ -119,6 +123,7 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 ## 检查与维护
 
 ```bash
+npm ci
 python3 -m pip install --group dev
 ruff check scripts tests tools
 ruff format --check scripts tests tools

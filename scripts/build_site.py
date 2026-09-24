@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 try:
@@ -56,6 +59,41 @@ def copy_public_charts(root: Path, output: Path, report_ids: set[str]) -> list[s
     return copied
 
 
+def _overlay_astro_pages(root: Path, output: Path, report_ids: set[str]) -> None:
+    """Build Astro against the already validated public snapshot."""
+    if not (root / "package.json").is_file():
+        return  # Synthetic Python-only build fixtures do not carry the site project.
+    # Astro renames compiled assets, so its temporary output must share the
+    # checkout filesystem; the reviewed data can still live on another mount.
+    with tempfile.TemporaryDirectory(prefix="market-intel-astro-", dir=root.parent) as temporary:
+        built = Path(temporary) / "site"
+        env = {**os.environ, "ASTRO_DATA_ROOT": str(output), "ASTRO_OUT_DIR": str(built)}
+        try:
+            subprocess.run(
+                ["npm", "run", "build"],
+                cwd=root,
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise ValueError("Astro static build failed") from exc
+        if not (built / "index.html").is_file():
+            raise ValueError("Astro index is missing")
+        for report_id in report_ids:
+            source = built / "reports" / report_id / "index.html"
+            if not source.is_file():
+                raise ValueError(f"Astro report page missing: {report_id}")
+            destination = output / "reports" / report_id / "index.html"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        if (built / "_astro").is_dir():
+            shutil.copytree(built / "_astro", output / "_astro", dirs_exist_ok=True)
+        shutil.copy2(built / "index.html", output / "index.html")
+
+
 def _read_index(path: Path, schema: str, key: str) -> tuple[dict, list[dict]]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -102,7 +140,7 @@ def _copy_daily_report(root: Path, output: Path) -> None:
                 shutil.copy2(source, output / filename)
 
 
-def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
+def _build_site_contents(root: Path, output: Path, summaries_path: Path | None = None) -> None:
     root = root.resolve()
     output = output.resolve()
     summaries_path = (summaries_path or root / "data/daily_summaries.json").resolve()
@@ -114,8 +152,6 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
         raise ValueError("build output must be outside the repository")
     if root.is_relative_to(output) or output == output.parent:
         raise ValueError("build output must not contain the repository")
-    if output.exists():
-        shutil.rmtree(output)
     (output / "data").mkdir(parents=True)
     (output / "reports").mkdir()
     for filename in STATIC_FILES:
@@ -158,6 +194,31 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
         destination = output / source.relative_to(root)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+    _overlay_astro_pages(root, output, {str(report["id"]) for report in reports})
+
+
+def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
+    """Publish an entirely validated artifact, preserving the old one on failure."""
+    root = root.resolve()
+    output = output.resolve()
+    if output == root or output.is_relative_to(root):
+        raise ValueError("build output must be outside the repository")
+    if root.is_relative_to(output) or output == output.parent:
+        raise ValueError("build output must not contain the repository")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="market-intel-site-", dir=output.parent) as temporary:
+        staging_root = Path(temporary)
+        staged = staging_root / "new"
+        previous = staging_root / "previous"
+        _build_site_contents(root, staged, summaries_path)
+        if output.exists():
+            output.replace(previous)
+        try:
+            staged.replace(output)
+        except OSError:
+            if previous.exists():
+                previous.replace(output)
+            raise
 
 
 def main() -> None:
