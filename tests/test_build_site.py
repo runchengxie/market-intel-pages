@@ -3,8 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.build_site import build_site
+from scripts.build_site import build_site, refresh_astro
 from scripts.sync_public_snapshot import sync_snapshot
+from tests.test_chart_contract import public_chart, rehash
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
@@ -65,6 +66,43 @@ def create_site(root: Path, session_count: int = 6) -> None:
 
 
 class BuildSiteTests(unittest.TestCase):
+    def test_build_copies_only_indexed_public_charts(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        chart_dir = self.root / "data/charts"
+        chart_dir.mkdir()
+        current = public_chart()
+        current["date"] = "2026-09-02"
+        current["report_id"] = "2026-09-02-morning"
+        current["charts"][0]["points"][0]["observation_date"] = "2026-09-02"
+        (chart_dir / "2026-09-02-morning.json").write_text(json.dumps(rehash(current)), encoding="utf-8")
+        (chart_dir / "2026-09-01-morning.json").write_text("stale private data", encoding="utf-8")
+        build_site(self.root, self.output)
+        self.assertTrue((self.output / "data/charts/2026-09-02-morning.json").is_file())
+        self.assertFalse((self.output / "data/charts/2026-09-01-morning.json").exists())
+
+    def test_build_rejects_candidate_chart_in_current_window(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        chart_dir = self.root / "data/charts"
+        chart_dir.mkdir()
+        current = public_chart()
+        current["date"] = "2026-09-02"
+        current["report_id"] = "2026-09-02-morning"
+        current["publication"] = "candidate"
+        current["charts"][0]["points"][0]["observation_date"] = "2026-09-02"
+        (chart_dir / "2026-09-02-morning.json").write_text(json.dumps(rehash(current)), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "public"):
+            build_site(self.root, self.output)
+
+    def test_failed_build_preserves_previous_artifact(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        build_site(self.root, self.output)
+        (self.output / "index.html").write_text("published artifact", encoding="utf-8")
+        (self.root / "data/charts").mkdir()
+        (self.root / "data/charts/2026-09-02-morning.json").write_text('{"publication":"candidate"}')
+        with self.assertRaises(ValueError):
+            build_site(self.root, self.output)
+        self.assertEqual("published artifact", (self.output / "index.html").read_text(encoding="utf-8"))
+
     def test_build_emits_health_and_optional_insights(self) -> None:
         sync_snapshot(self.root, self.archive)
         build_site(self.root, self.output)
@@ -232,3 +270,55 @@ class BuildSiteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "site"
+    build_site(root, output)
+    index_data = json.loads((output / "data/reports.json").read_text(encoding="utf-8"))
+    report_id = index_data["reports"][0]["id"]
+    index = (output / "index.html").read_text(encoding="utf-8")
+    assert "REPORT ARCHIVE" in index
+    assert f"/market-intel-pages/reports/{report_id}/" in index
+    assert (output / f"reports/{report_id}/index.html").is_file()
+    market = json.loads((output / "data/market_daily_report.json").read_text(encoding="utf-8"))
+    market_date = market["run_id"].removeprefix("daily-")
+    assert (output / f"reports/{market_date}-market-daily.md").is_file()
+    assert (output / f"reports/{market_date}-market-daily.txt").is_file()
+
+
+def test_refresh_astro_uses_latest_generated_snapshot(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "site"
+    build_site(root, output)
+    report_id = json.loads((output / "data/reports.json").read_text(encoding="utf-8"))["reports"][0]["id"]
+    report = output / f"reports/{report_id}.md"
+    report.write_text(report.read_text(encoding="utf-8") + "\n发布后解读标记\n", encoding="utf-8")
+    refresh_astro(root, output)
+    assert "发布后解读标记" in (output / f"reports/{report_id}/index.html").read_text(encoding="utf-8")
+
+
+def test_reviewed_chart_renders_static_values_only_on_matching_report(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "site"
+    build_site(root, output)
+    reports = json.loads((output / "data/reports.json").read_text(encoding="utf-8"))["reports"]
+    report_id = reports[0]["id"]
+    other_id = reports[1]["id"]
+    chart = output / f"data/charts/{report_id}.json"
+    chart.parent.mkdir(parents=True)
+    payload = public_chart()
+    payload["report_id"] = report_id
+    payload["date"] = reports[0]["date"]
+    payload["kind"] = reports[0]["kind"]
+    payload["charts"][0]["points"][0]["observation_date"] = reports[0]["date"]
+    chart.write_text(json.dumps(rehash(payload), ensure_ascii=False), encoding="utf-8")
+    refresh_astro(root, output)
+    matching = (output / f"reports/{report_id}/index.html").read_text(encoding="utf-8")
+    other = (output / f"reports/{other_id}/index.html").read_text(encoding="utf-8")
+    self_contained = ("上涨家数", reports[0]["date"], "https://example.test/source")
+    for text in self_contained:
+        assert text in matching
+    assert "astro-island" in matching
+    assert "https://example.test/source" not in other

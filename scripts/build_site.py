@@ -4,17 +4,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
+import subprocess
+import tempfile
 from pathlib import Path
 
 try:
+    from .audit_chart_artifact import audit_chart_artifact
+    from .chart_contract import validate_public_chart
     from .generate_daily_summary import current_summaries
     from .generate_insights import SCHEMA as INSIGHT_SCHEMA
     from .generate_insights import _valid_history
     from .insight_contract import evaluate_watchpoints
     from .pipeline_health import health_report
 except ImportError:
+    from audit_chart_artifact import audit_chart_artifact
+    from chart_contract import validate_public_chart
     from generate_daily_summary import current_summaries
     from generate_insights import SCHEMA as INSIGHT_SCHEMA
     from generate_insights import _valid_history
@@ -34,6 +41,59 @@ STATIC_FILES = (
     "theme-utils.js",
     "styles.css",
 )
+
+
+def copy_public_charts(root: Path, output: Path, report_ids: set[str]) -> list[str]:
+    """Copy only indexed and fully validated public chart manifests."""
+    source_dir = (root / "data/charts").resolve()
+    copied: list[str] = []
+    for report_id in sorted(report_ids):
+        source = root / "data/charts" / f"{report_id}.json"
+        if not source.exists():
+            continue
+        if not source.resolve().is_relative_to(source_dir) or not source.is_file():
+            raise ValueError(f"unsafe chart source: {report_id}")
+        payload = validate_public_chart(json.loads(source.read_text(encoding="utf-8")), expected_id=report_id)
+        destination = output / "data/charts" / f"{report_id}.json"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        copied.append(report_id)
+    return copied
+
+
+def _overlay_astro_pages(root: Path, output: Path, report_ids: set[str]) -> None:
+    """Build Astro against the already validated public snapshot."""
+    if not (root / "package.json").is_file():
+        return  # Synthetic Python-only build fixtures do not carry the site project.
+    # Astro renames compiled assets, so its temporary output must share the
+    # checkout filesystem; the reviewed data can still live on another mount.
+    with tempfile.TemporaryDirectory(prefix="market-intel-astro-", dir=root.parent) as temporary:
+        built = Path(temporary) / "site"
+        env = {**os.environ, "ASTRO_DATA_ROOT": str(output), "ASTRO_OUT_DIR": str(built)}
+        try:
+            subprocess.run(
+                ["npm", "run", "build"],
+                cwd=root,
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=180,
+            )
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            raise ValueError("Astro static build failed") from exc
+        if not (built / "index.html").is_file():
+            raise ValueError("Astro index is missing")
+        for report_id in report_ids:
+            source = built / "reports" / report_id / "index.html"
+            if not source.is_file():
+                raise ValueError(f"Astro report page missing: {report_id}")
+            destination = output / "reports" / report_id / "index.html"
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        if (built / "_astro").is_dir():
+            shutil.copytree(built / "_astro", output / "_astro", dirs_exist_ok=True)
+        shutil.copy2(built / "index.html", output / "index.html")
 
 
 def _read_index(path: Path, schema: str, key: str) -> tuple[dict, list[dict]]:
@@ -82,7 +142,7 @@ def _copy_daily_report(root: Path, output: Path) -> None:
                 shutil.copy2(source, output / filename)
 
 
-def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
+def _build_site_contents(root: Path, output: Path, summaries_path: Path | None = None) -> None:
     root = root.resolve()
     output = output.resolve()
     summaries_path = (summaries_path or root / "data/daily_summaries.json").resolve()
@@ -94,13 +154,12 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
         raise ValueError("build output must be outside the repository")
     if root.is_relative_to(output) or output == output.parent:
         raise ValueError("build output must not contain the repository")
-    if output.exists():
-        shutil.rmtree(output)
     (output / "data").mkdir(parents=True)
     (output / "reports").mkdir()
     for filename in STATIC_FILES:
         shutil.copy2(root / filename, output / filename)
     shutil.copy2(root / "data/reports.json", output / "data/reports.json")
+    copy_public_charts(root, output, {str(report["id"]) for report in reports})
     _copy_daily_report(root, output)
     summary_data["summaries"] = current_summaries(reports, summaries)
     (output / "data/daily_summaries.json").write_text(
@@ -137,6 +196,43 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
         destination = output / source.relative_to(root)
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+    _overlay_astro_pages(root, output, {str(report["id"]) for report in reports})
+
+
+def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
+    """Publish an entirely validated artifact, preserving the old one on failure."""
+    root = root.resolve()
+    output = output.resolve()
+    if output == root or output.is_relative_to(root):
+        raise ValueError("build output must be outside the repository")
+    if root.is_relative_to(output) or output == output.parent:
+        raise ValueError("build output must not contain the repository")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="market-intel-site-", dir=output.parent) as temporary:
+        staging_root = Path(temporary)
+        staged = staging_root / "new"
+        previous = staging_root / "previous"
+        _build_site_contents(root, staged, summaries_path)
+        if output.exists():
+            output.replace(previous)
+        try:
+            staged.replace(output)
+        except OSError:
+            if previous.exists():
+                previous.replace(output)
+            raise
+
+
+def refresh_astro(root: Path, output: Path) -> None:
+    """Render HTML again after the deploy workflow updates its reviewed snapshot."""
+    root = root.resolve()
+    output = output.resolve()
+    if output == root or output.is_relative_to(root) or root.is_relative_to(output):
+        raise ValueError("Astro snapshot must be outside the repository")
+    _, reports = _read_index(output / "data/reports.json", REPORT_SCHEMA, "reports")
+    _validate(reports, _read_index(output / "data/daily_summaries.json", SUMMARY_SCHEMA, "summaries")[1])
+    audit_chart_artifact(output)
+    _overlay_astro_pages(root, output, {str(report["id"]) for report in reports})
 
 
 def main() -> None:
@@ -144,8 +240,14 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="repository root")
     parser.add_argument("--output", type=Path, required=True, help="Pages artifact output directory")
     parser.add_argument("--summaries", type=Path, help="summary index override")
+    parser.add_argument(
+        "--refresh-astro", action="store_true", help="re-render HTML after commentary generation"
+    )
     args = parser.parse_args()
-    build_site(args.root, args.output, args.summaries)
+    if args.refresh_astro:
+        refresh_astro(args.root, args.output)
+    else:
+        build_site(args.root, args.output, args.summaries)
     print(f"Built public site at {args.output}")
 
 
