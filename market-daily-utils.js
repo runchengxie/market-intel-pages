@@ -68,7 +68,9 @@ function summarizeMarketDaily(payload) {
   const updatedDate = parts.length
     ? ["year", "month", "day"].map((type) => parts.find((part) => part.type === type).value).join("-")
     : date;
-  return { date, rows, claims, gaps, nextMorningRevision: updatedDate !== date };
+  const hasTextReport = Array.isArray(payload.report_formats)
+    && payload.report_formats.includes("txt") && payload.report_formats.includes("md");
+  return { date, rows, claims, gaps, hasTextReport, nextMorningRevision: updatedDate !== date };
 }
 
 function buildMarketDailyCharts(summary) {

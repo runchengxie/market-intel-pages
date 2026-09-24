@@ -304,6 +304,7 @@ button, input { font: inherit; }
 .market-daily-chart-label-box { min-width: 0; }
 .market-daily-chart-label { color: var(--ink); font-size: 12px; font-weight: 600; text-decoration-color: var(--accent); text-underline-offset: 3px; }
 .market-daily-chart-date { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+.market-daily-chart-source { display: block; color: var(--muted); font-size: 10px; }
 .market-daily-chart-track { position: relative; height: 14px; background: var(--accent-pale); border-radius: 3px; }
 .market-daily-chart-track::after { position: absolute; z-index: 1; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--ink-soft); content: ""; }
 .market-daily-chart-fill { position: absolute; top: 2px; bottom: 2px; border-radius: 2px; }

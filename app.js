@@ -31,7 +31,7 @@ function renderMarketDaily(payload) {
     return;
   }
   status.textContent = window.marketDailyUtils.formatMarketDailyStatus(summary);
-  files.replaceChildren(...[["下载纯文本报告", "txt"], ["查看 Markdown 版本", "md"]].map(([label, suffix]) => {
+  files.replaceChildren(...(summary.hasTextReport ? [["下载纯文本报告", "txt"], ["查看 Markdown 版本", "md"]] : []).map(([label, suffix]) => {
     const link = makeElement("a", "market-daily-file", label);
     link.href = `reports/${summary.date}-market-daily.${suffix}`;
     if (suffix === "txt") link.setAttribute("download", "");
@@ -48,7 +48,9 @@ function renderMarketDaily(payload) {
       label.rel = "noopener noreferrer";
       label.title = `观测日 ${row.observationDate} · ${row.sourceLabel}`;
       const labelBox = makeElement("div", "market-daily-chart-label-box");
-      labelBox.append(label, makeElement("span", "market-daily-chart-date", `观测日 ${row.observationDate}`));
+      labelBox.append(label,
+        makeElement("span", "market-daily-chart-date", `观测日 ${row.observationDate}`),
+        makeElement("span", "market-daily-chart-source", row.sourceLabel));
       const track = makeElement("div", "market-daily-chart-track");
       track.setAttribute("aria-hidden", "true");
       const fill = makeElement("span", `market-daily-chart-fill is-${row.side}`);

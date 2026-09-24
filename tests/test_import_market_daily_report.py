@@ -228,6 +228,7 @@ def test_import_requires_matching_public_manifest_and_omits_private_fields(tmp_p
     output = tmp_path / "site"
     assert import_report(source, output, manifest) == "2026-09-19"
     public = (output / "data/market_daily_report.json").read_text()
+    assert json.loads(public)["report_formats"] == ["md", "txt"]
     assert "private_research_draft" not in public
     assert "private_passage" not in public
     assert "unreviewed private draft title" not in public

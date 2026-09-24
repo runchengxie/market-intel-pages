@@ -172,6 +172,7 @@ def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[s
     return {
         "schema_version": payload["schema_version"],
         "publication": "public",
+        "report_formats": ["md", "txt"],
         "as_of": payload["as_of"],
         "generated_at": payload["generated_at"],
         "run_id": payload["run_id"],

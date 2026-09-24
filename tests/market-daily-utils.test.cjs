@@ -20,6 +20,7 @@ test("market daily keeps the observation date and lagged yield state", () => {
   assert.equal(summary.rows[0].quality, "lagged");
   assert.equal(summary.rows[1].text, "CPI 同比 3.40%");
   assert.deepEqual(summary.gaps, ["美债收益率当日变动", "指数行情"]);
+  assert.equal(summary.hasTextReport, false);
 });
 
 test("market daily status calls a report date a report date, including missing sources", () => {
@@ -38,6 +39,7 @@ test("market daily shows reviewed index returns, Treasury rates and cited explan
   const summary = summarizeMarketDaily({
     schema_version: "1.0", run_id: "daily-2026-09-23",
     as_of: "2026-09-24T08:30:00+00:00", quality_summary: { status: "ok" },
+    report_formats: ["md", "txt"],
     missing_sources: [],
     facts: [
       { id: "index.spx.change_percent", value: -0.8, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/amp/Business/example" },
@@ -52,6 +54,7 @@ test("market daily shows reviewed index returns, Treasury rates and cited explan
   assert.equal(summary.rows[1].sourceLabel, "美国财政部原始数据");
   assert.equal(summary.claims[0].text, "美联社认为美债收益率上升带来压力。");
   assert.deepEqual(summary.gaps, []);
+  assert.equal(summary.hasTextReport, true);
   assert.match(formatMarketDailyStatus(summary), /次日核实更新/);
 });
 
