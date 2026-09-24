@@ -3,9 +3,9 @@ const MARKET_DAILY_FACTS = [
   ["index.dow.change_percent", "道指日涨跌", "%"],
   ["index.nasdaq.change_percent", "纳指日涨跌", "%"],
   ["index.russell2000.change_percent", "罗素 2000 日涨跌", "%"],
-  ["treasury.10y.change_bp", "10 年期美债收益率日变动", " bp"],
   ["treasury.2y.change_bp", "2 年期美债收益率日变动", " bp"],
   ["treasury.5y.change_bp", "5 年期美债收益率日变动", " bp"],
+  ["treasury.10y.change_bp", "10 年期美债收益率日变动", " bp"],
   ["treasury.30y.change_bp", "30 年期美债收益率日变动", " bp"],
   ["macro.cpi_yoy", "CPI 同比", "%"],
   ["macro.pce_yoy", "PCE 同比", "%"],
@@ -37,6 +37,9 @@ function summarizeMarketDaily(payload) {
         || !/^\d{4}-\d{2}-\d{2}$/.test(fact.observation_date ?? "")
         || !validSource) return null;
     rows.push({
+      id,
+      label: label.replace(/日涨跌|收益率日变动/g, "").trim(),
+      value: fact.value,
       text: `${label} ${fact.value.toFixed(2)}${unit}`,
       observationDate: fact.observation_date,
       sourceUrl,
@@ -68,11 +71,33 @@ function summarizeMarketDaily(payload) {
   return { date, rows, claims, gaps, nextMorningRevision: updatedDate !== date };
 }
 
+function buildMarketDailyCharts(summary) {
+  if (!summary) return [];
+  const definitions = [
+    { title: "四大指数收盘涨跌", unit: "%", prefix: "index." },
+    { title: "美债收益率当日变动", unit: "bp", prefix: "treasury." },
+  ];
+  return definitions.map(({ title, unit, prefix }) => {
+    const rows = summary.rows.filter((row) => row.id.startsWith(prefix)
+      && row.observationDate === summary.date && row.quality !== "lagged");
+    const maximum = Math.max(...rows.map((row) => Math.abs(row.value)), 0);
+    return {
+      title, unit,
+      rows: rows.map((row) => ({
+        ...row,
+        side: row.value < 0 ? "negative" : "positive",
+        width: maximum ? Math.abs(row.value) / maximum * 100 : 0,
+        valueText: `${row.value >= 0 ? "+" : ""}${row.value.toFixed(2)}${unit === "%" ? "%" : " bp"}`,
+      })),
+    };
+  }).filter((chart) => chart.rows.length);
+}
+
 function formatMarketDailyStatus(summary) {
   return `${summary.date} 美东报告日 · 逐项显示原始观测日。`
     + (summary.nextMorningRevision ? " 次日核实更新。" : "")
     + (summary.gaps.length ? ` 尚缺：${summary.gaps.join("、")}。` : "");
 }
 
-if (typeof module !== "undefined") module.exports = { summarizeMarketDaily, formatMarketDailyStatus };
-if (typeof window !== "undefined") window.marketDailyUtils = { summarizeMarketDaily, formatMarketDailyStatus };
+if (typeof module !== "undefined") module.exports = { summarizeMarketDaily, formatMarketDailyStatus, buildMarketDailyCharts };
+if (typeof window !== "undefined") window.marketDailyUtils = { summarizeMarketDaily, formatMarketDailyStatus, buildMarketDailyCharts };

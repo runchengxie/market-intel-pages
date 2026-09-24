@@ -18,16 +18,50 @@ const dateFilter = document.querySelector("#date-filter");
 function renderMarketDaily(payload) {
   const summary = window.marketDailyUtils.summarizeMarketDaily(payload);
   const status = document.querySelector("#market-daily-status");
+  const files = document.querySelector("#market-daily-files");
+  const charts = document.querySelector("#market-daily-charts");
   const list = document.querySelector("#market-daily-list");
   const claimList = document.querySelector("#market-daily-claims");
   if (!summary) {
     status.textContent = "美股宏观日报尚未发布，或数据未通过校验。";
+    files.replaceChildren();
+    charts.replaceChildren();
     list.replaceChildren();
     claimList.replaceChildren();
     return;
   }
   status.textContent = window.marketDailyUtils.formatMarketDailyStatus(summary);
-  list.replaceChildren(...summary.rows.map((row) => {
+  files.replaceChildren(...[["下载纯文本报告", "txt"], ["查看 Markdown 版本", "md"]].map(([label, suffix]) => {
+    const link = makeElement("a", "market-daily-file", label);
+    link.href = `reports/${summary.date}-market-daily.${suffix}`;
+    if (suffix === "txt") link.setAttribute("download", "");
+    return link;
+  }));
+  charts.replaceChildren(...window.marketDailyUtils.buildMarketDailyCharts(summary).map((chart) => {
+    const figure = makeElement("figure", "market-daily-chart");
+    figure.append(makeElement("figcaption", "market-daily-chart-title", `${chart.title}（${chart.unit}）`));
+    chart.rows.forEach((row) => {
+      const line = makeElement("div", "market-daily-chart-row");
+      const label = makeElement("a", "market-daily-chart-label", row.label);
+      label.href = row.sourceUrl;
+      label.target = "_blank";
+      label.rel = "noopener noreferrer";
+      label.title = `观测日 ${row.observationDate} · ${row.sourceLabel}`;
+      const labelBox = makeElement("div", "market-daily-chart-label-box");
+      labelBox.append(label, makeElement("span", "market-daily-chart-date", `观测日 ${row.observationDate}`));
+      const track = makeElement("div", "market-daily-chart-track");
+      track.setAttribute("aria-hidden", "true");
+      const fill = makeElement("span", `market-daily-chart-fill is-${row.side}`);
+      fill.style.width = `${row.width / 2}%`;
+      track.append(fill);
+      const value = makeElement("span", "market-daily-chart-value", row.valueText);
+      line.append(labelBox, track, value);
+      figure.append(line);
+    });
+    figure.append(makeElement("p", "market-daily-chart-note", "点击名称查看原始来源。"));
+    return figure;
+  }));
+  list.replaceChildren(...summary.rows.filter((row) => row.id.startsWith("macro.") || row.quality === "lagged").map((row) => {
     const card = makeElement("article", "market-daily-card");
     card.append(makeElement("p", "market-daily-value", row.text));
     const source = makeElement("a", "source-link", `观测日 ${row.observationDate} · ${row.sourceLabel}`);
@@ -36,7 +70,6 @@ function renderMarketDaily(payload) {
     source.rel = "noopener noreferrer";
     card.append(source);
     if (row.quality === "lagged") card.append(makeElement("span", "market-daily-lag", "当日数据未公布"));
-    list.append(card);
     return card;
   }));
   claimList.replaceChildren(...summary.claims.map((claim) => {

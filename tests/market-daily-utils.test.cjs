@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { summarizeMarketDaily, formatMarketDailyStatus } = require("../market-daily-utils.js");
+const { summarizeMarketDaily, formatMarketDailyStatus, buildMarketDailyCharts } = require("../market-daily-utils.js");
 
 test("market daily keeps the observation date and lagged yield state", () => {
   const summary = summarizeMarketDaily({
@@ -53,4 +53,26 @@ test("market daily shows reviewed index returns, Treasury rates and cited explan
   assert.equal(summary.claims[0].text, "美联社认为美债收益率上升带来压力。");
   assert.deepEqual(summary.gaps, []);
   assert.match(formatMarketDailyStatus(summary), /次日核实更新/);
+});
+
+test("market daily charts keep signed values and source dates in separate units", () => {
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-23", facts: [
+      { id: "index.spx.change_percent", value: -0.8, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/amp/Business/example" },
+      { id: "index.dow.change_percent", value: 0.4, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/amp/Business/example" },
+      { id: "treasury.2y.change_bp", value: 14, quality: "ok", observation_date: "2026-09-23", source_url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve" },
+      { id: "treasury.10y.change_bp", value: 15, quality: "ok", observation_date: "2026-09-23", source_url: "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve" },
+    ],
+  });
+  const charts = buildMarketDailyCharts(summary);
+  assert.deepEqual(charts.map((chart) => [chart.title, chart.unit, chart.rows.length]), [
+    ["四大指数收盘涨跌", "%", 2], ["美债收益率当日变动", "bp", 2],
+  ]);
+  assert.deepEqual(charts[0].rows.map((row) => [row.valueText, row.side, row.width]), [
+    ["-0.80%", "negative", 100], ["+0.40%", "positive", 50],
+  ]);
+  assert.deepEqual(charts[1].rows.map((row) => row.label), ["2 年期美债", "10 年期美债"]);
+  assert.equal(charts[1].rows[0].valueText, "+14.00 bp");
+  assert.equal(charts[1].rows[0].observationDate, "2026-09-23");
+  assert.match(charts[1].rows[0].sourceUrl, /^https:\/\/home\.treasury\.gov\//);
 });

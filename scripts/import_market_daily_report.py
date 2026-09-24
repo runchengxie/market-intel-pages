@@ -246,9 +246,12 @@ def _markdown(payload: dict[str, Any]) -> str:
         f"# 美股市场日报（{_date(payload)}）",
         "",
         f"数据状态：{payload.get('quality_summary', {}).get('status', 'unknown')}",
-        f"资料核实截至：{payload['as_of']}（美东报告日 {_date(payload)}）",
+        f"报告生成时间：{payload['as_of']}（美东报告日 {_date(payload)}）",
         "",
     ]
+    cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
+    if cutoff:
+        lines[4:4] = [f"新闻资料截止：{cutoff}。", ""]
     lines.extend(_macro_lines(payload))
     gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
     if gaps:
@@ -265,16 +268,65 @@ def _markdown(payload: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _text_fact_lines(payload: dict[str, Any], prefix: str) -> list[str]:
+    facts = {fact["id"]: fact for fact in payload["facts"] if fact.get("id") in FACT_LABELS}
+    lines = []
+    for fact_id, (label, unit) in FACT_LABELS.items():
+        if not fact_id.startswith(prefix) or fact_id not in facts:
+            continue
+        fact = facts[fact_id]
+        value = f"{fact['value']:+.2f}" if prefix in ("index.", "treasury.") else f"{fact['value']:.2f}"
+        suffix = unit if unit == "%" else f" {unit}"
+        lines.extend(
+            [
+                f"- {label}：{value}{suffix}（观测日 {fact['observation_date']}）",
+                f"  来源：{fact['source_url']}",
+            ]
+        )
+    return lines or ["- 暂无经核实数据。"]
+
+
+def _text_report(payload: dict[str, Any]) -> str:
+    report_date = _date(payload)
+    lines = [
+        f"美股市场日报｜{report_date} 美东报告日",
+        f"报告生成时间：{payload['as_of']}；逐项显示原始观测日。",
+        "",
+        "一、美股市场表现",
+        *_text_fact_lines(payload, "index."),
+        "",
+        "二、美债与宏观",
+        *_text_fact_lines(payload, "treasury."),
+        *_text_fact_lines(payload, "macro."),
+        "",
+        "三、核实后的解读与公司动态",
+    ]
+    cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
+    if cutoff:
+        lines[2:2] = [f"新闻资料截止：{cutoff}。"]
+    for index, claim in enumerate(payload["claims"], start=1):
+        lines.extend([f"{index}、{claim['claim']}", *(f"   来源：{url}" for url in claim["sources"])])
+    if not payload["claims"]:
+        lines.append("暂无已核实的研究解释。")
+    gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
+    if gaps:
+        lines.extend(["", f"尚缺：{'、'.join(gaps)}。"])
+    lines.extend(["", "风险提示：市场有风险，投资需谨慎。", ""])
+    return "\n".join(lines)
+
+
 def import_report(source: Path, root: Path, manifest_path: Path) -> str:
     manifest = _public_manifest(source, manifest_path)
     payload = _public_payload(_read(source), manifest)
     report_date = _date(payload)
     data_path = root / "data/market_daily_report.json"
     report_path = root / f"reports/{report_date}-market-daily.md"
+    text_path = root / f"reports/{report_date}-market-daily.txt"
     data_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     data_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     report_path.write_text(_markdown(payload), encoding="utf-8")
+    text_path.write_text(_text_report(payload), encoding="utf-8")
     return report_date
 
 
