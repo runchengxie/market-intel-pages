@@ -5,9 +5,9 @@
     "md",
     "txt"
   ],
-  "as_of": "2026-09-24T11:56:55.228356+00:00",
-  "generated_at": "2026-09-24T11:56:55.228356+00:00",
-  "run_id": "daily-2026-09-23",
+  "as_of": "2026-09-24T22:32:26.570134+00:00",
+  "generated_at": "2026-09-24T22:32:26.570134+00:00",
+  "run_id": "daily-2026-09-24",
   "sections": [
     {
       "key": "market",
@@ -16,23 +16,15 @@
         "treasury.2y.change_bp",
         "treasury.5y.change_bp",
         "treasury.10y.change_bp",
-        "treasury.30y.change_bp",
-        "index.spx.change_percent",
-        "index.dow.change_percent",
-        "index.nasdaq.change_percent",
-        "index.russell2000.change_percent"
+        "treasury.30y.change_bp"
       ],
-      "claims": [
-        "reviewed.0"
-      ]
+      "claims": []
     },
     {
       "key": "drivers",
       "title": "市场驱动因素",
       "facts": [],
-      "claims": [
-        "reviewed.1"
-      ]
+      "claims": []
     },
     {
       "key": "macro",
@@ -43,31 +35,19 @@
         "macro.unemployment_rate",
         "macro.payroll_change_thousands"
       ],
-      "claims": [
-        "reviewed.2",
-        "reviewed.3"
-      ]
+      "claims": []
     },
     {
       "key": "company_news",
       "title": "公司新闻",
       "facts": [],
-      "claims": [
-        "reviewed.4",
-        "reviewed.5",
-        "reviewed.6",
-        "reviewed.7"
-      ]
+      "claims": []
     },
     {
       "key": "movers",
       "title": "主要上涨与下跌个股",
       "facts": [],
-      "claims": [
-        "reviewed.10",
-        "reviewed.11",
-        "reviewed.12"
-      ]
+      "claims": []
     }
   ],
   "facts": [
@@ -75,61 +55,61 @@
       "id": "treasury.2y.change_bp",
       "metric": "yield_change",
       "instrument": "US_TREASURY_2Y",
-      "value": 14.0,
+      "value": 2.0,
       "previous": null,
-      "change": 14.0,
+      "change": 2.0,
       "unit": "basis_points",
       "source": "US Treasury",
       "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
-      "source_time": "2026-09-24T11:56:54.509219+00:00",
-      "retrieved_at": "2026-09-24T11:56:54.509219+00:00",
+      "source_time": "2026-09-24T22:32:23.042660+00:00",
+      "retrieved_at": "2026-09-24T22:32:23.042660+00:00",
       "quality": "ok",
-      "observation_date": "2026-09-23"
+      "observation_date": "2026-09-24"
     },
     {
       "id": "treasury.5y.change_bp",
       "metric": "yield_change",
       "instrument": "US_TREASURY_5Y",
-      "value": 16.0,
+      "value": 4.0,
       "previous": null,
-      "change": 16.0,
+      "change": 4.0,
       "unit": "basis_points",
       "source": "US Treasury",
       "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
-      "source_time": "2026-09-24T11:56:54.509219+00:00",
-      "retrieved_at": "2026-09-24T11:56:54.509219+00:00",
+      "source_time": "2026-09-24T22:32:23.042660+00:00",
+      "retrieved_at": "2026-09-24T22:32:23.042660+00:00",
       "quality": "ok",
-      "observation_date": "2026-09-23"
+      "observation_date": "2026-09-24"
     },
     {
       "id": "treasury.10y.change_bp",
       "metric": "yield_change",
       "instrument": "US_TREASURY_10Y",
-      "value": 15.0,
+      "value": 7.0,
       "previous": null,
-      "change": 15.0,
+      "change": 7.0,
       "unit": "basis_points",
       "source": "US Treasury",
       "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
-      "source_time": "2026-09-24T11:56:54.509219+00:00",
-      "retrieved_at": "2026-09-24T11:56:54.509219+00:00",
+      "source_time": "2026-09-24T22:32:23.042660+00:00",
+      "retrieved_at": "2026-09-24T22:32:23.042660+00:00",
       "quality": "ok",
-      "observation_date": "2026-09-23"
+      "observation_date": "2026-09-24"
     },
     {
       "id": "treasury.30y.change_bp",
       "metric": "yield_change",
       "instrument": "US_TREASURY_30Y",
-      "value": 11.0,
+      "value": 7.0,
       "previous": null,
-      "change": 11.0,
+      "change": 7.0,
       "unit": "basis_points",
       "source": "US Treasury",
       "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
-      "source_time": "2026-09-24T11:56:54.509219+00:00",
-      "retrieved_at": "2026-09-24T11:56:54.509219+00:00",
+      "source_time": "2026-09-24T22:32:23.042660+00:00",
+      "retrieved_at": "2026-09-24T22:32:23.042660+00:00",
       "quality": "ok",
-      "observation_date": "2026-09-23"
+      "observation_date": "2026-09-24"
     },
     {
       "id": "macro.cpi_yoy",
@@ -141,8 +121,8 @@
       "unit": "percent_yoy",
       "source": "FRED",
       "source_url": "https://fred.stlouisfed.org/series/CPIAUCNS",
-      "source_time": "2026-09-24T11:56:54.690395+00:00",
-      "retrieved_at": "2026-09-24T11:56:54.690395+00:00",
+      "source_time": "2026-09-24T22:32:23.511292+00:00",
+      "retrieved_at": "2026-09-24T22:32:23.511292+00:00",
       "quality": "ok",
       "observation_date": "2026-08-01"
     },
@@ -156,8 +136,8 @@
       "unit": "percent_yoy",
       "source": "FRED",
       "source_url": "https://fred.stlouisfed.org/series/PCEPI",
-      "source_time": "2026-09-24T11:56:54.874656+00:00",
-      "retrieved_at": "2026-09-24T11:56:54.874656+00:00",
+      "source_time": "2026-09-24T22:32:23.991222+00:00",
+      "retrieved_at": "2026-09-24T22:32:23.991222+00:00",
       "quality": "ok",
       "observation_date": "2026-07-01"
     },
@@ -171,8 +151,8 @@
       "unit": "percent",
       "source": "FRED",
       "source_url": "https://fred.stlouisfed.org/series/UNRATE",
-      "source_time": "2026-09-24T11:56:55.046624+00:00",
-      "retrieved_at": "2026-09-24T11:56:55.046624+00:00",
+      "source_time": "2026-09-24T22:32:26.014376+00:00",
+      "retrieved_at": "2026-09-24T22:32:26.014376+00:00",
       "quality": "ok",
       "observation_date": "2026-08-01"
     },
@@ -186,246 +166,20 @@
       "unit": "thousand_persons",
       "source": "FRED",
       "source_url": "https://fred.stlouisfed.org/series/PAYEMS",
-      "source_time": "2026-09-24T11:56:55.227813+00:00",
-      "retrieved_at": "2026-09-24T11:56:55.227813+00:00",
+      "source_time": "2026-09-24T22:32:26.569994+00:00",
+      "retrieved_at": "2026-09-24T22:32:26.569994+00:00",
       "quality": "ok",
       "observation_date": "2026-08-01"
-    },
-    {
-      "id": "index.spx.change_percent",
-      "metric": "daily_return",
-      "instrument": "S&P 500",
-      "value": -0.8,
-      "previous": null,
-      "change": -0.8,
-      "unit": "percent",
-      "source": "www-cdn.abcnews.com",
-      "source_url": "https://www-cdn.abcnews.com/Business/wireStory/major-us-stock-indexes-fared-wednesday-9232026-136697299",
-      "source_time": "2026-09-23T16:12:00-04:00",
-      "retrieved_at": "2026-09-23T23:59:59-04:00",
-      "quality": "reviewed",
-      "observation_date": "2026-09-23"
-    },
-    {
-      "id": "index.dow.change_percent",
-      "metric": "daily_return",
-      "instrument": "Dow Jones Industrial Average",
-      "value": -0.7,
-      "previous": null,
-      "change": -0.7,
-      "unit": "percent",
-      "source": "www-cdn.abcnews.com",
-      "source_url": "https://www-cdn.abcnews.com/Business/wireStory/major-us-stock-indexes-fared-wednesday-9232026-136697299",
-      "source_time": "2026-09-23T16:12:00-04:00",
-      "retrieved_at": "2026-09-23T23:59:59-04:00",
-      "quality": "reviewed",
-      "observation_date": "2026-09-23"
-    },
-    {
-      "id": "index.nasdaq.change_percent",
-      "metric": "daily_return",
-      "instrument": "Nasdaq Composite",
-      "value": -1.1,
-      "previous": null,
-      "change": -1.1,
-      "unit": "percent",
-      "source": "www-cdn.abcnews.com",
-      "source_url": "https://www-cdn.abcnews.com/Business/wireStory/major-us-stock-indexes-fared-wednesday-9232026-136697299",
-      "source_time": "2026-09-23T16:12:00-04:00",
-      "retrieved_at": "2026-09-23T23:59:59-04:00",
-      "quality": "reviewed",
-      "observation_date": "2026-09-23"
-    },
-    {
-      "id": "index.russell2000.change_percent",
-      "metric": "daily_return",
-      "instrument": "Russell 2000",
-      "value": -1.8,
-      "previous": null,
-      "change": -1.8,
-      "unit": "percent",
-      "source": "www-cdn.abcnews.com",
-      "source_url": "https://www-cdn.abcnews.com/Business/wireStory/major-us-stock-indexes-fared-wednesday-9232026-136697299",
-      "source_time": "2026-09-23T16:12:00-04:00",
-      "retrieved_at": "2026-09-23T23:59:59-04:00",
-      "quality": "reviewed",
-      "observation_date": "2026-09-23"
     }
   ],
-  "events": [
-    {
-      "id": "reviewed.0"
-    },
-    {
-      "id": "reviewed.1"
-    },
-    {
-      "id": "reviewed.2"
-    },
-    {
-      "id": "reviewed.3"
-    },
-    {
-      "id": "reviewed.4"
-    },
-    {
-      "id": "reviewed.5"
-    },
-    {
-      "id": "reviewed.6"
-    },
-    {
-      "id": "reviewed.7"
-    },
-    {
-      "id": "reviewed.10"
-    },
-    {
-      "id": "reviewed.11"
-    },
-    {
-      "id": "reviewed.12"
-    }
+  "events": [],
+  "claims": [],
+  "missing_sources": [
+    "quotes",
+    "research"
   ],
-  "claims": [
-    {
-      "claim": "据美联社 9 月 23 日收盘报道，标普 500 跌 0.8%，道指跌 0.7%，纳指跌 1.1%，罗素 2000 跌 1.8%。",
-      "evidence_ids": [
-        "reviewed.0"
-      ],
-      "sources": [
-        "https://www-cdn.abcnews.com/Business/wireStory/major-us-stock-indexes-fared-wednesday-9232026-136697299"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "据路透社收盘报道，美股下跌当天油价和美债收益率上行；报道援引策略师观点称，美伊紧张言论加重市场顾虑，并称强劲的美国商业活动数据推高了市场对加息的预期。",
-      "evidence_ids": [
-        "reviewed.1"
-      ],
-      "sources": [
-        "https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "据路透社援引标普全球数据，美国 9 月综合 PMI 初值升至 58.4，前月为 56.0；报道同时指出供应约束和价格压力有所加重。",
-      "evidence_ids": [
-        "reviewed.2"
-      ],
-      "sources": [
-        "https://www.investing.com/news/economy-news/us-business-activity-at-more-than-fiveyear-high-inflation-pressures-building-4913336"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "据路透社报道，美联储理事 Barr 表示，在其基准情景下，可能仍需进一步调整政策，才能及时推动通胀回到目标；他没有给出具体次数或时点。",
-      "evidence_ids": [
-        "reviewed.3"
-      ],
-      "sources": [
-        "https://www.investing.com/news/economy-news/feds-barr-says-further-rate-hikes-will-likely-be-needed-4913382"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "Paychex 公布 2027 财年第一财季收入 16.305 亿美元，同比增长 6%；GAAP 摊薄每股收益 1.21 美元。",
-      "evidence_ids": [
-        "reviewed.4"
-      ],
-      "sources": [
-        "https://investor.paychex.com/news-events/press-releases/detail/850/paychex-reports-first-quarter-fiscal-2027-results"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "Cintas 公布 2027 财年第一财季收入 30.1 亿美元，同比增长 10.9%；公司上调全年收入及调整后每股收益指引。",
-      "evidence_ids": [
-        "reviewed.5"
-      ],
-      "sources": [
-        "https://www.cintas.com/about/newsroom/details/news/2026/09/22/cintas-corporation-announces-fiscal-2027-first-quarter-results/"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "麦当劳宣布 NEXT 战略，并提出到 2030 年把营业利润率提升至 50% 出头至中段区间的目标；这是公司目标而非已实现业绩。",
-      "evidence_ids": [
-        "reviewed.6"
-      ],
-      "sources": [
-        "https://www.prnewswire.com/news-releases/mcdonalds-advances-next-strategy-to-become-first-choice-for-more-customers-more-often-302886893.html"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "Cracker Barrel 公布 2026 财年第四财季收入 8.493 亿美元，同比下降 2.2%，并给出 2027 财年业绩展望。",
-      "evidence_ids": [
-        "reviewed.7"
-      ],
-      "sources": [
-        "https://investor.crackerbarrel.com/news-releases/news-release-details/cracker-barrel-reports-fourth-quarter-and-full-year-fiscal-2026"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "据路透社收盘报道，Cracker Barrel 当日上涨约 4.5%；报道将涨势与其第四财季销售额高于预期联系起来。",
-      "evidence_ids": [
-        "reviewed.10"
-      ],
-      "sources": [
-        "https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "据路透社收盘报道，Paychex 当日跌近 9%；报道指出，其最大业务部门第一财季收入低于市场预期。",
-      "evidence_ids": [
-        "reviewed.11"
-      ],
-      "sources": [
-        "https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    },
-    {
-      "claim": "据路透社收盘报道，Alphabet 当日跌近 4%，Amazon 跌逾 2%；报道同时讨论了市场对 Meta Muse 助手的反应，但未证明其为两只股票下跌的唯一原因。",
-      "evidence_ids": [
-        "reviewed.12"
-      ],
-      "sources": [
-        "https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222"
-      ],
-      "confidence": "confirmed",
-      "status": "accepted",
-      "provider": "source_audit"
-    }
-  ],
-  "missing_sources": [],
   "quality_summary": {
-    "status": "ok",
-    "revision": "next_morning_rechecked",
-    "reviewed_source_cutoff": "2026-09-23T23:59:59-04:00"
+    "status": "degraded"
   },
   "source_status": {
     "rates": {
@@ -435,14 +189,14 @@
       "quality": "ok"
     },
     "quotes": {
-      "quality": "reviewed",
-      "reason": "source_audited"
+      "quality": "degraded",
+      "reason": "not_connected"
     },
     "research": {
-      "quality": "reviewed",
-      "reason": "source_audited"
+      "quality": "degraded",
+      "reason": "not_connected"
     }
   },
-  "content_hash": "ab4688d5d3dbe1aa880ad69a5bd52ab39091f686b803a422e7d3d9cd6a09b761",
-  "source_report_sha256": "5d5fa22ed84b05fcdd296940c7fc5af2f02fb96a98c63192b799a86b3ebe5366"
+  "content_hash": "0c131a12bfc2ede8dba0e07f6c821f3421bd3b42571059eaea91e129c5d4b624",
+  "source_report_sha256": "1e25ab4529bbc310cbed76c912414234727a5afb63d925be38a00acdc403e7f9"
 }
