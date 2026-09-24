@@ -164,7 +164,9 @@ def current_summaries(reports: list[dict], history: list[dict]) -> list[dict]:
     return valid
 
 
-def _linked_insight(reports: list[dict], pair: tuple[dict, dict] | None, path: Path | None) -> dict | None:
+def _linked_insight(
+    reports: list[dict], pair: tuple[dict, dict] | None, path: Path | None
+) -> tuple[dict, str] | None:
     if pair is None or path is None or not path.exists():
         return None
     try:
@@ -173,7 +175,7 @@ def _linked_insight(reports: list[dict], pair: tuple[dict, dict] | None, path: P
         from generate_insights import _valid_history
     morning, evening = pair
     valid = _valid_history(_read_index(path).get("insights", []), reports)
-    return next(
+    candidate = next(
         (
             row
             for row in valid
@@ -181,6 +183,12 @@ def _linked_insight(reports: list[dict], pair: tuple[dict, dict] | None, path: P
         ),
         None,
     )
+    if candidate is None:
+        return None
+    try:
+        return candidate, validate_summary(candidate["analysis"]["overview"]["text"])
+    except ValueError:
+        return None
 
 
 def run(
@@ -205,7 +213,8 @@ def run(
     )
     history = current_summaries(reports, list(merged.values()))
     pair = select_source_pair(reports)
-    linked = _linked_insight(reports, pair, insights_path)
+    linked_result = _linked_insight(reports, pair, insights_path)
+    linked, linked_text = linked_result if linked_result else (None, None)
     if linked:
         provider, model = linked["provider"], linked["model"]
     status = "no eligible source pair"
@@ -238,7 +247,7 @@ def run(
             existing is not None
             and existing.get("provider") == linked.get("provider")
             and existing.get("insight_source_hash") == linked.get("source_hash")
-            and existing.get("text") == validate_summary(linked["analysis"]["overview"]["text"])
+            and existing.get("text") == linked_text
         )
         if (
             existing
@@ -251,7 +260,8 @@ def run(
             try:
                 prompt_path = Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md"
                 if linked:
-                    text = validate_summary(linked["analysis"]["overview"]["text"])
+                    assert linked_text is not None
+                    text = linked_text
                 else:
                     if api_key is None:
                         raise ValueError("model key unavailable")

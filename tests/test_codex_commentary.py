@@ -9,11 +9,67 @@ from unittest.mock import patch
 from scripts.generate_codex_commentary import run
 from scripts.generate_daily_summary import current_summaries
 from scripts.generate_daily_summary import run as run_summary
+from scripts.generate_insights import _latest_insights
 from scripts.generate_insights import run as run_insight
 from tests.test_insights import analysis, sources
 
 
 class CodexCommentaryTests(unittest.TestCase):
+    def test_valid_codex_record_outweighs_later_cloud_history(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports = root / "reports.json"
+            rows = sources()
+            reports.write_text(
+                json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": rows})
+            )
+            codex = run_insight(
+                reports,
+                root / "codex.json",
+                provider="codex",
+                api_key="local",
+                generator=lambda *_: analysis(),
+            )["insights"][0]
+            cloud = run_insight(
+                reports,
+                root / "cloud.json",
+                provider="gemini",
+                api_key="test",
+                generator=lambda *_: analysis(),
+            )["insights"][0]
+            cloud["generated_at"] = "2026-09-30T23:00:00+08:00"
+            self.assertEqual("codex", _latest_insights([codex, cloud], rows)[0]["provider"])
+
+    def test_too_long_linked_overview_uses_independent_summary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            reports, summaries, insights = (
+                root / name for name in ("reports.json", "summaries.json", "insights.json")
+            )
+            reports.write_text(
+                json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": sources()})
+            )
+            summaries.write_text(json.dumps({"summaries": []}))
+            run_summary(reports, summaries, summaries, "test", generator=lambda *_: "原有简评。")
+            long_analysis = analysis()
+            long_analysis["overview"]["text"] = "市场宽度仍待确认。" * 15
+            run_insight(
+                reports, insights, provider="gemini", api_key="test", generator=lambda *_: long_analysis
+            )
+            self.assertEqual(
+                "generated summary",
+                run_summary(
+                    reports,
+                    summaries,
+                    summaries,
+                    "test",
+                    generator=lambda *_: "备用简评。",
+                    insights_path=insights,
+                    force=True,
+                ),
+            )
+            self.assertEqual("备用简评。", json.loads(summaries.read_text())["summaries"][0]["text"])
+
     def test_cloud_insight_can_supply_summary_when_minimax_is_unavailable(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

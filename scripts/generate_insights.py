@@ -206,6 +206,12 @@ def _update_history(
     )
     if (
         current
+        and current.get("provider") == "codex"
+        and (current.get("prompt_hash") != prompt_hash or current.get("prompt_version") != PROMPT_VERSION)
+    ):
+        current = None
+    if (
+        current
         and (current.get("provider") != provider or current.get("fingerprint") == fingerprint)
         and not force
     ):
@@ -250,7 +256,16 @@ def _update_history(
 def _latest_insights(history: list[dict], reports: list[dict]) -> list[dict]:
     dates = sorted({r["date"] for r in reports}, reverse=True)[:5]
     latest = {}
-    for row in sorted(history, key=lambda r: (r["generated_at"], r["id"])):
+    prompt = (Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md").read_bytes()
+    current_prompt_hash = hashlib.sha256(prompt).hexdigest()
+    for row in sorted(
+        history,
+        key=lambda r: (
+            r.get("provider") == "codex" and r.get("prompt_hash") == current_prompt_hash,
+            r["generated_at"],
+            r["id"],
+        ),
+    ):
         if row["date"] in dates:
             latest[row["date"]] = row
     return sorted(latest.values(), key=lambda r: r["date"], reverse=True)
