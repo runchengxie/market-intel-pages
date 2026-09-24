@@ -56,16 +56,19 @@ python3 scripts/sync_public_snapshot.py \
 
 ## 模型生成
 
-两套生成入口分别维护简评和结构化解读：
+生产发布器在本机定时导入新报告时，优先用已登录的 Codex CLI 一次生成结构化解读，并将其通过证据引用与数字校验的概览用作每日简评；CLI 在只读沙盒运行，登录态不上传到 GitHub。无效输出不会写入公开索引，也不会阻止原报告发布。
+
+Actions 部署会保留有效的 Codex 记录；如无记录，结构化解读依次尝试 Gemini、DeepSeek、MiniMax。首个通过校验的结果即停止回退，简评优先沿用同一条解读的概览；所有解读均不可自行补造没有来源的公司新闻或市场归因。若三者均不可用，短简评仍可独立尝试 MiniMax。
+
+本地入口：
 
 | 内容 | 脚本 | 配置 |
 |---|---|---|
-| 一段每日简评 | `scripts/generate_daily_summary.py` | `MINIMAX_API_KEY`，可选 `MINIMAX_MODEL` |
-| 带来源的市场解读 | `scripts/generate_insights.py` | 默认使用 Gemini，也支持 `deepseek`，密钥通过对应环境变量提供 |
+| 本机默认 | `scripts/generate_codex_commentary.py` | 已登录的 Codex CLI；私有工作与归档目录 |
+| 一段每日简评 | `scripts/generate_daily_summary.py` | 有效解读概览；否则 `MINIMAX_API_KEY` |
+| 带来源的市场解读 | `scripts/generate_insights.py` | Actions 依次尝试 Gemini、DeepSeek、MiniMax |
 
-结构化解读默认模型为 `gemini-3.8-flash`，也可以将 `INSIGHT_PROVIDER` 设为 `deepseek` 并使用 `DEEPSEEK_API_KEY`。截至 2026-09-19，仓库已配置 `GEMINI_API_KEY`，并成功生成一条基于 09-18 材料的历史回放。仓库原有短简评仍标记为 `chatgpt-reviewed`，不能据此判断 MiniMax 在线调用是否成功。
-
-将 `INSIGHT_PROVIDER` 设为 `minimax` 可切换结构化解读的提供方，使用 `MINIMAX_API_KEY` 和 `MINIMAX_MODEL`。密钥通过本地进程环境或 GitHub Actions Secret 提供，浏览器只读取生成结果。
+本地单独测试可通过 `--provider` 选择 Gemini、DeepSeek 或 MiniMax；GitHub Actions 使用固定的回退顺序。密钥通过本地进程环境或 GitHub Actions Secret 提供，浏览器只读取生成结果。模型输出通过格式校验并不等于新闻事实获得独立核实。
 
 本地模型环境可以复制 `.env.example` 为 `.env`，再加载后运行：
 

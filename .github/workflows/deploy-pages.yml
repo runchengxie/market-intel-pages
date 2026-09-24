@@ -89,15 +89,6 @@ jobs:
         env:
           SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
         run: python3 scripts/build_site.py --output "$SITE_OUTPUT"
-      - name: Generate latest daily note
-        env:
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-          MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
-          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
-        run: |
-          force_flag=""
-          if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
-          python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
       - name: Generate evidence-linked commentary
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -108,14 +99,25 @@ jobs:
           DEEPSEEK_MODEL: ${{ vars.DEEPSEEK_MODEL }}
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
-          INSIGHT_PROVIDER: ${{ vars.INSIGHT_PROVIDER || 'gemini' }}
           FORCE_INSIGHTS: ${{ inputs.force_insights }}
           SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
           LEDGER_OUTPUT: ${{ runner.temp }}/market-intel-ledger
         run: |
           force_flag=""
           if [ "$FORCE_INSIGHTS" = "true" ]; then force_flag="--force"; fi
-          python3 scripts/generate_insights.py --reports data/reports.json --history data/insights.json --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag
+          for provider in gemini deepseek minimax; do
+            python3 scripts/generate_insights.py --provider "$provider" --reports data/reports.json --history "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag
+            force_flag=""
+          done
+      - name: Generate latest daily note
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
+          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+        run: |
+          force_flag=""
+          if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
+          python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --insights "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
       - name: Preserve commentary revisions and verification receipts
         uses: actions/upload-artifact@v4
         with:

@@ -150,6 +150,25 @@ def current_summaries(reports: list[dict], history: list[dict]) -> list[dict]:
     return valid
 
 
+def _linked_insight(reports: list[dict], pair: tuple[dict, dict] | None, path: Path | None) -> dict | None:
+    if pair is None or path is None or not path.exists():
+        return None
+    try:
+        from .generate_insights import _valid_history
+    except ImportError:
+        from generate_insights import _valid_history
+    morning, evening = pair
+    valid = _valid_history(_read_index(path).get("insights", []), reports)
+    return next(
+        (
+            row
+            for row in valid
+            if row.get("morning_report_id") == morning["id"] and row.get("evening_report_id") == evening["id"]
+        ),
+        None,
+    )
+
+
 def run(
     reports_path: Path,
     summaries_path: Path,
@@ -158,8 +177,12 @@ def run(
     model: str = "MiniMax-M2.7",
     force: bool = False,
     history_url: str | None = None,
+    generator=None,
+    provider: str = "minimax",
+    insights_path: Path | None = None,
 ) -> str:
     reports = _read_index(reports_path).get("reports", [])
+    generator = generator or generate_summary
     history = current_summaries(reports, _read_index(summaries_path).get("summaries", []))
     published_history = current_summaries(reports, _load_published_history(history_url))
     merged = {(row.get("morning_report_id"), row.get("evening_report_id")): row for row in history}
@@ -168,8 +191,11 @@ def run(
     )
     history = current_summaries(reports, list(merged.values()))
     pair = select_source_pair(reports)
+    linked = _linked_insight(reports, pair, insights_path)
+    if linked:
+        provider, model = linked["provider"], linked["model"]
     status = "no eligible source pair"
-    if pair and api_key:
+    if pair and (api_key or linked):
         morning, evening = pair
         pair_ids = (morning["id"], evening["id"])
         fingerprint = hashlib.sha256(
@@ -194,14 +220,25 @@ def run(
             ),
             None,
         )
-        if existing and existing.get("fingerprint") == fingerprint and not force:
+        if (
+            existing
+            and (existing.get("provider") == "codex" or existing.get("fingerprint") == fingerprint)
+            and not force
+        ):
             status = "reused existing summary"
         else:
             try:
                 prompt_path = Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md"
-                text = generate_summary(
-                    build_messages(morning, evening, prompt_path.read_text(encoding="utf-8")), api_key, model
-                )
+                if linked:
+                    text = validate_summary(linked["analysis"]["overview"]["text"])
+                else:
+                    if api_key is None:
+                        raise ValueError("model key unavailable")
+                    text = generator(
+                        build_messages(morning, evening, prompt_path.read_text(encoding="utf-8")),
+                        api_key,
+                        model,
+                    )
                 record = {
                     "date": morning["date"],
                     "text": text,
@@ -209,6 +246,7 @@ def run(
                     "evening_report_id": evening["id"],
                     "generated_at": datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
                     "model": model,
+                    "provider": provider,
                     "prompt_version": PROMPT_VERSION,
                     "fingerprint": fingerprint,
                     "source_hash": summary_source_hash(morning, evening),
@@ -255,6 +293,7 @@ def main() -> int:
     parser.add_argument("--summaries", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--history-url", help="previous deployed summary index URL")
+    parser.add_argument("--insights", type=Path, help="validated insight index for shared summary")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     status = run(
@@ -265,6 +304,7 @@ def main() -> int:
         os.environ.get("MINIMAX_MODEL") or "MiniMax-M2.7",
         args.force,
         args.history_url,
+        insights_path=args.insights,
     )
     print(status)
     return 0
