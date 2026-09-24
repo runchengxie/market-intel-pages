@@ -214,11 +214,16 @@ class GenerationTests(unittest.TestCase):
             self.assertEqual("generated", first["generation"]["status"])
             second = run(rp, ip, **args)
             self.assertEqual("cached", second["generation"]["status"])
+            stale_fingerprint = json.loads(ip.read_text())
+            stale_fingerprint["insights"][0]["fingerprint"] = "old-prompt"
+            ip.write_text(json.dumps(stale_fingerprint))
+            revised_prompt = run(rp, ip, **args)
+            self.assertEqual("generated", revised_prompt["generation"]["status"])
             rows[1]["sections"][0]["paragraphs"].append("背景更新。")
             rp.write_text(json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": rows}))
             third = run(rp, ip, **args)
             self.assertEqual("generated", third["generation"]["status"])
-            self.assertEqual(2, len(list((p / "archive/insights").glob("*.json"))))
+            self.assertEqual(3, len(list((p / "archive/insights").glob("*.json"))))
             self.assertNotEqual(first["insights"][0]["id"], third["insights"][0]["id"])
 
     def test_missing_credentials_publish_explicit_state(self):

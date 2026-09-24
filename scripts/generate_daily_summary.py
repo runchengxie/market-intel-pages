@@ -140,13 +140,27 @@ def summary_source_hash(morning: dict, evening: dict) -> str:
 
 
 def current_summaries(reports: list[dict], history: list[dict]) -> list[dict]:
+    try:
+        from .insight_contract import build_context
+    except ImportError:
+        from insight_contract import build_context
     by_id = {row["id"]: row for row in reports}
     valid = []
     for row in history:
         morning = by_id.get(row.get("morning_report_id"))
         evening = by_id.get(row.get("evening_report_id"))
-        if morning and evening and row.get("source_hash") == summary_source_hash(morning, evening):
-            valid.append(row)
+        if not morning or not evening or row.get("source_hash") != summary_source_hash(morning, evening):
+            continue
+        insight_hash = row.get("insight_source_hash")
+        if insight_hash:
+            try:
+                if build_context(reports, morning, evening)["source_hash"] != insight_hash:
+                    continue
+            except (ValueError, KeyError, TypeError):
+                continue
+        elif row.get("provider") == "codex":
+            continue
+        valid.append(row)
     return valid
 
 
@@ -220,8 +234,15 @@ def run(
             ),
             None,
         )
+        linked_matches = not linked or (
+            existing is not None
+            and existing.get("provider") == linked.get("provider")
+            and existing.get("insight_source_hash") == linked.get("source_hash")
+            and existing.get("text") == validate_summary(linked["analysis"]["overview"]["text"])
+        )
         if (
             existing
+            and linked_matches
             and (existing.get("provider") == "codex" or existing.get("fingerprint") == fingerprint)
             and not force
         ):
@@ -251,6 +272,8 @@ def run(
                     "fingerprint": fingerprint,
                     "source_hash": summary_source_hash(morning, evening),
                 }
+                if linked:
+                    record["insight_source_hash"] = linked["source_hash"]
                 history = [
                     item
                     for item in history

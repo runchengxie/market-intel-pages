@@ -11,7 +11,8 @@
       "provider": "codex",
       "prompt_version": "daily-commentary-v1",
       "fingerprint": "8e2b6da8e13398974a2c48b9fc24c2895bd4ad80b8d8102197f3986fc675d9fb",
-      "source_hash": "c5527c5c8f74e4317440011f32d3eae6f578cbe13eb7a93f4419e9ea2db3be79"
+      "source_hash": "c5527c5c8f74e4317440011f32d3eae6f578cbe13eb7a93f4419e9ea2db3be79",
+      "insight_source_hash": "fc70c9134ada02e92315e1f6be7695a972a86964c43e4aa1be404926c44e7bc8"
     }
   ]
 }

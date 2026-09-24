@@ -1,4 +1,5 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,6 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from scripts.generate_codex_commentary import run
+from scripts.generate_daily_summary import current_summaries
 from scripts.generate_daily_summary import run as run_summary
 from scripts.generate_insights import run as run_insight
 from tests.test_insights import analysis, sources
@@ -42,12 +44,16 @@ class CodexCommentaryTests(unittest.TestCase):
             def cli(arguments, **kwargs):
                 self.assertIn("read-only", arguments)
                 self.assertNotIn("GH_TOKEN", kwargs["env"])
+                self.assertNotIn("GEMINI_API_KEY_2", kwargs["env"])
                 Path(arguments[arguments.index("--output-last-message") + 1]).write_text(
                     json.dumps(analysis())
                 )
                 return SimpleNamespace(returncode=0)
 
-            with patch("scripts.generate_codex_commentary.subprocess.run", side_effect=cli) as command:
+            with (
+                patch.dict(os.environ, {"GEMINI_API_KEY_2": "test-secret"}),
+                patch("scripts.generate_codex_commentary.subprocess.run", side_effect=cli) as command,
+            ):
                 self.assertEqual(
                     "generated validated Codex commentary",
                     run(reports, summaries, insights, root / "archive", root / "work", Path("/bin/codex")),
@@ -59,6 +65,43 @@ class CodexCommentaryTests(unittest.TestCase):
             self.assertEqual(1, command.call_count)
             self.assertEqual("codex", json.loads(summaries.read_text())["summaries"][0]["provider"])
             self.assertEqual("codex", json.loads(insights.read_text())["insights"][0]["provider"])
+
+            replacement = analysis()
+            replacement["overview"]["text"] = "成交改善仍待确认。"
+            run_insight(
+                reports,
+                insights,
+                provider="gemini",
+                api_key="test",
+                force=True,
+                generator=lambda *_: replacement,
+            )
+            self.assertEqual(
+                "generated summary",
+                run_summary(reports, summaries, summaries, None, insights_path=insights),
+            )
+            self.assertEqual("gemini", json.loads(summaries.read_text())["summaries"][0]["provider"])
+
+    def test_summary_invalidates_when_historical_context_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows = sources()
+            older = json.loads(json.dumps(rows[0]))
+            older["id"], older["date"] = "older", "2026-09-13"
+            older["sections"][0]["paragraphs"][0] = "生成时间: 2026-09-13 19:00"
+            rows.insert(0, older)
+            reports, summaries, insights = (
+                root / name for name in ("reports.json", "summaries.json", "insights.json")
+            )
+            reports.write_text(
+                json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": rows})
+            )
+            summaries.write_text(json.dumps({"summaries": []}))
+            run_insight(reports, insights, provider="gemini", api_key="test", generator=lambda *_: analysis())
+            run_summary(reports, summaries, summaries, None, insights_path=insights)
+            self.assertEqual(1, len(current_summaries(rows, json.loads(summaries.read_text())["summaries"])))
+            rows[0]["sections"][0]["paragraphs"].append("历史材料修订。")
+            self.assertEqual(0, len(current_summaries(rows, json.loads(summaries.read_text())["summaries"])))
 
     def test_invalid_cli_analysis_does_not_write_indices(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -106,8 +106,9 @@ jobs:
           force_flag=""
           if [ "$FORCE_INSIGHTS" = "true" ]; then force_flag="--force"; fi
           for provider in gemini deepseek minimax; do
-            python3 scripts/generate_insights.py --provider "$provider" --reports data/reports.json --history "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag
-            force_flag=""
+            status=$(python3 scripts/generate_insights.py --provider "$provider" --reports data/reports.json --history "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+            echo "Insight provider $provider: $status"
+            if [ "$status" = "generated" ] || [ "$status" = "cached" ] || [ "$status" = "no_source_pair" ]; then break; fi
           done
       - name: Generate latest daily note
         env:

@@ -204,7 +204,11 @@ def _update_history(
         ),
         None,
     )
-    if current and (current.get("provider") != provider or current.get("model") == model) and not force:
+    if (
+        current
+        and (current.get("provider") != provider or current.get("fingerprint") == fingerprint)
+        and not force
+    ):
         generation["status"] = "cached"
     elif not api_keys:
         generation["status"] = "not_configured"
