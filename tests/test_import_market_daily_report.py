@@ -202,13 +202,81 @@ def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_pa
     assert "报告生成时间：2026-09-24T08:30:00+00:00" in report
     assert "一、美股市场表现" in report
     assert "标普 500 日涨跌：-0.80%（观测日 2026-09-23）" in report
-    assert "二、美债与宏观" in report
+    assert "二、市场驱动因素" in report
+    assert "三、经济数据与美联储动态" in report
     assert "10 年期美债收益率日变动：+15.00 bp" in report
-    assert "三、核实后的解读与公司动态" in report
+    assert "暂无经核实内容" not in report.split("三、经济数据与美联储动态")[1].split("四、公司新闻")[0]
+    assert "六、其他已核实内容" in report
     assert "报道认为收益率上升带来压力；这不是已证明的唯一因果。" in report
     assert "https://abcnews.com/amp/Business/example" in report
     assert "private draft must not leak" not in report
     assert "市场有风险" in report
+
+
+def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_path):
+    payload = _payload()
+    payload["facts"].append(
+        {
+            "id": "macro.cpi_yoy",
+            "value": 3.4,
+            "source_url": "https://fred.stlouisfed.org/series/CPIAUCNS",
+            "observation_date": "2026-08-01",
+        }
+    )
+    payload["events"] = [
+        {"id": "reviewed.1", "source_url": "https://example.test/close"},
+        {"id": "reviewed.2", "source_url": "https://example.test/company"},
+    ]
+    payload["claims"] = [
+        {
+            "claim": "收盘报道将跌势与收益率上涨联系起来。",
+            "evidence_ids": ["reviewed.1"],
+            "sources": ["https://example.test/close"],
+        },
+        {
+            "claim": "公司公告披露新的季度收入。",
+            "evidence_ids": ["reviewed.2"],
+            "sources": ["https://example.test/company"],
+        },
+    ]
+    payload["sections"] = [
+        {"key": "drivers", "title": "市场驱动因素", "claims": ["reviewed.1"], "facts": []},
+        {"key": "company_news", "title": "公司新闻", "claims": ["reviewed.2"], "facts": []},
+    ]
+    source, manifest = _source(tmp_path, payload)
+    import_report(source, tmp_path / "site", manifest)
+
+    report = (tmp_path / "site/reports/2026-09-19-market-daily.txt").read_text()
+    assert "二、市场驱动因素" in report
+    assert "四、公司新闻" in report
+    assert report.index("二、市场驱动因素") < report.index("收盘报道将跌势")
+    assert report.index("四、公司新闻") < report.index("公司公告披露")
+    assert report.count("收盘报道将跌势") == 1
+    assert report.count("公司公告披露") == 1
+
+    markdown = (tmp_path / "site/reports/2026-09-19-market-daily.md").read_text()
+    headings = [
+        f"## {title}"
+        for title in (
+            "美股市场表现",
+            "市场驱动因素",
+            "经济数据与美联储动态",
+            "公司新闻",
+            "主要上涨与下跌个股",
+        )
+    ]
+    assert all(heading in markdown for heading in headings)
+    assert markdown.index("## 美股市场表现") < markdown.index("标普 500 日涨跌")
+    assert markdown.index("## 经济数据与美联储动态") < markdown.index("CPI 同比")
+    assert markdown.index("## 公司新闻") < markdown.index("公司公告披露")
+
+
+def test_markdown_unclassified_claim_keeps_evidence_ids(tmp_path):
+    source, manifest = _source(tmp_path, _payload())
+    import_report(source, tmp_path / "site", manifest)
+    markdown = (tmp_path / "site/reports/2026-09-19-market-daily.md").read_text()
+    assert "## 其他已核实内容" in markdown
+    assert "证据：`index.spx.change_percent`" in markdown
 
 
 def test_import_requires_matching_public_manifest_and_omits_private_fields(tmp_path):

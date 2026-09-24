@@ -317,6 +317,8 @@ button, input { font: inherit; }
 .market-daily-value { margin: 0 0 8px; font-size: 16px; font-weight: 650; line-height: 1.5; }
 .market-daily-lag { display: block; margin-top: 7px; font-size: 12px; color: var(--muted); }
 .market-daily-claims { display: grid; gap: 12px; margin-top: 12px; }
+.market-daily-claim-section { display: grid; gap: 10px; }
+.market-daily-claim-heading { margin: 8px 0 0; color: var(--ink); font-size: 14px; font-weight: 650; }
 .market-daily-explanation { margin: 0 0 8px; line-height: 1.65; }
 .market-daily-claims .source-link + .source-link { margin-left: 12px; }
 .insight-status, .insight-meta { color: var(--muted); font-size: 12px; line-height: 1.8; }

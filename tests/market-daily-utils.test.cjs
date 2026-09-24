@@ -58,6 +58,26 @@ test("market daily shows reviewed index returns, Treasury rates and cited explan
   assert.match(formatMarketDailyStatus(summary), /次日核实更新/);
 });
 
+test("market daily groups reviewed explanations and company news by evidence section", () => {
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-23", facts: [
+      { id: "index.spx.change_percent", value: -0.8, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://example.test/close" },
+    ],
+    events: [{ id: "reviewed.1" }, { id: "reviewed.2" }],
+    claims: [
+      { claim: "收益率影响市场", evidence_ids: ["reviewed.1"], sources: ["https://example.test/close"] },
+      { claim: "公司发布业绩", evidence_ids: ["reviewed.2"], sources: ["https://example.test/company"] },
+    ],
+    sections: [
+      { key: "drivers", title: "市场驱动因素", claims: ["reviewed.1"] },
+      { key: "company_news", title: "公司新闻", claims: ["reviewed.2"] },
+    ],
+  });
+  assert.deepEqual(summary.claimSections.map((section) => [section.key, section.claims.map((claim) => claim.text)]), [
+    ["drivers", ["收益率影响市场"]], ["company_news", ["公司发布业绩"]],
+  ]);
+});
+
 test("market daily charts keep signed values and source dates in separate units", () => {
   const summary = summarizeMarketDaily({
     schema_version: "1.0", run_id: "daily-2026-09-23", facts: [

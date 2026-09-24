@@ -74,17 +74,22 @@ function renderMarketDaily(payload) {
     if (row.quality === "lagged") card.append(makeElement("span", "market-daily-lag", "当日数据未公布"));
     return card;
   }));
-  claimList.replaceChildren(...summary.claims.map((claim) => {
-    const item = makeElement("article", "market-daily-card");
-    item.append(makeElement("p", "market-daily-explanation", claim.text));
-    claim.sourceUrls.forEach((url, index) => {
-      const source = makeElement("a", "source-link", `核实来源 ${index + 1}`);
-      source.href = url;
-      source.target = "_blank";
-      source.rel = "noopener noreferrer";
-      item.append(source);
+  claimList.replaceChildren(...summary.claimSections.map((section) => {
+    const group = makeElement("section", "market-daily-claim-section");
+    group.append(makeElement("h3", "market-daily-claim-heading", section.title));
+    section.claims.forEach((claim) => {
+      const item = makeElement("article", "market-daily-card");
+      item.append(makeElement("p", "market-daily-explanation", claim.text));
+      claim.sourceUrls.forEach((url, index) => {
+        const source = makeElement("a", "source-link", `核实来源 ${index + 1}`);
+        source.href = url;
+        source.target = "_blank";
+        source.rel = "noopener noreferrer";
+        item.append(source);
+      });
+      group.append(item);
     });
-    return item;
+    return group;
   }));
 }
 
