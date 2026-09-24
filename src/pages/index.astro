@@ -2,6 +2,7 @@
 import '../styles/site.css';
 import { loadReports, loadSummaries, loadMarketDaily, loadLatestInsight, readJson } from '../lib/reports.mjs';
 import { renderMarkdown } from '../lib/markdown.mjs';
+import { formatEvidenceLine } from '../lib/evidence.mjs';
 
 const reports = loadReports();
 const summaries = loadSummaries(reports).sort((a, b) => b.date.localeCompare(a.date));
@@ -54,7 +55,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           {market?.markdown ? <>
             <p class="section-note">{market.date} 美东报告日 · 逐项以正文标注原始观测日和来源。</p>
             <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>查看 Markdown 版本</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>下载纯文本报告</a></div>
-            <details><summary>展开美股日报</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown)} /></details>
+            <details><summary>展开美股日报</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown, { compactSources: true })} /></details>
           </> : <p class="empty">暂未取得可公开的美股日报。</p>}
         </section>
         <section class="panel" aria-labelledby="insight-title"><div class="section-heading"><span class="eyebrow">MARKET JOURNAL</span><h2 id="insight-title">市场解读与验证</h2></div>
@@ -62,11 +63,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             <p class="section-note">{insight.date} · 信息截至 {timestampLabel(insight.as_of)} · 解读生成 {timestampLabel(insight.generated_at)}（北京时间）。展开依据可核对原文。</p>
             {insight.generation_mode === 'retrospective' && <p class="backfill-note">历史材料回放：基于归档或补发报告生成，保留实际生成时间。</p>}
             <p>{insight.analysis.overview.text}</p>
-            <details><summary>查看概览依据</summary><ul>{citedEvidence(insight.analysis.overview.evidence_ids).map((item) => <li><a href={`${base}/reports/${item.report_id}/`}>{item.section}</a>：{item.text}</li>)}</ul></details>
-            {(insight.analysis.changes || []).length > 0 && <><h3>值得留意的变化</h3>{insight.analysis.changes.map((item) => <div class="insight-item"><p>{item.text}</p><details><summary>查看依据</summary><ul>{citedEvidence(item.evidence_ids).map((evidence) => <li><a href={`${base}/reports/${evidence.report_id}/`}>{evidence.section}</a>：{evidence.text}</li>)}</ul></details></div>)}</>}
-            {(insight.analysis.tensions || []).length > 0 && <><h3>还没得到确认的地方</h3>{insight.analysis.tensions.map((item) => <div class="insight-item"><p>{item.text}</p><details><summary>查看依据</summary><ul>{citedEvidence(item.evidence_ids).map((evidence) => <li><a href={`${base}/reports/${evidence.report_id}/`}>{evidence.section}</a>：{evidence.text}</li>)}</ul></details></div>)}</>}
+            <details><summary>查看概览依据</summary><ul>{citedEvidence(insight.analysis.overview.evidence_ids).map((item) => <li><a href={`${base}/reports/${item.report_id}/`}>{item.section}</a>：{formatEvidenceLine(item.section, item.text)}</li>)}</ul></details>
+            {(insight.analysis.changes || []).length > 0 && <><h3>值得留意的变化</h3>{insight.analysis.changes.map((item) => <div class="insight-item"><p>{item.text}</p><details><summary>查看依据</summary><ul>{citedEvidence(item.evidence_ids).map((evidence) => <li><a href={`${base}/reports/${evidence.report_id}/`}>{evidence.section}</a>：{formatEvidenceLine(evidence.section, evidence.text)}</li>)}</ul></details></div>)}</>}
+            {(insight.analysis.tensions || []).length > 0 && <><h3>还没得到确认的地方</h3>{insight.analysis.tensions.map((item) => <div class="insight-item"><p>{item.text}</p><details><summary>查看依据</summary><ul>{citedEvidence(item.evidence_ids).map((evidence) => <li><a href={`${base}/reports/${evidence.report_id}/`}>{evidence.section}</a>：{formatEvidenceLine(evidence.section, evidence.text)}</li>)}</ul></details></div>)}</>}
             {watchpoints.length > 0 && <><h3>留给下一份晚报的问题</h3><div class="watchpoint-list">{watchpoints.map((item) => <div class="watchpoint"><span class:list={['status-pill', item.outcome?.status || 'pending']}>{outcomeLabels[item.outcome?.status || 'pending']}</span><p>{item.question}</p><p class="section-note">{item.metricLabel} {item.operator} {item.threshold}{item.unit}</p>{item.outcome?.report_id && <><p class="section-note">核对 {item.outcome.observed_date} 晚报{item.outcome.observed_value !== null ? `：${item.outcome.observed_value}${item.unit}` : ''}</p>{item.outcome.evidence?.length > 0 && <details><summary>查看核对依据</summary><ul>{item.outcome.evidence.map((evidence) => <li><a href={`${base}/reports/${evidence.report_id}/`}>{evidence.section}</a>：{evidence.text}</li>)}</ul></details>}</>}</div>)}</div><p class="section-note">保留原判断，另记后续条件核对结果。</p></>}
-            {insight.quality_warnings?.length > 0 && <details><summary>数据缺项与限制（{insight.quality_warnings.length}）</summary><ul>{insight.quality_warnings.map((warning) => <li>{warning}</li>)}</ul></details>}
+            {insight.quality_warnings?.length > 0 && <details><summary>数据缺项与限制（{insight.quality_warnings.length}）</summary><ul>{insight.quality_warnings.map((warning) => <li>{formatEvidenceLine('六维观察', warning)}</li>)}</ul></details>}
           </> : <p class="empty">暂无通过验证的市场解读。</p>}
         </section>
         <section class="panel" aria-labelledby="summary-title"><div class="section-heading"><span class="eyebrow">DAILY NOTES</span><h2 id="summary-title">最近几天的市场简评</h2></div>

@@ -23,6 +23,9 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.doesNotMatch(html, /private-chat-target/);
   assert.doesNotMatch(index, /echarts\.|ChartIsland\.|\.png["']/);
   assert.doesNotMatch(html, /echarts\.|ChartIsland\.|\.png["']/);
+  assert.match(index, /来源：<a href="https:\/\//);
+  assert.doesNotMatch(index, /\| 流动性 \|/);
+  assert.match(html, /<table>/);
 });
 
 test('historical insight discloses timing, limitations and verification units', () => {
@@ -46,4 +49,23 @@ test('GFM tables render but untrusted HTML and script URLs are removed', async (
   assert.match(html, /<table>/);
   assert.match(html, /流动性/);
   assert.doesNotMatch(html, /<script|href="javascript:/);
+});
+
+test('market daily source URLs become compact numbered links only in the rendered page', async () => {
+  const { renderMarkdown } = await import('../src/lib/markdown.mjs');
+  const source = '- 来源：https://example.com/one, https://example.org/two';
+  const html = renderMarkdown(source, { compactSources: true });
+  assert.match(html, /<a href="https:\/\/example.com\/one"[^>]*>来源 1<\/a>/);
+  assert.match(html, /<a href="https:\/\/example.org\/two"[^>]*>来源 2<\/a>/);
+  assert.doesNotMatch(html, />https:\/\/example.com\/one</);
+  assert.match(renderMarkdown(source), /https:\/\/example.com\/one/);
+});
+
+test('single table-row evidence is labelled instead of showing raw Markdown pipes', async () => {
+  const { formatEvidenceLine } = await import('../src/lib/evidence.mjs');
+  assert.equal(formatEvidenceLine('六维观察', '| 流动性 | 25.4 | 偏弱 | 成交额/历史中位 0.90x |'),
+    '维度：流动性；观察分：25.4；状态：偏弱；证据：成交额/历史中位 0.90x');
+  assert.equal(formatEvidenceLine('七、行业板块 TOP10', '| 电子 | +0.94% | +0.53% | 436 | 59.9% |'),
+    '行业：电子；均涨跌：+0.94%；中位数：+0.53%；家数：436；上涨率：59.9%');
+  assert.equal(formatEvidenceLine('市场总览', '上涨 1891 家 | 下跌 3564 家'), '上涨 1891 家 | 下跌 3564 家');
 });
