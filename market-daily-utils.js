@@ -9,7 +9,7 @@ const MARKET_DAILY_FACTS = [
   ["macro.payroll_change_thousands", "非农就业月变动", " 千人"],
 ];
 const MARKET_DAILY_GAPS = {
-  rates_lag: "当日收益率", quotes: "指数行情", research: "研究解释", fred: "部分 FRED 数据",
+  rates_lag: "美债收益率当日变动", quotes: "指数行情", research: "研究解释", fred: "部分 FRED 数据",
 };
 
 function summarizeMarketDaily(payload) {
@@ -38,5 +38,10 @@ function summarizeMarketDaily(payload) {
   return { date: payload.run_id.slice(6), rows, gaps };
 }
 
-if (typeof module !== "undefined") module.exports = { summarizeMarketDaily };
-if (typeof window !== "undefined") window.marketDailyUtils = { summarizeMarketDaily };
+function formatMarketDailyStatus(summary) {
+  return `${summary.date} 美东报告日 · 逐项显示原始观测日。`
+    + (summary.gaps.length ? ` 尚缺：${summary.gaps.join("、")}。` : "");
+}
+
+if (typeof module !== "undefined") module.exports = { summarizeMarketDaily, formatMarketDailyStatus };
+if (typeof window !== "undefined") window.marketDailyUtils = { summarizeMarketDaily, formatMarketDailyStatus };

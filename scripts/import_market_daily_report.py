@@ -27,7 +27,7 @@ MISSING_LABELS = {
     "quotes": "指数行情",
     "research": "研究解释",
     "fred": "部分 FRED 数据",
-    "rates_lag": "当日收益率",
+    "rates_lag": "美债收益率当日变动",
 }
 
 

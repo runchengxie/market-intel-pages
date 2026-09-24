@@ -24,8 +24,7 @@ function renderMarketDaily(payload) {
     list.replaceChildren();
     return;
   }
-  status.textContent = `${summary.date} 美东交易日 · 逐项显示原始观测日。`
-    + (summary.gaps.length ? ` 尚缺：${summary.gaps.join("、")}。` : "");
+  status.textContent = window.marketDailyUtils.formatMarketDailyStatus(summary);
   list.replaceChildren(...summary.rows.map((row) => {
     const card = makeElement("article", "market-daily-card");
     card.append(makeElement("p", "market-daily-value", row.text));
