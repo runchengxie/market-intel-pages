@@ -97,7 +97,7 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 
 | 路径 | 用途 |
 |---|---|
-| `index.html`、`app.js`、`summary-utils.js`、`market-daily-utils.js`、`styles.css` | 页面结构、展示逻辑和样式 |
+| `index.html`、`app.js`、`report-markdown.js`、`summary-utils.js`、`market-daily-utils.js`、`styles.css` | 页面结构、报告表格与列表渲染、展示逻辑和样式 |
 | `data/reports.json`、`reports/` | 公开报告索引、正文与 Markdown 原文 |
 | `data/daily_summaries.json` | 每日简评及配对来源 |
 | `data/insights.json` | 带来源的解读、生成状态和观察条件结果 |
@@ -111,7 +111,7 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 
 每日简评使用 `market_intel_pages.daily_summaries.v1`，记录目标日期、正文、晨晚报 ID、生成时间、模型和提示词版本。结构化解读使用 `market_intel_pages.insights.v1`，另记录材料截止时间、内容哈希、段落证据、观察条件与核验结果。
 
-构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，分别计算原报告时间和目标数据日期的年龄，避免补发旧数据掩盖延迟。未提供交易日历目标时，标记 `calendar_unverified`，并保留默认 72 小时的过期提醒。报告与模型正文通过文本节点展示。
+构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，分别计算原报告时间和目标数据日期的年龄，避免补发旧数据掩盖延迟。未提供交易日历目标时，标记 `calendar_unverified`，并保留默认 72 小时的过期提醒。报告正文中的 Markdown 表格、列表和标题会转换为页面结构，单元格与正文仍通过文本节点展示；不执行原文中的 HTML。
 
 ## 检查与维护
 
@@ -124,6 +124,7 @@ vulture scripts tests tools --min-confidence 80
 python3 -m pytest
 node --test tests/*.cjs
 node --check app.js
+node --check report-markdown.js
 python3 scripts/build_site.py --output /tmp/quant-market-intel-check
 pip-audit --strict
 python3 tools/audit_structure.py --output /tmp/market-intel-structure.json

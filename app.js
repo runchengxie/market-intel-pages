@@ -182,9 +182,7 @@ function renderReport(report) {
   for (const section of report.sections ?? []) {
     const sectionElement = makeElement("section", "report-section");
     sectionElement.append(makeElement("h4", "", section.title));
-    for (const paragraph of section.paragraphs ?? []) {
-      sectionElement.append(makeElement("p", "", paragraph));
-    }
+    sectionElement.append(...window.reportMarkdown.renderReportBlocks(document, section.paragraphs ?? []));
     body.append(sectionElement);
   }
   if (/^reports\/[a-zA-Z0-9._-]+\.md$/.test(report.source_url ?? "")) {
