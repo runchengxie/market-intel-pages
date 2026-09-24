@@ -232,6 +232,14 @@ button, input { font: inherit; }
 .report-section { margin-top: 13px; }
 .report-section h4 { margin: 0 0 7px; color: var(--ink); font-size: 12px; font-weight: 600; }
 .report-section p { margin: 5px 0; color: var(--body-soft); font-size: 12px; line-height: 1.9; }
+.report-section h5, .report-section h6 { margin: 12px 0 5px; color: var(--ink); font-size: 12px; }
+.report-section ul, .report-section ol { margin: 5px 0; padding-left: 20px; color: var(--body-soft); font-size: 12px; line-height: 1.9; }
+.report-section li { padding-left: 2px; }
+.report-table-scroll { max-width: 100%; overflow-x: auto; margin: 9px 0 13px; }
+.report-section table { width: 100%; min-width: 520px; border-collapse: collapse; font-size: 12px; line-height: 1.6; }
+.report-section th, .report-section td { padding: 7px 10px; border-bottom: 1px solid var(--line); color: var(--body-soft); text-align: left; vertical-align: top; }
+.report-section th { color: var(--ink); font-weight: 600; background: var(--card); white-space: nowrap; }
+.report-section .is-numeric { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .source-link {
   display: inline-block;
   margin-top: 14px;

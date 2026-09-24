@@ -29,6 +29,7 @@ STATIC_FILES = (
     "index.html",
     "app.js",
     "summary-utils.js",
+    "report-markdown.js",
     "market-daily-utils.js",
     "theme-utils.js",
     "styles.css",

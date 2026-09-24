@@ -18,6 +18,7 @@ def create_site(root: Path, session_count: int = 6) -> None:
         "app.js",
         "styles.css",
         "summary-utils.js",
+        "report-markdown.js",
         "market-daily-utils.js",
         "theme-utils.js",
     ):
@@ -199,6 +200,7 @@ class BuildSiteTests(unittest.TestCase):
         self.assertEqual(10, len(report_data["reports"]))
         self.assertTrue((self.output / "summary-utils.js").is_file())
         self.assertTrue((self.output / "market-daily-utils.js").is_file())
+        self.assertTrue((self.output / "report-markdown.js").is_file())
         self.assertEqual(
             "market_intel_pages.daily_summaries.v1",
             json.loads((self.output / "data/daily_summaries.json").read_text())["schema_version"],
