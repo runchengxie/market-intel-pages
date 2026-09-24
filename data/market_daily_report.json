@@ -1,0 +1,197 @@
+{
+  "as_of": "2026-09-24T02:16:02.850749+00:00",
+  "claims": [],
+  "content_hash": "1625b42fa0eafdcff849d8ddde077cd46212063cbdbfbd09f27aac515f45d29d",
+  "events": [],
+  "facts": [
+    {
+      "change": -5.0,
+      "id": "treasury.2y.change_bp",
+      "instrument": "DGS2",
+      "metric": "yield_change",
+      "observation_date": "2026-09-22",
+      "previous": null,
+      "quality": "lagged",
+      "retrieved_at": "2026-09-24T02:15:58.276636+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:15:58.276636+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/DGS2",
+      "unit": "basis_points",
+      "value": -5.0
+    },
+    {
+      "change": 0.0,
+      "id": "treasury.5y.change_bp",
+      "instrument": "DGS5",
+      "metric": "yield_change",
+      "observation_date": "2026-09-22",
+      "previous": null,
+      "quality": "lagged",
+      "retrieved_at": "2026-09-24T02:15:58.712021+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:15:58.712021+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/DGS5",
+      "unit": "basis_points",
+      "value": 0.0
+    },
+    {
+      "change": 0.0,
+      "id": "treasury.10y.change_bp",
+      "instrument": "DGS10",
+      "metric": "yield_change",
+      "observation_date": "2026-09-22",
+      "previous": null,
+      "quality": "lagged",
+      "retrieved_at": "2026-09-24T02:15:59.148551+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:15:59.148551+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/DGS10",
+      "unit": "basis_points",
+      "value": 0.0
+    },
+    {
+      "change": 0.0,
+      "id": "treasury.30y.change_bp",
+      "instrument": "DGS30",
+      "metric": "yield_change",
+      "observation_date": "2026-09-22",
+      "previous": null,
+      "quality": "lagged",
+      "retrieved_at": "2026-09-24T02:15:59.573249+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:15:59.573249+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/DGS30",
+      "unit": "basis_points",
+      "value": 0.0
+    },
+    {
+      "change": null,
+      "id": "macro.cpi_yoy",
+      "instrument": "CPIAUCNS",
+      "metric": "cpi_yoy",
+      "observation_date": "2026-08-01",
+      "previous": null,
+      "quality": "ok",
+      "retrieved_at": "2026-09-24T02:16:01.240833+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:16:01.240833+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/CPIAUCNS",
+      "unit": "percent_yoy",
+      "value": 3.4
+    },
+    {
+      "change": null,
+      "id": "macro.pce_yoy",
+      "instrument": "PCEPI",
+      "metric": "pce_yoy",
+      "observation_date": "2026-07-01",
+      "previous": null,
+      "quality": "ok",
+      "retrieved_at": "2026-09-24T02:16:01.864890+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:16:01.864890+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/PCEPI",
+      "unit": "percent_yoy",
+      "value": 3.7
+    },
+    {
+      "change": null,
+      "id": "macro.unemployment_rate",
+      "instrument": "UNRATE",
+      "metric": "unemployment_rate",
+      "observation_date": "2026-08-01",
+      "previous": 4.1,
+      "quality": "ok",
+      "retrieved_at": "2026-09-24T02:16:02.389809+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:16:02.389809+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/UNRATE",
+      "unit": "percent",
+      "value": 4.1
+    },
+    {
+      "change": null,
+      "id": "macro.payroll_change_thousands",
+      "instrument": "PAYEMS",
+      "metric": "payroll_change_thousands",
+      "observation_date": "2026-08-01",
+      "previous": null,
+      "quality": "ok",
+      "retrieved_at": "2026-09-24T02:16:02.850633+00:00",
+      "source": "FRED",
+      "source_time": "2026-09-24T02:16:02.850633+00:00",
+      "source_url": "https://fred.stlouisfed.org/series/PAYEMS",
+      "unit": "thousand_persons",
+      "value": 162.0
+    }
+  ],
+  "generated_at": "2026-09-24T02:16:02.850749+00:00",
+  "missing_sources": [
+    "quotes",
+    "research",
+    "rates_lag"
+  ],
+  "quality_summary": {
+    "status": "degraded"
+  },
+  "run_id": "daily-2026-09-23",
+  "schema_version": "1.0",
+  "sections": [
+    {
+      "claims": [],
+      "facts": [
+        "treasury.2y.change_bp",
+        "treasury.5y.change_bp",
+        "treasury.10y.change_bp",
+        "treasury.30y.change_bp"
+      ],
+      "key": "market",
+      "title": "市场表现"
+    },
+    {
+      "claims": [],
+      "facts": [],
+      "key": "drivers",
+      "title": "市场驱动因素"
+    },
+    {
+      "claims": [],
+      "facts": [
+        "macro.cpi_yoy",
+        "macro.pce_yoy",
+        "macro.unemployment_rate",
+        "macro.payroll_change_thousands"
+      ],
+      "key": "macro",
+      "title": "经济数据与美联储动态"
+    },
+    {
+      "claims": [],
+      "facts": [],
+      "key": "company_news",
+      "title": "公司新闻"
+    },
+    {
+      "claims": [],
+      "facts": [],
+      "key": "movers",
+      "title": "主要上涨与下跌个股"
+    }
+  ],
+  "source_status": {
+    "macro": {
+      "quality": "ok"
+    },
+    "quotes": {
+      "quality": "degraded",
+      "reason": "not_connected"
+    },
+    "rates": {
+      "quality": "lagged"
+    },
+    "research": {
+      "quality": "degraded",
+      "reason": "not_connected"
+    }
+  }
+}
