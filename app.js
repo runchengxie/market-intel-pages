@@ -45,6 +45,7 @@ function renderMarketDaily(payload) {
       button.disabled = true;
       try {
         await downloadMarketDailyChartPng(chartSvg, summary.date);
+        button.textContent = "下载图表 PNG";
       } catch {
         button.textContent = "图片生成失败，请使用文字版";
       } finally {
