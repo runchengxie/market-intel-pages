@@ -158,9 +158,57 @@ def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
     source, manifest = _source(tmp_path, payload)
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
     markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
+    assert "报告生成时间：2026-09-24T08:30:00+00:00" in markdown
     assert "标普 500 日涨跌：-0.80%" in markdown
     assert "10 年期美债收益率日变动：15.00 bp" in markdown
     assert "美国财政部" in markdown
+
+
+def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_path):
+    payload = _payload()
+    payload.update(
+        run_id="daily-2026-09-23",
+        as_of="2026-09-24T08:30:00+00:00",
+        generated_at="2026-09-24T08:30:00+00:00",
+        facts=[
+            {
+                "id": "index.spx.change_percent",
+                "value": -0.8,
+                "quality": "reviewed",
+                "source_url": "https://abcnews.com/amp/Business/example",
+                "observation_date": "2026-09-23",
+            },
+            {
+                "id": "treasury.10y.change_bp",
+                "value": 15.0,
+                "quality": "ok",
+                "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
+                "observation_date": "2026-09-23",
+            },
+        ],
+        claims=[
+            {
+                "claim": "报道认为收益率上升带来压力；这不是已证明的唯一因果。",
+                "evidence_ids": ["index.spx.change_percent"],
+                "sources": ["https://abcnews.com/amp/Business/example"],
+            }
+        ],
+        private_research_draft="private draft must not leak",
+    )
+    source, manifest = _source(tmp_path, payload)
+
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
+    report = (tmp_path / "site/reports/2026-09-23-market-daily.txt").read_text()
+    assert "报告生成时间：2026-09-24T08:30:00+00:00" in report
+    assert "一、美股市场表现" in report
+    assert "标普 500 日涨跌：-0.80%（观测日 2026-09-23）" in report
+    assert "二、美债与宏观" in report
+    assert "10 年期美债收益率日变动：+15.00 bp" in report
+    assert "三、核实后的解读与公司动态" in report
+    assert "报道认为收益率上升带来压力；这不是已证明的唯一因果。" in report
+    assert "https://abcnews.com/amp/Business/example" in report
+    assert "private draft must not leak" not in report
+    assert "市场有风险" in report
 
 
 def test_import_requires_matching_public_manifest_and_omits_private_fields(tmp_path):
@@ -180,6 +228,7 @@ def test_import_requires_matching_public_manifest_and_omits_private_fields(tmp_p
     output = tmp_path / "site"
     assert import_report(source, output, manifest) == "2026-09-19"
     public = (output / "data/market_daily_report.json").read_text()
+    assert json.loads(public)["report_formats"] == ["md", "txt"]
     assert "private_research_draft" not in public
     assert "private_passage" not in public
     assert "unreviewed private draft title" not in public

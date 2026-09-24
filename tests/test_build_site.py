@@ -78,11 +78,32 @@ class BuildSiteTests(unittest.TestCase):
         sync_snapshot(self.root, self.archive)
         payload = {"schema_version": "1.0", "run_id": "daily-2026-09-23"}
         (self.root / "data/market_daily_report.json").write_text(json.dumps(payload), encoding="utf-8")
+        (self.root / "reports/2026-09-23-market-daily.txt").write_text("verified text\n", encoding="utf-8")
+        (self.root / "reports/2026-09-23-market-daily.md").write_text(
+            "# verified markdown\n", encoding="utf-8"
+        )
+        (self.root / "reports/2026-09-22-market-daily.txt").write_text("stale\n", encoding="utf-8")
         build_site(self.root, self.output)
         self.assertEqual(
             payload,
             json.loads((self.output / "data/market_daily_report.json").read_text()),
         )
+        self.assertEqual(
+            "verified text\n",
+            (self.output / "reports/2026-09-23-market-daily.txt").read_text(),
+        )
+        self.assertTrue((self.output / "reports/2026-09-23-market-daily.md").is_file())
+        self.assertFalse((self.output / "reports/2026-09-22-market-daily.txt").exists())
+
+    def test_build_rejects_claimed_text_format_without_file(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        (self.root / "data/market_daily_report.json").write_text(
+            json.dumps({"run_id": "daily-2026-09-23", "report_formats": ["md", "txt"]}),
+            encoding="utf-8",
+        )
+        (self.root / "reports/2026-09-23-market-daily.md").write_text("# report\n")
+        with self.assertRaisesRegex(ValueError, "claimed market daily format missing"):
+            build_site(self.root, self.output)
 
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()

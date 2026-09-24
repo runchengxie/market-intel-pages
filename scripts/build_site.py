@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 from pathlib import Path
 
@@ -65,6 +66,19 @@ def _copy_daily_report(root: Path, output: Path) -> None:
     daily_report = root / "data/market_daily_report.json"
     if daily_report.exists():
         shutil.copy2(daily_report, output / "data/market_daily_report.json")
+        payload = json.loads(daily_report.read_text(encoding="utf-8"))
+        run_id = payload.get("run_id", "")
+        if not isinstance(run_id, str) or not re.fullmatch(r"daily-\d{4}-\d{2}-\d{2}", run_id):
+            raise ValueError("invalid market daily report run_id")
+        report_date = run_id.removeprefix("daily-")
+        declared_formats = payload.get("report_formats", [])
+        for suffix in ("md", "txt"):
+            filename = f"reports/{report_date}-market-daily.{suffix}"
+            source = root / filename
+            if suffix in declared_formats and not source.is_file():
+                raise ValueError(f"claimed market daily format missing: {filename}")
+            if source.is_file():
+                shutil.copy2(source, output / filename)
 
 
 def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> None:
