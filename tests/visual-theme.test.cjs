@@ -33,16 +33,16 @@ function contrast(first, second) {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-test("light and dark themes use a legible non-green finance palette", () => {
+test("light and dark themes use a legible unified warm palette", () => {
   for (const selector of [":root", ':root[data-theme="dark"]']) {
     const colors = palette(selector);
     for (const token of ["--accent", "--brand", "--ink", "--paper", "--muted", "--accent-on"]) {
       assert.ok(colors[token], `${selector} defines ${token}`);
     }
-    const [accentRed, accentGreen, accentBlue] = rgb(colors["--accent"]);
-    const [brandRed, brandGreen] = rgb(colors["--brand"]);
-    assert.ok(accentBlue > accentGreen && accentBlue > accentRed, `${selector} uses a blue accent`);
-    assert.ok(brandRed > brandGreen, `${selector} uses a warm brand mark`);
+    for (const token of ["--paper", "--card", "--line", "--accent", "--accent-pale", "--brand", "--health-bg", "--health-ink"]) {
+      const [red, green, blue] = rgb(colors[token]);
+      assert.ok(red > green && green > blue, `${selector} ${token} stays warm`);
+    }
     assert.ok(contrast(colors["--ink"], colors["--paper"]) >= 7, `${selector} primary text is legible`);
     assert.ok(contrast(colors["--muted"], colors["--paper"]) >= 4.5, `${selector} secondary text is legible`);
     assert.ok(contrast(colors["--accent-on"], colors["--accent"]) >= 4.5, `${selector} active controls are legible`);

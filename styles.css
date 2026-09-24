@@ -1,20 +1,20 @@
 :root {
   color-scheme: light dark;
-  --paper: #f6f4f0;
-  --card: #fffefa;
-  --ink: #1c2936;
-  --muted: #5d6873;
-  --line: #d9dfe4;
-  --accent: #24466b;
-  --accent-on: #ffffff;
-  --accent-pale: #e9eff5;
-  --brand: #a43e3a;
-  --panel: #fffefa;
-  --panel-line: #d9dfe4;
-  --ink-soft: #3f5060;
-  --body-soft: #4f5e6b;
-  --health-bg: #e9eff5;
-  --health-ink: #26425f;
+  --paper: #f8f3eb;
+  --card: #fffaf3;
+  --ink: #30241d;
+  --muted: #67564a;
+  --line: #e4d6c8;
+  --accent: #7b4530;
+  --accent-on: #fffaf3;
+  --accent-pale: #f2e3d4;
+  --brand: #9c3f31;
+  --panel: #fffaf3;
+  --panel-line: #e4d6c8;
+  --ink-soft: #4c382d;
+  --body-soft: #59483c;
+  --health-bg: #f1e5d9;
+  --health-ink: #694532;
   font-family: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -294,12 +294,12 @@ button, input { font: inherit; }
 .market-insights { margin-bottom: 32px; }
 .market-daily { margin-bottom: 32px; }
 .market-daily-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.market-daily-card { padding: 16px; border: 1px solid var(--panel-line); border-top: 2px solid var(--accent); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgb(20 38 60 / 4%); }
+.market-daily-card { padding: 16px; border: 1px solid var(--panel-line); border-top: 2px solid var(--accent); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgb(57 30 20 / 4%); }
 .market-daily-value { margin: 0 0 8px; font-size: 16px; font-weight: 650; line-height: 1.5; }
 .market-daily-lag { display: block; margin-top: 7px; font-size: 12px; color: var(--muted); }
 .insight-status, .insight-meta { color: var(--muted); font-size: 12px; line-height: 1.8; }
 .insight-status { margin: 12px 0 18px; }
-.insight-card { margin: 0 0 20px; padding: 26px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgb(20 38 60 / 4%); }
+.insight-card { margin: 0 0 20px; padding: 26px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgb(57 30 20 / 4%); }
 .insight-overview { font-size: 20px; line-height: 1.7; font-weight: 600; color: var(--ink); margin: 12px 0; }
 .insight-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin: 22px 0; }
 .insight-section h4, .verification h4 { margin: 0 0 12px; color: var(--accent); font-size: 14px; }
@@ -328,8 +328,8 @@ button, input { font: inherit; }
 }
 
 
-:root[data-theme="dark"] { color-scheme: dark; --paper:#101a27; --card:#1c2a39; --ink:#f1f5f9; --muted:#bac7d4; --line:#314458; --accent:#9dbbdf; --accent-on:#142333; --accent-pale:#26394e; --brand:#da7e77; --panel:#1c2a39; --ink-soft:#d4dfe9; --body-soft:#c3d0dd; --panel-line:#314458; --health-bg:#26394e; --health-ink:#d5e5f8; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --paper:#101a27; --card:#1c2a39; --ink:#f1f5f9; --muted:#bac7d4; --line:#314458; --accent:#9dbbdf; --accent-on:#142333; --accent-pale:#26394e; --brand:#da7e77; --panel:#1c2a39; --ink-soft:#d4dfe9; --body-soft:#c3d0dd; --panel-line:#314458; --health-bg:#26394e; --health-ink:#d5e5f8; } }
+:root[data-theme="dark"] { color-scheme: dark; --paper:#211912; --card:#30231b; --ink:#f6ece0; --muted:#d1bda9; --line:#574235; --accent:#e6ad80; --accent-on:#2b1e15; --accent-pale:#493328; --brand:#de8b72; --panel:#30231b; --ink-soft:#e2d2c3; --body-soft:#d6c2af; --panel-line:#574235; --health-bg:#493328; --health-ink:#f1d4b6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { color-scheme: dark; --paper:#211912; --card:#30231b; --ink:#f6ece0; --muted:#d1bda9; --line:#574235; --accent:#e6ad80; --accent-on:#2b1e15; --accent-pale:#493328; --brand:#de8b72; --panel:#30231b; --ink-soft:#e2d2c3; --body-soft:#d6c2af; --panel-line:#574235; --health-bg:#493328; --health-ink:#f1d4b6; } }
 .topbar-actions { display:inline-flex; align-items:center; gap:16px; }
 .theme-toggle { padding:7px 10px; color:var(--muted); background:transparent; border:1px solid var(--line); border-radius:999px; cursor:pointer; font-size:11px; }
 .theme-toggle:hover, .theme-toggle:focus-visible { color:var(--ink); border-color:var(--accent); }
