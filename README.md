@@ -120,14 +120,16 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 
 构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，分别计算原报告时间和目标数据日期的年龄，避免补发旧数据掩盖延迟。未提供交易日历目标时，标记 `calendar_unverified`，并保留默认 72 小时的过期提醒。报告正文中的 Markdown 表格、列表和标题会转换为页面结构，单元格与正文仍通过文本节点展示；不执行原文中的 HTML。
 
-六图由上游生成私有候选，逐点核对来源网页、观测日、许可和数值后才可另行签发 `publication: public` 清单。Pages 导入器不会把候选自动升级为公开数据：
+六图由上游生成私有候选，逐点核对来源网页、观测日、许可和数值后才可另行签发 `publication: public` 清单。审核人须为该公开清单生成私有回执模板，填写每个点值的事实依据、公开再展示许可依据与核对说明。回执与清单内容哈希绑定；网址存在、回执齐全仅证明流程完整，不能代替人工核实网页内容或法律判断。Pages 导入器不会把候选自动升级为公开数据，也不会接受没有匹配回执的公开清单：
 
 ```bash
-python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --archive /path/to/private-archive
-python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --archive /path/to/private-archive --apply
+python3 scripts/chart_review.py --source /path/to/reviewed-public-chart.json --output /path/to/private-review.json
+# 人工填写 private-review.json 中每个点值的 fact_url、fact_note、rights_url、rights_note、reviewer、reviewed_at。
+python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --review /path/to/private-review.json --archive /path/to/private-archive
+python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --review /path/to/private-review.json --archive /path/to/private-archive --apply
 ```
 
-无审核通过的清单时，页面显示六张缺项卡。已审核卡片的原始数值、日期和来源在静态 HTML 中可读；交互图仅在展开时加载当期 JSON 与绘图库，不请求旧 PNG。Actions 在生成解读与简评后重渲染 Astro HTML，避免正文与本次数据快照不一致。
+回执只存仓库外的私有归档；导入时复制到 `chart_reviews/<report_id>/<chart_sha256>.json`，方便日后复核。无审核通过的清单时，页面显示六张缺项卡。已审核卡片的原始数值、日期和来源在静态 HTML 中可读；交互图仅在展开时加载当期 JSON 与绘图库，不请求旧 PNG。Actions 在生成解读与简评后重渲染 Astro HTML，避免正文与本次数据快照不一致。2026-09-24 批次的实际审核状态见[六图候选审核记录](docs/chart-review-2026-09-25.md)。
 
 ## 检查与维护
 
