@@ -13,7 +13,14 @@ SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 def create_site(root: Path, session_count: int = 6) -> None:
     (root / "data").mkdir(parents=True)
     (root / "reports").mkdir()
-    for name in ("index.html", "app.js", "styles.css", "summary-utils.js", "theme-utils.js"):
+    for name in (
+        "index.html",
+        "app.js",
+        "styles.css",
+        "summary-utils.js",
+        "market-daily-utils.js",
+        "theme-utils.js",
+    ):
         (root / name).write_text(name, encoding="utf-8")
 
     reports = []
@@ -65,6 +72,16 @@ class BuildSiteTests(unittest.TestCase):
         self.assertEqual(
             "market_intel_pages.insights.v1",
             json.loads((self.output / "data/insights.json").read_text())["schema_version"],
+        )
+
+    def test_build_copies_imported_market_daily_data(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        payload = {"schema_version": "1.0", "run_id": "daily-2026-09-23"}
+        (self.root / "data/market_daily_report.json").write_text(json.dumps(payload), encoding="utf-8")
+        build_site(self.root, self.output)
+        self.assertEqual(
+            payload,
+            json.loads((self.output / "data/market_daily_report.json").read_text()),
         )
 
     def setUp(self) -> None:
@@ -160,6 +177,7 @@ class BuildSiteTests(unittest.TestCase):
         self.assertEqual(expected, copied)
         self.assertEqual(10, len(report_data["reports"]))
         self.assertTrue((self.output / "summary-utils.js").is_file())
+        self.assertTrue((self.output / "market-daily-utils.js").is_file())
         self.assertEqual(
             "market_intel_pages.daily_summaries.v1",
             json.loads((self.output / "data/daily_summaries.json").read_text())["schema_version"],

@@ -15,6 +15,31 @@ const summaryList = document.querySelector("#daily-summary-list");
 const summaryEmpty = document.querySelector("#summary-empty");
 const dateFilter = document.querySelector("#date-filter");
 
+function renderMarketDaily(payload) {
+  const summary = window.marketDailyUtils.summarizeMarketDaily(payload);
+  const status = document.querySelector("#market-daily-status");
+  const list = document.querySelector("#market-daily-list");
+  if (!summary) {
+    status.textContent = "美股宏观日报尚未发布，或数据未通过校验。";
+    list.replaceChildren();
+    return;
+  }
+  status.textContent = `${summary.date} 美东交易日 · 逐项显示原始观测日。`
+    + (summary.gaps.length ? ` 尚缺：${summary.gaps.join("、")}。` : "");
+  list.replaceChildren(...summary.rows.map((row) => {
+    const card = makeElement("article", "market-daily-card");
+    card.append(makeElement("p", "market-daily-value", row.text));
+    const source = makeElement("a", "source-link", `观测日 ${row.observationDate} · FRED 原始数据`);
+    source.href = row.sourceUrl;
+    source.target = "_blank";
+    source.rel = "noopener noreferrer";
+    card.append(source);
+    if (row.quality === "lagged") card.append(makeElement("span", "market-daily-lag", "当日数据未公布"));
+    list.append(card);
+    return card;
+  }));
+}
+
 function makeElement(tag, className, text) {
   const element = document.createElement(tag);
   if (className) element.className = className;
@@ -241,10 +266,15 @@ async function loadReports() {
       throw new Error("unsupported report index");
     }
     state.reports = [...data.reports].sort((a, b) => b.date.localeCompare(a.date));
-    const [insights, health] = await Promise.allSettled([
+    const [insights, health, marketDaily] = await Promise.allSettled([
       optionalIndex("data/insights.json", "market_intel_pages.insights.v1"),
       optionalIndex("data/health.json", "market_intel_pages.health.v1"),
+      fetch("data/market_daily_report.json", { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("market daily unavailable");
+        return response.json();
+      }),
     ]);
+    renderMarketDaily(marketDaily.status === "fulfilled" ? marketDaily.value : null);
     if (insights.status === "fulfilled" && Array.isArray(insights.value.insights)) {
       state.insights = insights.value.insights;
       state.outcomes = insights.value.outcomes ?? [];

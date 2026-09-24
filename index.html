@@ -8,6 +8,7 @@
     <title>Quant 市场情报 · Quant Market Intel</title>
     <link rel="stylesheet" href="styles.css">
     <script src="summary-utils.js" defer></script>
+    <script src="market-daily-utils.js" defer></script>
     <script src="theme-utils.js" defer></script>
     <script src="app.js" defer></script>
   </head>
@@ -51,6 +52,14 @@
           <span class="demo-badge">网页展示最近 5 个交易日</span>
         </div>
         <div id="data-health" class="data-health" role="status">正在核对数据时间…</div>
+        <section class="market-daily" aria-labelledby="market-daily-title">
+          <div class="notes-heading">
+            <div><div class="eyebrow">US MACRO</div><h3 id="market-daily-title">美国宏观与利率</h3></div>
+            <span class="notes-source">FRED · 标注数据观测日</span>
+          </div>
+          <p id="market-daily-status" class="insight-status">正在读取美股宏观日报…</p>
+          <div id="market-daily-list" class="market-daily-list"></div>
+        </section>
         <section class="market-insights" aria-labelledby="insights-title">
           <div class="notes-heading">
             <div>
