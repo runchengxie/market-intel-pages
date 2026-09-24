@@ -22,7 +22,7 @@ def main():
     if args.output_dir.resolve().is_relative_to(root):
         raise ValueError("comparison outputs must remain outside the public repository")
     results = []
-    for provider in DEFAULT_MODELS:
+    for provider in (name for name in DEFAULT_MODELS if name != "codex"):
         prefix = provider.upper()
         output = run(
             args.reports,

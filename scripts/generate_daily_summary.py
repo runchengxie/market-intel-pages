@@ -140,14 +140,55 @@ def summary_source_hash(morning: dict, evening: dict) -> str:
 
 
 def current_summaries(reports: list[dict], history: list[dict]) -> list[dict]:
+    try:
+        from .insight_contract import build_context
+    except ImportError:
+        from insight_contract import build_context
     by_id = {row["id"]: row for row in reports}
     valid = []
     for row in history:
         morning = by_id.get(row.get("morning_report_id"))
         evening = by_id.get(row.get("evening_report_id"))
-        if morning and evening and row.get("source_hash") == summary_source_hash(morning, evening):
-            valid.append(row)
+        if not morning or not evening or row.get("source_hash") != summary_source_hash(morning, evening):
+            continue
+        insight_hash = row.get("insight_source_hash")
+        if insight_hash:
+            try:
+                if build_context(reports, morning, evening)["source_hash"] != insight_hash:
+                    continue
+            except (ValueError, KeyError, TypeError):
+                continue
+        elif row.get("provider") == "codex":
+            continue
+        valid.append(row)
     return valid
+
+
+def _linked_insight(
+    reports: list[dict], pair: tuple[dict, dict] | None, path: Path | None
+) -> tuple[dict, str] | None:
+    if pair is None or path is None or not path.exists():
+        return None
+    try:
+        from .generate_insights import _valid_history
+    except ImportError:
+        from generate_insights import _valid_history
+    morning, evening = pair
+    valid = _valid_history(_read_index(path).get("insights", []), reports)
+    candidate = next(
+        (
+            row
+            for row in valid
+            if row.get("morning_report_id") == morning["id"] and row.get("evening_report_id") == evening["id"]
+        ),
+        None,
+    )
+    if candidate is None:
+        return None
+    try:
+        return candidate, validate_summary(candidate["analysis"]["overview"]["text"])
+    except ValueError:
+        return None
 
 
 def run(
@@ -158,8 +199,12 @@ def run(
     model: str = "MiniMax-M2.7",
     force: bool = False,
     history_url: str | None = None,
+    generator=None,
+    provider: str = "minimax",
+    insights_path: Path | None = None,
 ) -> str:
     reports = _read_index(reports_path).get("reports", [])
+    generator = generator or generate_summary
     history = current_summaries(reports, _read_index(summaries_path).get("summaries", []))
     published_history = current_summaries(reports, _load_published_history(history_url))
     merged = {(row.get("morning_report_id"), row.get("evening_report_id")): row for row in history}
@@ -168,8 +213,12 @@ def run(
     )
     history = current_summaries(reports, list(merged.values()))
     pair = select_source_pair(reports)
+    linked_result = _linked_insight(reports, pair, insights_path)
+    linked, linked_text = linked_result if linked_result else (None, None)
+    if linked:
+        provider, model = linked["provider"], linked["model"]
     status = "no eligible source pair"
-    if pair and api_key:
+    if pair and (api_key or linked):
         morning, evening = pair
         pair_ids = (morning["id"], evening["id"])
         fingerprint = hashlib.sha256(
@@ -194,14 +243,33 @@ def run(
             ),
             None,
         )
-        if existing and existing.get("fingerprint") == fingerprint and not force:
+        linked_matches = not linked or (
+            existing is not None
+            and existing.get("provider") == linked.get("provider")
+            and existing.get("insight_source_hash") == linked.get("source_hash")
+            and existing.get("text") == linked_text
+        )
+        if (
+            existing
+            and linked_matches
+            and (existing.get("provider") == "codex" or existing.get("fingerprint") == fingerprint)
+            and not force
+        ):
             status = "reused existing summary"
         else:
             try:
                 prompt_path = Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md"
-                text = generate_summary(
-                    build_messages(morning, evening, prompt_path.read_text(encoding="utf-8")), api_key, model
-                )
+                if linked:
+                    assert linked_text is not None
+                    text = linked_text
+                else:
+                    if api_key is None:
+                        raise ValueError("model key unavailable")
+                    text = generator(
+                        build_messages(morning, evening, prompt_path.read_text(encoding="utf-8")),
+                        api_key,
+                        model,
+                    )
                 record = {
                     "date": morning["date"],
                     "text": text,
@@ -209,10 +277,13 @@ def run(
                     "evening_report_id": evening["id"],
                     "generated_at": datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
                     "model": model,
+                    "provider": provider,
                     "prompt_version": PROMPT_VERSION,
                     "fingerprint": fingerprint,
                     "source_hash": summary_source_hash(morning, evening),
                 }
+                if linked:
+                    record["insight_source_hash"] = linked["source_hash"]
                 history = [
                     item
                     for item in history
@@ -255,6 +326,7 @@ def main() -> int:
     parser.add_argument("--summaries", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--history-url", help="previous deployed summary index URL")
+    parser.add_argument("--insights", type=Path, help="validated insight index for shared summary")
     parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
     status = run(
@@ -265,6 +337,7 @@ def main() -> int:
         os.environ.get("MINIMAX_MODEL") or "MiniMax-M2.7",
         args.force,
         args.history_url,
+        insights_path=args.insights,
     )
     print(status)
     return 0

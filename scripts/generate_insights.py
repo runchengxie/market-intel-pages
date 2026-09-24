@@ -22,7 +22,12 @@ except ImportError:
 
 SCHEMA = "market_intel_pages.insights.v1"
 PROMPT_VERSION = "market-insight-v1"
-DEFAULT_MODELS = {"gemini": "gemini-3.8-flash", "minimax": "MiniMax-M2.7", "deepseek": "deepseek-chat"}
+DEFAULT_MODELS = {
+    "codex": "codex-cli",
+    "gemini": "gemini-3.8-flash",
+    "minimax": "MiniMax-M2.7",
+    "deepseek": "deepseek-chat",
+}
 VALIDATION_ERROR_CODES = {
     "invalid analysis schema": "analysis_schema_invalid",
     "invalid claim count": "analysis_claim_count_invalid",
@@ -144,28 +149,6 @@ def _load_history(path: Path, history_url: str | None) -> tuple[list[dict], str 
     return history, history_warning
 
 
-def _cached_record(
-    history: list[dict], context: dict, fingerprint: str, prompt_hash: str, provider: str, model: str
-) -> dict | None:
-    return next(
-        (
-            r
-            for r in history
-            if r.get("fingerprint") == fingerprint
-            or (
-                r.get("morning_report_id") == context["morning_report_id"]
-                and r.get("evening_report_id") == context["evening_report_id"]
-                and r.get("provider") == provider
-                and r.get("model") == model
-                and r.get("prompt_hash") == prompt_hash
-                and r.get("prompt_version") == PROMPT_VERSION
-                and set(context["source_report_ids"]) == set(r["source_report_ids"])
-            )
-        ),
-        None,
-    )
-
-
 def _generate_with_fallback(generator, context, prompt, provider, model, api_keys):
     last_error = None
     for api_key in api_keys:
@@ -211,8 +194,27 @@ def _update_history(
     generation["target_date"] = morning["date"]
     api_keys = [api_key] if isinstance(api_key, str) else [key for key in (api_key or []) if key]
     generation["analysis_attempts"] = len(api_keys)
-    existing = _cached_record(history, context, fingerprint, prompt_hash, provider, model)
-    if existing and not force:
+    current = next(
+        (
+            row
+            for row in history
+            if row.get("morning_report_id") == morning["id"]
+            and row.get("evening_report_id") == evening["id"]
+            and row.get("source_hash") == context["source_hash"]
+        ),
+        None,
+    )
+    if (
+        current
+        and current.get("provider") == "codex"
+        and (current.get("prompt_hash") != prompt_hash or current.get("prompt_version") != PROMPT_VERSION)
+    ):
+        current = None
+    if (
+        current
+        and (current.get("provider") != provider or current.get("fingerprint") == fingerprint)
+        and not force
+    ):
         generation["status"] = "cached"
     elif not api_keys:
         generation["status"] = "not_configured"
@@ -254,7 +256,16 @@ def _update_history(
 def _latest_insights(history: list[dict], reports: list[dict]) -> list[dict]:
     dates = sorted({r["date"] for r in reports}, reverse=True)[:5]
     latest = {}
-    for row in sorted(history, key=lambda r: (r["generated_at"], r["id"])):
+    prompt = (Path(__file__).resolve().parent.parent / "prompts" / f"{PROMPT_VERSION}.md").read_bytes()
+    current_prompt_hash = hashlib.sha256(prompt).hexdigest()
+    for row in sorted(
+        history,
+        key=lambda r: (
+            r.get("provider") == "codex" and r.get("prompt_hash") == current_prompt_hash,
+            r["generated_at"],
+            r["id"],
+        ),
+    ):
         if row["date"] in dates:
             latest[row["date"]] = row
     return sorted(latest.values(), key=lambda r: r["date"], reverse=True)
@@ -334,7 +345,9 @@ def main():
     parser.add_argument("--history-url")
     parser.add_argument("--archive-dir", type=Path)
     parser.add_argument(
-        "--provider", choices=DEFAULT_MODELS, default=os.environ.get("INSIGHT_PROVIDER", "gemini")
+        "--provider",
+        choices=tuple(DEFAULT_MODELS.keys() - {"codex"}),
+        default=os.environ.get("INSIGHT_PROVIDER", "gemini"),
     )
     parser.add_argument("--model")
     parser.add_argument("--force", action="store_true")
