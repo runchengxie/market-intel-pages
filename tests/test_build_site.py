@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.build_site import build_site
+from scripts.build_site import build_site, refresh_astro
 from scripts.sync_public_snapshot import sync_snapshot
 from tests.test_chart_contract import public_chart, rehash
 
@@ -282,3 +282,30 @@ def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path
     assert (output / "reports/2026-09-18-evening/index.html").is_file()
     assert (output / "reports/2026-09-23-market-daily.md").is_file()
     assert (output / "reports/2026-09-23-market-daily.txt").is_file()
+
+
+def test_refresh_astro_uses_latest_generated_snapshot(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "site"
+    build_site(root, output)
+    report = output / "reports/2026-09-23-market-daily.md"
+    report.write_text(report.read_text(encoding="utf-8") + "\n发布后解读标记\n", encoding="utf-8")
+    refresh_astro(root, output)
+    assert "发布后解读标记" in (output / "index.html").read_text(encoding="utf-8")
+
+
+def test_reviewed_chart_renders_static_values_only_on_matching_report(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    output = tmp_path / "site"
+    build_site(root, output)
+    chart = output / "data/charts/2026-09-18-morning.json"
+    chart.parent.mkdir(parents=True)
+    chart.write_text(json.dumps(public_chart(), ensure_ascii=False), encoding="utf-8")
+    refresh_astro(root, output)
+    matching = (output / "reports/2026-09-18-morning/index.html").read_text(encoding="utf-8")
+    other = (output / "reports/2026-09-23-morning/index.html").read_text(encoding="utf-8")
+    self_contained = ("上涨家数", "2026-09-18", "https://example.test/source")
+    for text in self_contained:
+        assert text in matching
+    assert "astro-island" in matching
+    assert "https://example.test/source" not in other

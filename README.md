@@ -80,7 +80,7 @@ set -a; . ./.env; set +a
 python3 scripts/generate_insights.py --reports data/reports.json --output /tmp/insights.json --provider deepseek --force
 ```
 
-网页支持跟随系统、浅色和深色主题，右上角按钮会记住选择。
+Astro 页面目前统一使用暖色浅色主题；旧版主题按钮仅保留在回退页面中。
 
 本地生成示例：
 
@@ -119,6 +119,15 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 每日简评使用 `market_intel_pages.daily_summaries.v1`，记录目标日期、正文、晨晚报 ID、生成时间、模型和提示词版本。结构化解读使用 `market_intel_pages.insights.v1`，另记录材料截止时间、内容哈希、段落证据、观察条件与核验结果。
 
 构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，分别计算原报告时间和目标数据日期的年龄，避免补发旧数据掩盖延迟。未提供交易日历目标时，标记 `calendar_unverified`，并保留默认 72 小时的过期提醒。报告正文中的 Markdown 表格、列表和标题会转换为页面结构，单元格与正文仍通过文本节点展示；不执行原文中的 HTML。
+
+六图由上游生成私有候选，逐点核对来源网页、观测日、许可和数值后才可另行签发 `publication: public` 清单。Pages 导入器不会把候选自动升级为公开数据：
+
+```bash
+python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --archive /path/to/private-archive
+python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --archive /path/to/private-archive --apply
+```
+
+无审核通过的清单时，页面显示六张缺项卡。已审核卡片的原始数值、日期和来源在静态 HTML 中可读；交互图仅在展开时加载当期 JSON 与绘图库，不请求旧 PNG。Actions 在生成解读与简评后重渲染 Astro HTML，避免正文与本次数据快照不一致。
 
 ## 检查与维护
 

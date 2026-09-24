@@ -12,6 +12,7 @@ import tempfile
 from pathlib import Path
 
 try:
+    from .audit_chart_artifact import audit_chart_artifact
     from .chart_contract import validate_public_chart
     from .generate_daily_summary import current_summaries
     from .generate_insights import SCHEMA as INSIGHT_SCHEMA
@@ -19,6 +20,7 @@ try:
     from .insight_contract import evaluate_watchpoints
     from .pipeline_health import health_report
 except ImportError:
+    from audit_chart_artifact import audit_chart_artifact
     from chart_contract import validate_public_chart
     from generate_daily_summary import current_summaries
     from generate_insights import SCHEMA as INSIGHT_SCHEMA
@@ -221,13 +223,31 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
             raise
 
 
+def refresh_astro(root: Path, output: Path) -> None:
+    """Render HTML again after the deploy workflow updates its reviewed snapshot."""
+    root = root.resolve()
+    output = output.resolve()
+    if output == root or output.is_relative_to(root) or root.is_relative_to(output):
+        raise ValueError("Astro snapshot must be outside the repository")
+    _, reports = _read_index(output / "data/reports.json", REPORT_SCHEMA, "reports")
+    _validate(reports, _read_index(output / "data/daily_summaries.json", SUMMARY_SCHEMA, "summaries")[1])
+    audit_chart_artifact(output)
+    _overlay_astro_pages(root, output, {str(report["id"]) for report in reports})
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="repository root")
     parser.add_argument("--output", type=Path, required=True, help="Pages artifact output directory")
     parser.add_argument("--summaries", type=Path, help="summary index override")
+    parser.add_argument(
+        "--refresh-astro", action="store_true", help="re-render HTML after commentary generation"
+    )
     args = parser.parse_args()
-    build_site(args.root, args.output, args.summaries)
+    if args.refresh_astro:
+        refresh_astro(args.root, args.output)
+    else:
+        build_site(args.root, args.output, args.summaries)
     print(f"Built public site at {args.output}")
 
 

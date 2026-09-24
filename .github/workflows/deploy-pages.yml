@@ -128,6 +128,10 @@ jobs:
           force_flag=""
           if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
           python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --insights "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
+      - name: Render pages with final commentary snapshot
+        env:
+          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+        run: python3 scripts/build_site.py --output "$SITE_OUTPUT" --refresh-astro
       - name: Preserve commentary revisions and verification receipts
         uses: actions/upload-artifact@v4
         with:

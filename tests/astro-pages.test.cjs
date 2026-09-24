@@ -20,6 +20,8 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.match(html, /\/market-intel-pages\/reports\/2026-09-18-evening\.md/);
   assert.match(html, /缺项/);
   assert.doesNotMatch(html, /private-chat-target/);
+  assert.doesNotMatch(index, /echarts\.|ChartIsland\.|\.png["']/);
+  assert.doesNotMatch(html, /echarts\.|ChartIsland\.|\.png["']/);
 });
 
 test('GFM tables render but untrusted HTML and script URLs are removed', async () => {

@@ -1,5 +1,6 @@
 ---
 import { loadChart } from '../lib/reports.mjs';
+import ChartIsland from './ChartIsland.jsx';
 
 const { reportId } = Astro.props;
 const cards = loadChart(reportId);
@@ -16,6 +17,7 @@ const formatValue = (point) => `${Number(point.value).toLocaleString('zh-CN', { 
           <span class:list={['status-pill', card.status]}>{({ ok: '已核实', degraded: '降级', missing: '缺项', skipped: '跳过' })[card.status] || '缺项'}</span>
         </div>
         {card.reason && <p class="chart-reason">{card.reason}</p>}
+        {card.points.length > 0 && <ChartIsland reportId={reportId} chartKey={card.key} client:visible />}
         {card.points.length > 0 && (
           <details class="chart-values">
             <summary>查看数值与来源</summary>
