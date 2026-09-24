@@ -9,12 +9,14 @@ import shutil
 from pathlib import Path
 
 try:
+    from .chart_contract import validate_public_chart
     from .generate_daily_summary import current_summaries
     from .generate_insights import SCHEMA as INSIGHT_SCHEMA
     from .generate_insights import _valid_history
     from .insight_contract import evaluate_watchpoints
     from .pipeline_health import health_report
 except ImportError:
+    from chart_contract import validate_public_chart
     from generate_daily_summary import current_summaries
     from generate_insights import SCHEMA as INSIGHT_SCHEMA
     from generate_insights import _valid_history
@@ -34,6 +36,24 @@ STATIC_FILES = (
     "theme-utils.js",
     "styles.css",
 )
+
+
+def copy_public_charts(root: Path, output: Path, report_ids: set[str]) -> list[str]:
+    """Copy only indexed and fully validated public chart manifests."""
+    source_dir = (root / "data/charts").resolve()
+    copied: list[str] = []
+    for report_id in sorted(report_ids):
+        source = root / "data/charts" / f"{report_id}.json"
+        if not source.exists():
+            continue
+        if not source.resolve().is_relative_to(source_dir) or not source.is_file():
+            raise ValueError(f"unsafe chart source: {report_id}")
+        payload = validate_public_chart(json.loads(source.read_text(encoding="utf-8")), expected_id=report_id)
+        destination = output / "data/charts" / f"{report_id}.json"
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        copied.append(report_id)
+    return copied
 
 
 def _read_index(path: Path, schema: str, key: str) -> tuple[dict, list[dict]]:
@@ -101,6 +121,7 @@ def build_site(root: Path, output: Path, summaries_path: Path | None = None) -> 
     for filename in STATIC_FILES:
         shutil.copy2(root / filename, output / filename)
     shutil.copy2(root / "data/reports.json", output / "data/reports.json")
+    copy_public_charts(root, output, {str(report["id"]) for report in reports})
     _copy_daily_report(root, output)
     summary_data["summaries"] = current_summaries(reports, summaries)
     (output / "data/daily_summaries.json").write_text(

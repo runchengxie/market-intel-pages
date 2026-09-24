@@ -5,6 +5,7 @@ from pathlib import Path
 
 from scripts.build_site import build_site
 from scripts.sync_public_snapshot import sync_snapshot
+from tests.test_chart_contract import public_chart, rehash
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
@@ -65,6 +66,33 @@ def create_site(root: Path, session_count: int = 6) -> None:
 
 
 class BuildSiteTests(unittest.TestCase):
+    def test_build_copies_only_indexed_public_charts(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        chart_dir = self.root / "data/charts"
+        chart_dir.mkdir()
+        current = public_chart()
+        current["date"] = "2026-09-02"
+        current["report_id"] = "2026-09-02-morning"
+        current["charts"][0]["points"][0]["observation_date"] = "2026-09-02"
+        (chart_dir / "2026-09-02-morning.json").write_text(json.dumps(rehash(current)), encoding="utf-8")
+        (chart_dir / "2026-09-01-morning.json").write_text("stale private data", encoding="utf-8")
+        build_site(self.root, self.output)
+        self.assertTrue((self.output / "data/charts/2026-09-02-morning.json").is_file())
+        self.assertFalse((self.output / "data/charts/2026-09-01-morning.json").exists())
+
+    def test_build_rejects_candidate_chart_in_current_window(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        chart_dir = self.root / "data/charts"
+        chart_dir.mkdir()
+        current = public_chart()
+        current["date"] = "2026-09-02"
+        current["report_id"] = "2026-09-02-morning"
+        current["publication"] = "candidate"
+        current["charts"][0]["points"][0]["observation_date"] = "2026-09-02"
+        (chart_dir / "2026-09-02-morning.json").write_text(json.dumps(rehash(current)), encoding="utf-8")
+        with self.assertRaisesRegex(ValueError, "public"):
+            build_site(self.root, self.output)
+
     def test_build_emits_health_and_optional_insights(self) -> None:
         sync_snapshot(self.root, self.archive)
         build_site(self.root, self.output)
