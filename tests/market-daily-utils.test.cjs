@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { summarizeMarketDaily } = require("../market-daily-utils.js");
+const { summarizeMarketDaily, formatMarketDailyStatus } = require("../market-daily-utils.js");
 
 test("market daily keeps the observation date and lagged yield state", () => {
   const summary = summarizeMarketDaily({
@@ -19,7 +19,14 @@ test("market daily keeps the observation date and lagged yield state", () => {
   assert.equal(summary.rows[0].observationDate, "2026-09-22");
   assert.equal(summary.rows[0].quality, "lagged");
   assert.equal(summary.rows[1].text, "CPI 同比 3.40%");
-  assert.deepEqual(summary.gaps, ["当日收益率", "指数行情"]);
+  assert.deepEqual(summary.gaps, ["美债收益率当日变动", "指数行情"]);
+});
+
+test("market daily status calls a report date a report date, including missing sources", () => {
+  assert.equal(
+    formatMarketDailyStatus({ date: "2026-09-23", gaps: ["指数行情"] }),
+    "2026-09-23 美东报告日 · 逐项显示原始观测日。 尚缺：指数行情。",
+  );
 });
 
 test("market daily hides fixture and invalid source data", () => {

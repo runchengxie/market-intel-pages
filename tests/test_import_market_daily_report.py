@@ -69,7 +69,7 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
             },
         ],
         quality_summary={"status": "degraded"},
-        missing_sources=["quotes", "research"],
+        missing_sources=["quotes", "research", "rates_lag"],
     )
     source = tmp_path / "daily_report.json"
     source.write_text(json.dumps(payload), encoding="utf-8")
@@ -81,6 +81,7 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
     assert "观测日 2026-08-01" in markdown
     assert "https://fred.stlouisfed.org/series/CPIAUCNS" in markdown
     assert "指数行情" in markdown
+    assert "美债收益率当日变动" in markdown
 
 
 def test_import_report_rejects_fixture_status(tmp_path):
