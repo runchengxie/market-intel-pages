@@ -129,7 +129,7 @@ python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --
 python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --review /path/to/private-review.json --archive /path/to/private-archive --apply
 ```
 
-回执只存仓库外的私有归档；导入时复制到 `chart_reviews/<report_id>/<chart_sha256>.json`，方便日后复核。无审核通过的清单时，页面显示六张缺项卡。已审核卡片的原始数值、日期和来源在静态 HTML 中可读；交互图仅在展开时加载当期 JSON 与绘图库，不请求旧 PNG。Actions 在生成解读与简评后重渲染 Astro HTML，避免正文与本次数据快照不一致。2026-09-24 批次的实际审核状态见[六图候选审核记录](docs/chart-review-2026-09-25.md)。
+回执只存仓库外的私有归档；导入时按回执自身内容哈希追加到 `chart_reviews/<report_id>/<chart_sha256>/<review_sha256>.json`。即使图表未变，新的有效复核仍留档，旧回执不会被覆盖。无审核通过的清单时，页面显示六张缺项卡。已审核卡片的原始数值、日期和来源在静态 HTML 中可读；交互图仅在展开时加载当期 JSON 与绘图库，不请求旧 PNG。Actions 在生成解读与简评后重渲染 Astro HTML，避免正文与本次数据快照不一致。2026-09-24 批次的实际审核状态见[六图候选审核记录](docs/chart-review-2026-09-25.md)。
 
 ## 检查与维护
 

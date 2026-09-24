@@ -81,7 +81,7 @@ def _validate_review_points(payload: dict, points: object) -> None:
 
 
 def validate_review_receipt(chart: object, review: object) -> dict:
-    """Require a dated, full-coverage private review for the exact public bytes."""
+    """Require a dated, full-coverage private review for exact canonical chart content."""
     payload = validate_public_chart(chart)
     if not isinstance(review, dict) or set(review) != {
         "schema_version",

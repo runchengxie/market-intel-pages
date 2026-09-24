@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,16 @@ def _write_atomic(path: Path, data: bytes) -> None:
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _archive_review(archive: Path, report_id: str, chart_hash: str, review: dict) -> bool:
+    canonical = json.dumps(review, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    review_sha256 = hashlib.sha256(canonical).hexdigest()
+    path = archive / "chart_reviews" / report_id / chart_hash / f"{review_sha256}.json"
+    if path.exists():
+        return False
+    _write_atomic(path, (json.dumps(review, ensure_ascii=False, indent=2) + "\n").encode())
+    return True
 
 
 def import_charts(
@@ -58,19 +69,19 @@ def import_charts(
     data = (json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
     changed = int(old != data)
     result = {"changed": changed, "report_id": report_id, "applied": False}
-    if not apply or not changed:
+    if not apply:
         return result
+    review_archived = _archive_review(archive, report_id, payload["content_sha256"], reviewed)
+    if not changed:
+        return {**result, "review_archived": review_archived}
     if old is not None:
         old_payload = validate_public_chart(json.loads(old))
         old_hash = old_payload["content_sha256"]
         archive_path = archive / "chart_revisions" / report_id / f"{old_hash}.json"
         if not archive_path.exists():
             _write_atomic(archive_path, old)
-    receipt_path = archive / "chart_reviews" / report_id / f"{payload['content_sha256']}.json"
-    if not receipt_path.exists():
-        _write_atomic(receipt_path, (json.dumps(reviewed, ensure_ascii=False, indent=2) + "\n").encode())
     _write_atomic(destination, data)
-    return {**result, "applied": True}
+    return {**result, "applied": True, "review_archived": review_archived}
 
 
 def main() -> None:

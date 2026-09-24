@@ -92,7 +92,28 @@ def test_apply_archives_prior_version_and_is_idempotent(
     )
     assert destination.read_bytes() != old
     assert any(path.read_bytes() == old for path in archive.rglob("*.json"))
-    assert len(list((archive / "chart_reviews" / "2026-09-18-morning").glob("*.json"))) == 2
+    assert len(list((archive / "chart_reviews" / "2026-09-18-morning").rglob("*.json"))) == 2
+
+
+def test_new_review_is_archived_even_when_chart_is_unchanged(
+    site_root: Path, public_chart_path: Path, review_path: Path, tmp_path: Path
+):
+    archive = tmp_path / "archive"
+    assert (
+        import_charts(site_root, public_chart_path, archive, review=review_path, apply=True)["changed"] == 1
+    )
+    review = json.loads(review_path.read_text(encoding="utf-8"))
+    review["reviewed_at"] = "2026-09-20T09:00:00+08:00"
+    review["points"][0]["fact_note"] = "再次核对数值与观测日"
+    review_path.write_text(json.dumps(review), encoding="utf-8")
+    result = import_charts(site_root, public_chart_path, archive, review=review_path, apply=True)
+    assert result["changed"] == 0
+    receipts = list((archive / "chart_reviews" / "2026-09-18-morning").rglob("*.json"))
+    assert len(receipts) == 2
+    assert {json.loads(path.read_text(encoding="utf-8"))["reviewed_at"] for path in receipts} == {
+        "2026-09-19T08:00:00+08:00",
+        "2026-09-20T09:00:00+08:00",
+    }
 
 
 def test_candidate_and_wrong_report_are_rejected(
