@@ -62,6 +62,13 @@ PUBLIC_CLAIM_FIELDS = (
     "provider",
 )
 PUBLIC_SECTION_FIELDS = ("key", "title", "facts", "claims")
+RESEARCH_SECTION_TITLES = {
+    "market": "美股市场表现",
+    "drivers": "市场驱动因素",
+    "macro": "经济数据与美联储动态",
+    "company_news": "公司新闻",
+    "movers": "主要上涨与下跌个股",
+}
 
 
 def _valid_report_time(payload: dict[str, Any]) -> bool:
@@ -202,16 +209,18 @@ def _date(payload: dict[str, Any]) -> str:
     return str(payload["as_of"])[:10]
 
 
-def _macro_lines(payload: dict[str, Any]) -> list[str]:
+def _markdown_fact_lines(payload: dict[str, Any], section: str) -> list[str]:
     lines: list[str] = []
     for fact in payload["facts"]:
         label = FACT_LABELS.get(fact.get("id"))
         if label is None:
             continue
+        fact_id = str(fact.get("id") or "")
+        if (fact_id.startswith("index.")) != (section == "market"):
+            continue
         value = fact.get("value")
         url = str(fact.get("source_url") or "")
         observed = str(fact.get("observation_date") or "")
-        fact_id = str(fact.get("id") or "")
         if fact_id.startswith("index."):
             valid_source = (
                 url.startswith("https://")
@@ -237,9 +246,7 @@ def _macro_lines(payload: dict[str, Any]) -> list[str]:
             f"- {label[0]}：{value:.2f}{'' if label[1] == '%' else ' '}{label[1]}"
             f"（观测日 {observed}；[{source_name}]({url})）"
         )
-    if not lines:
-        return []
-    return ["## 美国市场、宏观与利率", "", *lines, ""]
+    return lines
 
 
 def _markdown(payload: dict[str, Any]) -> str:
@@ -253,18 +260,29 @@ def _markdown(payload: dict[str, Any]) -> str:
     cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
     if cutoff:
         lines[4:4] = [f"新闻资料截止：{cutoff}。", ""]
-    lines.extend(_macro_lines(payload))
     gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
     if gaps:
         lines.extend([f"尚缺：{'、'.join(gaps)}。", ""])
-    lines.extend(["## 研究解释", ""])
-    for claim in payload["claims"]:
-        evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
-        lines.extend(
-            [f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - 来源：{', '.join(claim['sources'])}"]
-        )
-    if not payload["claims"]:
-        lines.append("暂无已校验的研究结论。")
+    grouped = _group_claims(payload)
+    for key, title in RESEARCH_SECTION_TITLES.items():
+        lines.extend([f"## {title}", ""])
+        facts = _markdown_fact_lines(payload, key) if key in ("market", "macro") else []
+        lines.extend(facts)
+        for claim in grouped[key]:
+            evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
+            lines.extend(
+                [f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - 来源：{', '.join(claim['sources'])}"]
+            )
+        if not facts and not grouped[key]:
+            lines.append("暂无经核实内容。")
+        lines.append("")
+    if grouped["other"]:
+        lines.extend(["## 其他已核实内容", ""])
+        for claim in grouped["other"]:
+            evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
+            lines.extend(
+                [f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - 来源：{', '.join(claim['sources'])}"]
+            )
     lines.append("")
     return "\n".join(lines)
 
@@ -284,31 +302,71 @@ def _text_fact_lines(payload: dict[str, Any], prefix: str) -> list[str]:
                 f"  来源：{fact['source_url']}",
             ]
         )
-    return lines or ["- 暂无经核实数据。"]
+    return lines
+
+
+def _group_claims(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    groups: dict[str, list[dict[str, Any]]] = {key: [] for key in RESEARCH_SECTION_TITLES}
+    groups["other"] = []
+    section_ids = {
+        section.get("key"): set(section.get("claims", []))
+        for section in payload.get("sections", [])
+        if isinstance(section, dict) and isinstance(section.get("claims"), list)
+    }
+    for claim in payload["claims"]:
+        key = next(
+            (
+                key
+                for key in RESEARCH_SECTION_TITLES
+                if section_ids.get(key, set()).intersection(claim["evidence_ids"])
+            ),
+            "other",
+        )
+        groups[key].append(claim)
+    return groups
+
+
+def _text_claim_lines(claims: list[dict[str, Any]]) -> list[str]:
+    if not claims:
+        return ["- 暂无经核实内容。"]
+    lines = []
+    for index, claim in enumerate(claims, start=1):
+        lines.extend([f"{index}、{claim['claim']}", *(f"   来源：{url}" for url in claim["sources"])])
+    return lines
 
 
 def _text_report(payload: dict[str, Any]) -> str:
     report_date = _date(payload)
+    grouped = _group_claims(payload)
+    market_facts = _text_fact_lines(payload, "index.")
+    macro_facts = _text_fact_lines(payload, "treasury.") + _text_fact_lines(payload, "macro.")
     lines = [
         f"美股市场日报｜{report_date} 美东报告日",
         f"报告生成时间：{payload['as_of']}；逐项显示原始观测日。",
         "",
         "一、美股市场表现",
-        *_text_fact_lines(payload, "index."),
+        *(market_facts or ["- 暂无经核实指数行情。"]),
+        *(_text_claim_lines(grouped["market"]) if grouped["market"] else []),
         "",
-        "二、美债与宏观",
-        *_text_fact_lines(payload, "treasury."),
-        *_text_fact_lines(payload, "macro."),
+        "二、市场驱动因素",
+        *_text_claim_lines(grouped["drivers"]),
         "",
-        "三、核实后的解读与公司动态",
+        "三、经济数据与美联储动态",
+        *(macro_facts or ["- 暂无经核实利率与宏观数据。"]),
+        *(_text_claim_lines(grouped["macro"]) if grouped["macro"] else []),
+        "",
+        "四、公司新闻",
+        *_text_claim_lines(grouped["company_news"]),
+        "",
+        "五、主要上涨与下跌个股",
+        *_text_claim_lines(grouped["movers"]),
+        "",
     ]
     cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
     if cutoff:
         lines[2:2] = [f"新闻资料截止：{cutoff}。"]
-    for index, claim in enumerate(payload["claims"], start=1):
-        lines.extend([f"{index}、{claim['claim']}", *(f"   来源：{url}" for url in claim["sources"])])
-    if not payload["claims"]:
-        lines.append("暂无已核实的研究解释。")
+    if grouped["other"]:
+        lines.extend(["六、其他已核实内容", *_text_claim_lines(grouped["other"])])
     gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
     if gaps:
         lines.extend(["", f"尚缺：{'、'.join(gaps)}。"])

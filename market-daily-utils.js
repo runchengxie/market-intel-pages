@@ -17,6 +17,11 @@ const TREASURY_SOURCE = /^https:\/\/home\.treasury\.gov\/resource-center\/data-c
 const MARKET_DAILY_GAPS = {
   rates_lag: "美债收益率当日变动", quotes: "指数行情", research: "研究解释", fred: "部分 FRED 数据",
 };
+const MARKET_DAILY_CLAIM_SECTIONS = [
+  ["market", "市场表现"], ["drivers", "市场驱动因素"],
+  ["macro", "经济数据与美联储动态"], ["company_news", "公司新闻"],
+  ["movers", "主要上涨与下跌个股"], ["other", "其他已核实内容"],
+];
 
 function summarizeMarketDaily(payload) {
   if (!payload || !/^1\./.test(payload.schema_version ?? "")
@@ -49,6 +54,13 @@ function summarizeMarketDaily(payload) {
   }
   if (!rows.length) return null;
   const evidenceIds = new Set([...(payload.facts ?? []), ...(payload.events ?? [])].map((item) => item.id));
+  const sectionByEvidence = new Map();
+  for (const [key] of MARKET_DAILY_CLAIM_SECTIONS) {
+    const section = (payload.sections ?? []).find((item) => item.key === key);
+    for (const id of Array.isArray(section?.claims) ? section.claims : []) {
+      if (typeof id === "string" && !sectionByEvidence.has(id)) sectionByEvidence.set(id, key);
+    }
+  }
   const claims = [];
   for (const claim of payload.claims ?? []) {
     if (typeof claim.claim !== "string" || !claim.claim.trim()
@@ -56,8 +68,12 @@ function summarizeMarketDaily(payload) {
         || !claim.evidence_ids.every((id) => evidenceIds.has(id))
         || !Array.isArray(claim.sources) || !claim.sources.length
         || !claim.sources.every((url) => /^https:\/\/[^\s/]+\//.test(url))) return null;
-    claims.push({ text: claim.claim, sourceUrls: claim.sources });
+    const sectionKey = claim.evidence_ids.map((id) => sectionByEvidence.get(id)).find(Boolean) ?? "other";
+    claims.push({ text: claim.claim, sourceUrls: claim.sources, sectionKey });
   }
+  const claimSections = MARKET_DAILY_CLAIM_SECTIONS.map(([key, title]) => ({
+    key, title, claims: claims.filter((claim) => claim.sectionKey === key),
+  })).filter((section) => section.claims.length);
   const gaps = (payload.missing_sources ?? [])
     .filter((item) => Object.hasOwn(MARKET_DAILY_GAPS, item))
     .map((item) => MARKET_DAILY_GAPS[item]);
@@ -70,7 +86,7 @@ function summarizeMarketDaily(payload) {
     : date;
   const hasTextReport = Array.isArray(payload.report_formats)
     && payload.report_formats.includes("txt") && payload.report_formats.includes("md");
-  return { date, rows, claims, gaps, hasTextReport, nextMorningRevision: updatedDate !== date };
+  return { date, rows, claims, claimSections, gaps, hasTextReport, nextMorningRevision: updatedDate !== date };
 }
 
 function buildMarketDailyCharts(summary) {
