@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { readFileSync, existsSync } = require('node:fs');
+const { readFileSync, existsSync, cpSync, writeFileSync, mkdtempSync, rmSync } = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
@@ -55,8 +55,8 @@ test('market daily source URLs become compact numbered links only in the rendere
   const { renderMarkdown } = await import('../src/lib/markdown.mjs');
   const source = '- 来源：https://example.com/one, https://example.org/two';
   const html = renderMarkdown(source, { compactSources: true });
-  assert.match(html, /<a href="https:\/\/example.com\/one"[^>]*>来源 1<\/a>/);
-  assert.match(html, /<a href="https:\/\/example.org\/two"[^>]*>来源 2<\/a>/);
+  assert.match(html, /<a href="https:\/\/example.com\/one"[^>]*>来源1<\/a>/);
+  assert.match(html, /<a href="https:\/\/example.org\/two"[^>]*>来源2<\/a>/);
   assert.doesNotMatch(html, />https:\/\/example.com\/one</);
   assert.match(renderMarkdown(source), /https:\/\/example.com\/one/);
 });
@@ -68,4 +68,30 @@ test('single table-row evidence is labelled instead of showing raw Markdown pipe
   assert.equal(formatEvidenceLine('七、行业板块 TOP10', '| 电子 | +0.94% | +0.53% | 436 | 59.9% |'),
     '行业：电子；均涨跌：+0.94%；中位数：+0.53%；家数：436；上涨率：59.9%');
   assert.equal(formatEvidenceLine('市场总览', '上涨 1891 家 | 下跌 3564 家'), '上涨 1891 家 | 下跌 3564 家');
+});
+
+test('verified watchpoint outcome shows labelled table evidence', () => {
+  const fixture = mkdtempSync(path.join(path.dirname(root), 'market-insight-outcome-'));
+  try {
+    cpSync(path.join(root, 'data'), path.join(fixture, 'data'), { recursive: true });
+    cpSync(path.join(root, 'reports'), path.join(fixture, 'reports'), { recursive: true });
+    const file = path.join(fixture, 'data/insights.json');
+    const insights = JSON.parse(readFileSync(file, 'utf8'));
+    const outcome = insights.outcomes[0];
+    outcome.status = 'met';
+    outcome.report_id = '2026-09-23-evening';
+    outcome.observed_date = '2026-09-23';
+    outcome.observed_value = 25.4;
+    outcome.evidence = [{ report_id: outcome.report_id, section: '六维观察', text: '| 流动性 | 25.4 | 偏弱 | 成交额/历史中位 0.90x |' }];
+    writeFileSync(file, JSON.stringify(insights));
+    execFileSync('npm', ['run', 'build', '--', '--outDir', path.join(fixture, 'built')], {
+      cwd: root, stdio: 'pipe', env: { ...process.env, ASTRO_DATA_ROOT: fixture },
+    });
+    const html = readFileSync(path.join(fixture, 'built/index.html'), 'utf8');
+    assert.match(html, /查看核对依据/);
+    assert.match(html, /维度：流动性；观察分：25\.4；状态：偏弱/);
+    assert.doesNotMatch(html, /\| 流动性 \|/);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });

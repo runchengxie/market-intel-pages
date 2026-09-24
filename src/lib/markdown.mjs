@@ -8,7 +8,7 @@ function compactSourceLines(markdown) {
     const urls = sources.split(/,\s+/);
     if (!urls.every((url) => /^https:\/\/\S+$/.test(url))) return line;
     return prefix + urls.map((url, index) => {
-      const label = urls.length === 1 ? '来源' : `来源 ${index + 1}`;
+      const label = urls.length === 1 ? '来源' : `来源${index + 1}`;
       return `[${label}](${url.replace(/\(/g, '%28').replace(/\)/g, '%29')})`;
     }).join('、');
   });
