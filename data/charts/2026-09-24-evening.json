@@ -9,8 +9,8 @@
     {
       "key": "dashboard",
       "title": "综合仪表盘",
-      "status": "ok",
-      "reason": null,
+      "status": "degraded",
+      "reason": "2026-09-24 融资余额仅取得上交所数据，未确认北交所数据；为避免误作全市场合计，暂不展示该日融资余额。",
       "points": [
         {
           "label": "上涨家数",
@@ -129,14 +129,6 @@
           "value": 13366.90755322,
           "unit": "亿",
           "observation_date": "2026-09-14",
-          "source_label": "Tushare 融资融券交易汇总",
-          "source_url": "https://tushare.pro/document/2?doc_id=58"
-        },
-        {
-          "label": "融资余额 2026-09-24",
-          "value": 13318.41736225,
-          "unit": "亿",
-          "observation_date": "2026-09-24",
           "source_label": "Tushare 融资融券交易汇总",
           "source_url": "https://tushare.pro/document/2?doc_id=58"
         }
@@ -275,7 +267,7 @@
       "reason": null,
       "points": [
         {
-          "label": "标普500",
+          "label": "标普500 ETF (SPY)",
           "value": -0.08,
           "unit": "%",
           "observation_date": "2026-09-24",
@@ -283,7 +275,7 @@
           "source_url": "https://finance.yahoo.com/quote/SPY/history/"
         },
         {
-          "label": "纳指100",
+          "label": "纳指100 ETF (QQQ)",
           "value": -0.01,
           "unit": "%",
           "observation_date": "2026-09-24",
@@ -541,5 +533,5 @@
       ]
     }
   ],
-  "content_sha256": "cce0c7a868413431490d562efbe344048cdaabf3516fe45b6d3e3a8143922402"
+  "content_sha256": "efcffb934be642fa376a47a2c3ffa79d258659fc5750e6fefc0cda96347f41ed"
 }
