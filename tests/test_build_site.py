@@ -134,6 +134,24 @@ class BuildSiteTests(unittest.TestCase):
         self.assertTrue((self.output / "reports/2026-09-23-market-daily.md").is_file())
         self.assertFalse((self.output / "reports/2026-09-22-market-daily.txt").exists())
 
+    def test_build_copies_five_us_daily_history_reports(self) -> None:
+        sync_snapshot(self.root, self.archive)
+        rows = []
+        for day in ("2026-09-23", "2026-09-24"):
+            rows.append({"schema_version": "1.0", "run_id": f"daily-{day}", "report_formats": ["md", "txt"]})
+            (self.root / f"reports/{day}-market-daily.md").write_text(f"# {day}\n")
+            (self.root / f"reports/{day}-market-daily.txt").write_text(f"{day}\n")
+        (self.root / "data/market_daily_report.json").write_text(json.dumps(rows[-1]))
+        (self.root / "data/market_daily_reports.json").write_text(json.dumps({
+            "schema_version": "market_intel_pages.us_daily_history.v1", "reports": rows[::-1],
+        }))
+
+        build_site(self.root, self.output)
+
+        self.assertTrue((self.output / "reports/2026-09-23-market-daily.md").is_file())
+        history = json.loads((self.output / "data/market_daily_reports.json").read_text())
+        self.assertEqual(["daily-2026-09-24", "daily-2026-09-23"], [row["run_id"] for row in history["reports"]])
+
     def test_build_rejects_claimed_text_format_without_file(self) -> None:
         sync_snapshot(self.root, self.archive)
         (self.root / "data/market_daily_report.json").write_text(

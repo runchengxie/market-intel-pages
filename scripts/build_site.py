@@ -125,9 +125,25 @@ def _validate(reports: list[dict], summaries: list[dict]) -> None:
 
 def _copy_daily_report(root: Path, output: Path) -> None:
     daily_report = root / "data/market_daily_report.json"
+    history_path = root / "data/market_daily_reports.json"
+    if history_path.is_file():
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+        rows = history.get("reports")
+        if history.get("schema_version") != "market_intel_pages.us_daily_history.v1" or not isinstance(rows, list) or not 1 <= len(rows) <= 5:
+            raise ValueError("invalid US daily history index")
+        dates = [str(row.get("run_id", "")).removeprefix("daily-") for row in rows]
+        if dates != sorted(set(dates), reverse=True) or any(not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) for day in dates):
+            raise ValueError("invalid US daily history dates")
+        if not daily_report.is_file() or json.loads(daily_report.read_text(encoding="utf-8")) != rows[0]:
+            raise ValueError("latest US daily report does not match history")
+        shutil.copy2(history_path, output / "data/market_daily_reports.json")
+    elif daily_report.exists():
+        rows = [json.loads(daily_report.read_text(encoding="utf-8"))]
+    else:
+        rows = []
     if daily_report.exists():
         shutil.copy2(daily_report, output / "data/market_daily_report.json")
-        payload = json.loads(daily_report.read_text(encoding="utf-8"))
+    for payload in rows:
         run_id = payload.get("run_id", "")
         if not isinstance(run_id, str) or not re.fullmatch(r"daily-\d{4}-\d{2}-\d{2}", run_id):
             raise ValueError("invalid market daily report run_id")

@@ -100,6 +100,9 @@ RESEARCH_SECTION_TITLES = {
 def _valid_report_time(payload: dict[str, Any]) -> bool:
     market_time = datetime.fromisoformat(payload["as_of"]).astimezone(ZoneInfo("America/New_York"))
     report_date = date.fromisoformat(str(payload["run_id"]).removeprefix("daily-"))
+    age = (market_time.date() - report_date).days
+    if payload.get("quality_summary", {}).get("revision") == "historical_backfill":
+        return 0 < age <= 10
     return market_time.date() == report_date or (
         market_time.date() == report_date + timedelta(days=1) and market_time.time() < time(9, 30)
     )
@@ -449,6 +452,8 @@ def _markdown(payload: dict[str, Any]) -> str:
     cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
     if cutoff:
         lines[4:4] = [f"新闻资料截止：{cutoff}。", ""]
+    if payload.get("quality_summary", {}).get("revision") == "historical_backfill":
+        lines[4:4] = ["历史补报：按指定交易日数据事后重建，生成时间不代表当日已发布。", ""]
     gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
     if gaps:
         lines.extend([f"尚缺：{'、'.join(gaps)}。", ""])
@@ -572,6 +577,8 @@ def _text_report(payload: dict[str, Any]) -> str:
     cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
     if cutoff:
         lines[2:2] = [f"新闻资料截止：{cutoff}。"]
+    if payload.get("quality_summary", {}).get("revision") == "historical_backfill":
+        lines[2:2] = ["历史补报：本次事后重建，非当日已发布报告。"]
     if grouped["other"]:
         lines.extend(["六、其他已核实内容", *_text_claim_lines(grouped["other"])])
     gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
@@ -586,11 +593,34 @@ def import_report(source: Path, root: Path, manifest_path: Path) -> str:
     payload = _public_payload(_read(source), manifest)
     report_date = _date(payload)
     data_path = root / "data/market_daily_report.json"
+    history_path = root / "data/market_daily_reports.json"
     report_path = root / f"reports/{report_date}-market-daily.md"
     text_path = root / f"reports/{report_date}-market-daily.txt"
+    if history_path.is_file():
+        previous = json.loads(history_path.read_text(encoding="utf-8"))
+        if previous.get("schema_version") != "market_intel_pages.us_daily_history.v1" or not isinstance(previous.get("reports"), list):
+            raise ValueError("invalid US daily history index")
+        reports = previous["reports"]
+    elif data_path.is_file():
+        reports = [json.loads(data_path.read_text(encoding="utf-8"))]
+    else:
+        reports = []
+    by_date = {_date(row): row for row in reports}
+    older = by_date.get(report_date)
+    if older and datetime.fromisoformat(older["generated_at"]) > datetime.fromisoformat(payload["generated_at"]):
+        raise ValueError("older US daily revision cannot replace newer report")
+    by_date[report_date] = payload
+    dates = sorted(by_date, reverse=True)[:5]
+    if report_date not in dates:
+        raise ValueError("US daily report falls outside five-date public window")
+    history = {
+        "schema_version": "market_intel_pages.us_daily_history.v1",
+        "reports": [by_date[day] for day in dates],
+    }
     data_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    data_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    data_path.write_text(json.dumps(history["reports"][0], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     report_path.write_text(_markdown(payload), encoding="utf-8")
     text_path.write_text(_text_report(payload), encoding="utf-8")
     return report_date

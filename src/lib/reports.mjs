@@ -62,6 +62,18 @@ export function loadMarketDaily() {
   return { ...report, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null };
 }
 
+export function loadMarketDailyHistory() {
+  const history = readJson('data/market_daily_reports.json');
+  const rows = history?.schema_version === 'market_intel_pages.us_daily_history.v1'
+    && Array.isArray(history.reports) ? history.reports : [readJson('data/market_daily_report.json')].filter(Boolean);
+  return rows.filter((row) => row.publication === 'public' && /^daily-\d{4}-\d{2}-\d{2}$/.test(row.run_id))
+    .slice(0, 5).map((row) => {
+      const date = row.run_id.slice(6);
+      const file = path.join(dataRoot(), `reports/${date}-market-daily.md`);
+      return { ...row, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null };
+    }).filter((row) => row.markdown);
+}
+
 export function loadLatestInsight() {
   const history = readJson('data/insights.json')?.insights || [];
   return [...history].sort((a, b) => b.date.localeCompare(a.date))[0] || null;

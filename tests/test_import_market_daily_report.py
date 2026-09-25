@@ -69,6 +69,44 @@ def test_import_report_writes_public_json_and_markdown(tmp_path):
     assert "SPX rose" in (output / "reports/2026-09-19-market-daily.md").read_text()
 
 
+def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp_path):
+    output = tmp_path / "site"
+    for day in ("2026-09-18", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"):
+        work = tmp_path / day
+        work.mkdir()
+        payload = _payload()
+        payload["run_id"] = f"daily-{day}"
+        payload["as_of"] = f"{day}T23:00:00-04:00"
+        payload["generated_at"] = payload["as_of"]
+        payload["facts"] = []
+        payload["claims"] = []
+        source, manifest = _source(work, payload)
+        import_report(source, output, manifest)
+
+    history = json.loads((output / "data/market_daily_reports.json").read_text())
+    assert [row["run_id"] for row in history["reports"]] == [
+        "daily-2026-09-25", "daily-2026-09-24", "daily-2026-09-23",
+        "daily-2026-09-22", "daily-2026-09-21",
+    ]
+    assert json.loads((output / "data/market_daily_report.json").read_text())["run_id"] == "daily-2026-09-25"
+
+    work = tmp_path / "revision"
+    work.mkdir()
+    payload = _payload()
+    payload.update(
+        run_id="daily-2026-09-24",
+        as_of="2026-09-25T15:00:00+00:00",
+        generated_at="2026-09-25T15:00:00+00:00",
+        quality_summary={"status": "degraded", "revision": "historical_backfill"},
+        facts=[], claims=[],
+    )
+    source, manifest = _source(work, payload)
+    import_report(source, output, manifest)
+    history = json.loads((output / "data/market_daily_reports.json").read_text())
+    assert history["reports"][1]["quality_summary"]["revision"] == "historical_backfill"
+    assert json.loads((output / "data/market_daily_report.json").read_text())["run_id"] == "daily-2026-09-25"
+
+
 def test_import_report_rejects_credentials(tmp_path):
     payload = _payload()
     payload["claims"][0]["claim"] = "API_KEY leaked"
@@ -318,6 +356,24 @@ def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
     assert "| CME 比特币期货 | 108,500.00 美元/BTC | +1.20% | 2026-09-24 | [Yahoo Finance]" in markdown
     assert len(public["facts"]) == 12
     assert public["source_status"]["cross_asset"]["quality"] == "ok"
+
+
+def test_import_report_labels_late_historical_market_facts(tmp_path):
+    payload = _cross_asset_payload()
+    payload["as_of"] = "2026-09-25T15:00:00+00:00"
+    payload["generated_at"] = payload["as_of"]
+    payload["quality_summary"] = {"status": "degraded", "revision": "historical_backfill"}
+    source, manifest = _source(tmp_path, payload)
+
+    import_report(source, tmp_path / "site", manifest)
+
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    assert "历史补报" in markdown
+    assert "布伦特期货" in markdown
+    payload["quality_summary"].pop("revision")
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "other", manifest)
 
 
 @pytest.mark.parametrize(
