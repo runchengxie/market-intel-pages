@@ -29,7 +29,7 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.doesNotMatch(html, /private-chat-target/);
   assert.doesNotMatch(index, /echarts\.|ChartIsland\.|\.png["']/);
   assert.doesNotMatch(html, /echarts\.|ChartIsland\.|\.png["']/);
-  assert.match(index, /来源：<a href="https:\/\//);
+  assert.match(index, /<a href="https:\/\/home\.treasury\.gov[^"]*"[^>]*>美国财政部<\/a>/);
   assert.doesNotMatch(index, /\| 流动性 \|/);
   assert.match(html, /<table>/);
 });
@@ -50,6 +50,10 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
       fact('cross_asset.brent.close', 68.25, 'USD/barrel', 'Yahoo Finance', 'https://finance.yahoo.com/quote/BZ=F/', 'close', reportDate),
       fact('cross_asset.brent.change_percent', 1.25, 'percent', 'Yahoo Finance', 'https://finance.yahoo.com/quote/BZ=F/', 'daily_return', reportDate),
     );
+    for (const rate of report.facts.filter((row) => row.id.startsWith('treasury.2y.'))) {
+      rate.source = 'FRED';
+      rate.source_url = 'https://fred.stlouisfed.org/series/DGS2';
+    }
     writeFileSync(file, JSON.stringify(report));
     execFileSync('npm', ['run', 'build', '--', '--outDir', path.join(fixture, 'built')], {
       cwd: root, stdio: 'pipe', env: { ...process.env, ASTRO_DATA_ROOT: fixture },
@@ -61,6 +65,7 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
     assert.match(html, /跨资产行情/);
     assert.match(html, /68\.25 USD\/barrel/);
     assert.match(html, />美国财政部</);
+    assert.match(html, /<a href="https:\/\/fred\.stlouisfed\.org\/series\/DGS2"[^>]*>FRED<\/a>/);
     assert.match(html, />Yahoo Finance</);
     assert.match(html, /来源1/);
     assert.match(html, /经济数据、公司新闻与报告全文/);

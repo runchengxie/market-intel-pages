@@ -21,9 +21,10 @@ const factSource = (fact) => {
   const href = fact?.source_url;
   if (!/^https:\/\//.test(href || '')) return null;
   const id = fact.id || '';
-  const label = id.startsWith('treasury.') ? '美国财政部'
-    : id.startsWith('macro.') ? 'FRED'
-      : id.startsWith('cross_asset.') ? 'Yahoo Finance' : '来源';
+  const label = href.startsWith('https://home.treasury.gov/') ? '美国财政部'
+    : href.startsWith('https://fred.stlouisfed.org/') ? 'FRED'
+      : href.startsWith('https://finance.yahoo.com/') ? 'Yahoo Finance'
+        : id.startsWith('index.') ? '核实报道' : '来源';
   return { href, label };
 };
 const formatNumber = (value, digits = 2) => Number.isFinite(value)
