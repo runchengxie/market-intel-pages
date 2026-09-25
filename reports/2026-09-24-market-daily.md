@@ -1,0 +1,34 @@
+# 美股市场日报（2026-09-24）
+
+数据状态：degraded
+报告生成时间：2026-09-24T22:32:26.570134+00:00（美东报告日 2026-09-24）
+
+尚缺：指数行情、研究解释。
+
+## 美股市场表现
+
+暂无经核实内容。
+
+## 市场驱动因素
+
+暂无经核实内容。
+
+## 经济数据与美联储动态
+
+- 2 年期美债收益率日变动：2.00 bp（观测日 2026-09-24；[美国财政部](https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve)）
+- 5 年期美债收益率日变动：4.00 bp（观测日 2026-09-24；[美国财政部](https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve)）
+- 10 年期美债收益率日变动：7.00 bp（观测日 2026-09-24；[美国财政部](https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve)）
+- 30 年期美债收益率日变动：7.00 bp（观测日 2026-09-24；[美国财政部](https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve)）
+- CPI 同比：3.40%（观测日 2026-08-01；[FRED](https://fred.stlouisfed.org/series/CPIAUCNS)）
+- PCE 同比：3.70%（观测日 2026-07-01；[FRED](https://fred.stlouisfed.org/series/PCEPI)）
+- 失业率：4.10%（观测日 2026-08-01；[FRED](https://fred.stlouisfed.org/series/UNRATE)）
+- 非农就业月变动：162.00 千人（观测日 2026-08-01；[FRED](https://fred.stlouisfed.org/series/PAYEMS)）
+
+## 公司新闻
+
+暂无经核实内容。
+
+## 主要上涨与下跌个股
+
+暂无经核实内容。
+
