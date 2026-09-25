@@ -67,7 +67,7 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
     assert.match(html, />美国财政部</);
     assert.match(html, /<a href="https:\/\/fred\.stlouisfed\.org\/series\/DGS2"[^>]*>FRED<\/a>/);
     assert.match(html, />Yahoo Finance</);
-    assert.match(html, /来源1/);
+    assert.match(html, /Yahoo Finance/);
     assert.match(html, /经济数据、公司新闻与报告全文/);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
