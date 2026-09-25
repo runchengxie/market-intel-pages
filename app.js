@@ -22,12 +22,14 @@ function renderMarketDaily(payload) {
   const charts = document.querySelector("#market-daily-charts");
   const list = document.querySelector("#market-daily-list");
   const claimList = document.querySelector("#market-daily-claims");
+  const secondary = document.querySelector("#market-daily-secondary-list");
   if (!summary) {
     status.textContent = "美股宏观日报尚未发布，或数据未通过校验。";
     files.replaceChildren();
     charts.replaceChildren();
     list.replaceChildren();
     claimList.replaceChildren();
+    secondary.replaceChildren();
     return;
   }
   status.textContent = window.marketDailyUtils.formatMarketDailyStatus(summary);
@@ -80,32 +82,77 @@ function renderMarketDaily(payload) {
     figure.append(makeElement("p", "market-daily-chart-note", "点击名称查看原始来源。"));
     return figure;
   }));
-  list.replaceChildren(...summary.rows.filter((row) => row.id.startsWith("macro.") || row.quality === "lagged").map((row) => {
+  const makeSourceLink = (url, label) => {
+    const link = makeElement("a", "source-link", label);
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    return link;
+  };
+  const rateGroup = makeElement("section", "market-daily-data-group");
+  rateGroup.append(makeElement("h4", "market-daily-claim-heading", "美债收益率"));
+  const rateTable = makeElement("table", "market-daily-table");
+  const rateHead = makeElement("tr");
+  for (const heading of ["期限", "收益率", "日变动", "观测日", "来源"]) rateHead.append(makeElement("th", "", heading));
+  rateTable.createTHead().append(rateHead);
+  const rateBody = rateTable.createTBody();
+  for (const row of summary.rateRows) {
+    const tr = makeElement("tr");
+    tr.append(makeElement("th", "", row.label),
+      makeElement("td", "", row.levelValue === null ? "—" : `${row.levelValue.toFixed(2)}%`),
+      makeElement("td", "", row.changeValue === null ? "—" : `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)} bp`),
+      makeElement("td", "market-daily-date", row.observationDate ?? "—"));
+    const sourceCell = makeElement("td");
+    if (row.sourceUrl) sourceCell.append(makeSourceLink(row.sourceUrl, row.sourceLabel));
+    tr.append(sourceCell);
+    rateBody.append(tr);
+  }
+  rateGroup.append(rateTable);
+
+  const assetsGroup = makeElement("section", "market-daily-data-group");
+  assetsGroup.append(makeElement("h4", "market-daily-claim-heading", "布伦特、金银与比特币"));
+  const assetGrid = makeElement("div", "market-daily-assets");
+  for (const row of summary.crossAssetRows) {
+    const card = makeElement("article", "market-daily-card");
+    card.append(makeElement("h5", "market-daily-asset-name", row.label),
+      makeElement("p", "market-daily-value", `${row.priceValue.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${row.priceUnit}`),
+      makeElement("p", `market-daily-return ${row.changeValue < 0 ? "is-negative" : "is-positive"}`, `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)}%`),
+      makeElement("span", "market-daily-date", `观测日 ${row.observationDate} · `),
+      makeSourceLink(row.sourceUrl, row.sourceLabel));
+    assetGrid.append(card);
+  }
+  assetsGroup.append(assetGrid);
+  list.replaceChildren(rateGroup, assetsGroup);
+
+  secondary.replaceChildren(...[
+    ...summary.secondaryRows.map((row) => {
     const card = makeElement("article", "market-daily-card");
     card.append(makeElement("p", "market-daily-value", row.text));
-    const source = makeElement("a", "source-link", `观测日 ${row.observationDate} · ${row.sourceLabel}`);
-    source.href = row.sourceUrl;
-    source.target = "_blank";
-    source.rel = "noopener noreferrer";
-    card.append(source);
+    card.append(makeElement("span", "market-daily-date", `观测日 ${row.observationDate} · `), makeSourceLink(row.sourceUrl, row.sourceLabel));
     if (row.quality === "lagged") card.append(makeElement("span", "market-daily-lag", "当日数据未公布"));
     return card;
-  }));
-  claimList.replaceChildren(...summary.claimSections.map((section) => {
+  }), ...summary.secondaryClaimSections.map((section) => {
     const group = makeElement("section", "market-daily-claim-section");
     group.append(makeElement("h3", "market-daily-claim-heading", section.title));
     section.claims.forEach((claim) => {
       const item = makeElement("article", "market-daily-card");
       item.append(makeElement("p", "market-daily-explanation", claim.text));
       claim.sourceUrls.forEach((url, index) => {
-        const source = makeElement("a", "source-link", `核实来源 ${index + 1}`);
-        source.href = url;
-        source.target = "_blank";
-        source.rel = "noopener noreferrer";
-        item.append(source);
+        item.append(makeSourceLink(url, `来源${index + 1}`));
       });
       group.append(item);
     });
+    return group;
+  })]);
+  claimList.replaceChildren(...summary.primaryClaims.map((section) => {
+    const group = makeElement("section", "market-daily-claim-section");
+    group.append(makeElement("h4", "market-daily-claim-heading", section.title));
+    for (const claim of section.claims) {
+      const item = makeElement("article", "market-daily-card");
+      item.append(makeElement("p", "market-daily-explanation", claim.text));
+      claim.sourceUrls.forEach((url, index) => item.append(makeSourceLink(url, `来源${index + 1}`)));
+      group.append(item);
+    }
     return group;
   }));
 }

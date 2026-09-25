@@ -323,6 +323,21 @@ button, input { font: inherit; }
 .market-daily-chart-value { color: var(--ink); font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; white-space: nowrap; }
 .market-daily-chart-note { margin: 13px 0 0; color: var(--muted); font-size: 10px; }
 .market-daily-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.market-daily-data-group { min-width: 0; padding: 16px; border: 1px solid var(--panel-line); border-radius: 8px; background: var(--panel); }
+.market-daily-data-group > .market-daily-claim-heading { margin-top: 0; }
+.market-daily-table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; color: var(--ink); font-size: 12px; white-space: nowrap; }
+.market-daily-table th, .market-daily-table td { padding: 9px 11px; border-bottom: 1px solid var(--panel-line); text-align: right; font-variant-numeric: tabular-nums; }
+.market-daily-table th:first-child, .market-daily-table td:first-child { text-align: left; }
+.market-daily-table thead th { color: var(--muted); font-size: 10px; font-weight: 600; }
+.market-daily-assets { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.market-daily-asset-name { margin: 0 0 8px; color: var(--ink); font-size: 12px; }
+.market-daily-return { margin: -4px 0 8px; font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.market-daily-return.is-positive { color: var(--brand); }
+.market-daily-return.is-negative { color: var(--chart-negative); }
+.market-daily-date { color: var(--muted); font-size: 10px; }
+.market-daily-secondary { margin-top: 14px; border-top: 1px solid var(--line); color: var(--body-soft); }
+.market-daily-secondary > summary { padding: 12px 2px; color: var(--accent); font-size: 12px; font-weight: 600; cursor: pointer; }
+.market-daily-secondary-list { display: grid; gap: 12px; padding-bottom: 10px; }
 .market-daily-card { padding: 16px; border: 1px solid var(--panel-line); border-top: 2px solid var(--accent); border-radius: 8px; background: var(--panel); box-shadow: 0 4px 16px rgb(57 30 20 / 4%); }
 .market-daily-value { margin: 0 0 8px; font-size: 16px; font-weight: 650; line-height: 1.5; }
 .market-daily-lag { display: block; margin-top: 7px; font-size: 12px; color: var(--muted); }
@@ -357,6 +372,10 @@ button, input { font: inherit; }
   .market-daily-chart { padding: 14px; }
   .market-daily-chart-row { grid-template-columns: 91px minmax(56px, 1fr) 70px; gap: 7px; }
   .market-daily-chart-date { font-size: 9px; }
+  .market-daily-list { grid-template-columns: 1fr; }
+  .market-daily-assets { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .market-daily-assets .market-daily-card { padding: 12px; }
+  .market-daily-value { font-size: 14px; overflow-wrap: anywhere; }
   .insight-columns { grid-template-columns: 1fr; gap: 10px; }
   .insight-card { padding: 18px; }
   .insight-overview { font-size: 18px; }

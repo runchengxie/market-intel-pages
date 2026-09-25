@@ -24,6 +24,18 @@ FACT_LABELS = {
     "treasury.5y.change_bp": ("5 年期美债收益率日变动", "bp"),
     "treasury.10y.change_bp": ("10 年期美债收益率日变动", "bp"),
     "treasury.30y.change_bp": ("30 年期美债收益率日变动", "bp"),
+    "treasury.2y.level_percent": ("2 年期美债收益率水平", "%"),
+    "treasury.5y.level_percent": ("5 年期美债收益率水平", "%"),
+    "treasury.10y.level_percent": ("10 年期美债收益率水平", "%"),
+    "treasury.30y.level_percent": ("30 年期美债收益率水平", "%"),
+    "cross_asset.brent.close": ("布伦特期货收盘", "美元/桶"),
+    "cross_asset.brent.change_percent": ("布伦特日涨跌", "%"),
+    "cross_asset.gold.close": ("COMEX 黄金期货收盘", "美元/金衡盎司"),
+    "cross_asset.gold.change_percent": ("黄金日涨跌", "%"),
+    "cross_asset.silver.close": ("COMEX 白银期货收盘", "美元/金衡盎司"),
+    "cross_asset.silver.change_percent": ("白银日涨跌", "%"),
+    "cross_asset.bitcoin.close": ("CME 比特币期货收盘", "美元/BTC"),
+    "cross_asset.bitcoin.change_percent": ("比特币期货日涨跌", "%"),
     "macro.cpi_yoy": ("CPI 同比", "%"),
     "macro.pce_yoy": ("PCE 同比", "%"),
     "macro.unemployment_rate": ("失业率", "%"),
@@ -31,11 +43,18 @@ FACT_LABELS = {
 }
 FRED_URL = r"https://fred\.stlouisfed\.org/series/[A-Z0-9]+"
 TREASURY_URL = r"https://home\.treasury\.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates\.csv/all/\d{6}\?_format=csv&field_tdr_date_value_month=\d{6}&page=&type=daily_treasury_yield_curve"
+YAHOO_URLS = {
+    "brent": r"https://finance\.yahoo\.com/quote/BZ%3DF/history/",
+    "gold": r"https://finance\.yahoo\.com/quote/GC%3DF/history/",
+    "silver": r"https://finance\.yahoo\.com/quote/SI%3DF/history/",
+    "bitcoin": r"https://finance\.yahoo\.com/quote/BTC%3DF/history/",
+}
 MISSING_LABELS = {
     "quotes": "指数行情",
     "research": "研究解释",
     "fred": "部分 FRED 数据",
     "rates_lag": "美债收益率当日变动",
+    "cross_asset": "布伦特、金银或比特币行情",
 }
 PUBLIC_FACT_FIELDS = (
     "id",
@@ -64,6 +83,7 @@ PUBLIC_CLAIM_FIELDS = (
 PUBLIC_SECTION_FIELDS = ("key", "title", "facts", "claims")
 RESEARCH_SECTION_TITLES = {
     "market": "美股市场表现",
+    "cross_asset": "跨资产行情",
     "drivers": "市场驱动因素",
     "macro": "经济数据与美联储动态",
     "company_news": "公司新闻",
@@ -118,8 +138,84 @@ def _unique_evidence_ids(payload: dict[str, Any]) -> bool:
     )
 
 
+def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
+    fact_id = str(fact.get("id") or "")
+    observed = fact.get("observation_date")
+    source_url = str(fact.get("source_url") or "")
+    unit = fact.get("unit")
+    if fact_id.startswith("index."):
+        return (
+            fact.get("quality") == "reviewed"
+            and unit == "percent"
+            and observed == report_date
+            and source_url.startswith("https://")
+        )
+    if fact_id.startswith("treasury."):
+        is_level = fact_id.endswith(".level_percent")
+        expected_unit = "percent" if is_level else "basis_points"
+        expected_metric = "yield_level" if is_level else "yield_change"
+        source_valid = bool(re.fullmatch(TREASURY_URL, source_url)) or bool(
+            re.fullmatch(FRED_URL, source_url)
+        )
+        return source_valid and unit == expected_unit and fact.get("metric") == expected_metric
+    if fact_id.startswith("cross_asset."):
+        parts = fact_id.split(".")
+        if len(parts) != 3:
+            return False
+        _, asset, field = parts
+        url_pattern = YAHOO_URLS.get(asset)
+        is_close = field == "close"
+        expected_unit = {
+            "brent": "USD/barrel",
+            "gold": "USD/troy_ounce",
+            "silver": "USD/troy_ounce",
+            "bitcoin": "USD/bitcoin",
+        }.get(asset)
+        expected_metric = (
+            ("crypto_futures_close" if asset == "bitcoin" else "commodity_close")
+            if is_close
+            else "daily_return"
+        )
+        return (
+            url_pattern is not None
+            and bool(re.fullmatch(url_pattern, source_url))
+            and fact.get("source") == "Yahoo Finance"
+            and fact.get("quality") == "ok"
+            and observed == report_date
+            and unit == (expected_unit if is_close else "percent")
+            and fact.get("metric") == expected_metric
+        )
+    if fact_id.startswith("macro."):
+        return bool(re.fullmatch(FRED_URL, source_url))
+    return False
+
+
 def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
-    return not any(fact.get("id") in FACT_LABELS for fact in payload["facts"]) or _valid_report_time(payload)
+    if not any(fact.get("id") in FACT_LABELS for fact in payload["facts"]):
+        return True
+    if not _valid_report_time(payload):
+        return False
+    report_date = str(payload["run_id"]).removeprefix("daily-")
+    report_date = str(payload["run_id"]).removeprefix("daily-")
+    known_facts = [fact for fact in payload["facts"] if fact.get("id") in FACT_LABELS]
+    if not all(_valid_market_fact(fact, report_date) for fact in known_facts):
+        return False
+    facts_by_id = {fact["id"]: fact for fact in known_facts}
+    for tenor in ("2y", "5y", "10y", "30y"):
+        level = facts_by_id.get(f"treasury.{tenor}.level_percent")
+        change = facts_by_id.get(f"treasury.{tenor}.change_bp")
+        if (
+            level
+            and change
+            and any(level.get(key) != change.get(key) for key in ("observation_date", "source", "source_url"))
+        ):
+            return False
+    for asset in YAHOO_URLS:
+        close = facts_by_id.get(f"cross_asset.{asset}.close")
+        change = facts_by_id.get(f"cross_asset.{asset}.change_percent")
+        if bool(close) != bool(change):
+            return False
+    return True
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -194,7 +290,7 @@ def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[s
         ),
         "source_status": {
             key: _select(payload.get("source_status", {}).get(key, {}), ("quality", "reason"))
-            for key in ("rates", "macro", "quotes", "research")
+            for key in ("rates", "macro", "quotes", "research", "cross_asset")
             if key in payload.get("source_status", {})
         },
         "content_hash": payload.get("content_hash"),
@@ -209,44 +305,114 @@ def _date(payload: dict[str, Any]) -> str:
     return str(payload["as_of"])[:10]
 
 
-def _markdown_fact_lines(payload: dict[str, Any], section: str) -> list[str]:
-    lines: list[str] = []
-    for fact in payload["facts"]:
-        label = FACT_LABELS.get(fact.get("id"))
-        if label is None:
-            continue
-        fact_id = str(fact.get("id") or "")
-        if (fact_id.startswith("index.")) != (section == "market"):
-            continue
-        value = fact.get("value")
-        url = str(fact.get("source_url") or "")
-        observed = str(fact.get("observation_date") or "")
-        if fact_id.startswith("index."):
-            valid_source = (
-                url.startswith("https://")
-                and fact.get("quality") == "reviewed"
-                and observed == _date(payload)
-            )
-            source_name = "核实报道"
-        elif fact_id.startswith("treasury.") and re.fullmatch(TREASURY_URL, url):
-            valid_source = True
-            source_name = "美国财政部"
-        else:
-            valid_source = bool(re.fullmatch(FRED_URL, url))
-            source_name = "FRED"
-        if (
-            isinstance(value, bool)
-            or not isinstance(value, (int, float))
-            or not math.isfinite(value)
-            or not valid_source
-            or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", observed)
-        ):
-            raise ValueError(f"invalid sourced macro fact: {fact.get('id')}")
+def _fact_category(fact_id: str) -> str:
+    for prefix, category in (
+        ("index.", "market"),
+        ("treasury.", "rates"),
+        ("cross_asset.", "cross_asset"),
+        ("macro.", "macro"),
+    ):
+        if fact_id.startswith(prefix):
+            return category
+    return ""
+
+
+def _markdown_source(fact: dict[str, Any]) -> str:
+    fact_id = str(fact["id"])
+    url = str(fact["source_url"])
+    if fact_id.startswith("index."):
+        name = "核实报道"
+    elif fact_id.startswith("cross_asset."):
+        name = "Yahoo Finance"
+    elif url.startswith("https://home.treasury.gov/"):
+        name = "美国财政部"
+    else:
+        name = "FRED"
+    return f"[{name}]({url})"
+
+
+def _market_table(facts: list[dict[str, Any]]) -> list[str]:
+    lines = ["| 指数 | 收盘涨跌 | 观测日 | 来源 |", "|---|---:|---|---|"]
+    for fact in facts:
+        label = FACT_LABELS[fact["id"]][0].removesuffix("日涨跌").strip()
         lines.append(
-            f"- {label[0]}：{value:.2f}{'' if label[1] == '%' else ' '}{label[1]}"
-            f"（观测日 {observed}；[{source_name}]({url})）"
+            f"| {label} | {float(fact['value']):+.2f}% | {fact['observation_date']} | {_markdown_source(fact)} |"
         )
     return lines
+
+
+def _rates_table(facts: list[dict[str, Any]]) -> list[str]:
+    lines = ["| 美债期限 | 收益率水平 | 日变动 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+    names = {"2y": "2 年期", "5y": "5 年期", "10y": "10 年期", "30y": "30 年期"}
+    for fact in facts:
+        _, tenor, metric = fact["id"].split(".")
+        if metric == "level_percent":
+            continue
+        level = next((row for row in facts if row["id"] == f"treasury.{tenor}.level_percent"), None)
+        level_text = f"{float(level['value']):.2f}%" if level else "—"
+        lines.append(
+            f"| {names[tenor]} | {level_text} | {float(fact['value']):+.2f} bp | "
+            f"{fact['observation_date']} | {_markdown_source(fact)} |"
+        )
+    return lines
+
+
+def _cross_asset_table(facts: list[dict[str, Any]]) -> list[str]:
+    lines = ["| 品种 | 期货价格 | 日涨跌 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+    for fact in facts:
+        if not fact["id"].endswith(".close"):
+            continue
+        _, asset, _ = fact["id"].split(".")
+        change = next((row for row in facts if row["id"] == f"cross_asset.{asset}.change_percent"), None)
+        if change is None:
+            continue
+        label = FACT_LABELS[fact["id"]][0].removesuffix("收盘")
+        unit = FACT_LABELS[fact["id"]][1]
+        lines.append(
+            f"| {label} | {float(fact['value']):,.2f} {unit} | {float(change['value']):+.2f}% | "
+            f"{fact['observation_date']} | {_markdown_source(fact)} |"
+        )
+    return lines
+
+
+def _macro_table(facts: list[dict[str, Any]]) -> list[str]:
+    lines = ["| 数据 | 数值 | 观测日 | 来源 |", "|---|---:|---|---|"]
+    for fact in facts:
+        label, unit = FACT_LABELS[fact["id"]]
+        lines.append(
+            f"| {label} | {float(fact['value']):.2f}{unit} | {fact['observation_date']} | "
+            f"{_markdown_source(fact)} |"
+        )
+    return lines
+
+
+def _markdown_fact_lines(payload: dict[str, Any], section: str) -> list[str]:
+    grouped = []
+    for fact in payload["facts"]:
+        fact_id = str(fact.get("id") or "")
+        if _fact_category(fact_id) != section or fact_id not in FACT_LABELS:
+            continue
+        value = fact.get("value")
+        observed = str(fact.get("observation_date") or "")
+        is_valid = (
+            not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and math.isfinite(value)
+            and re.fullmatch(r"\d{4}-\d{2}-\d{2}", observed)
+            and _valid_market_fact(fact, _date(payload))
+        )
+        if not is_valid:
+            raise ValueError(f"invalid sourced market fact: {fact_id}")
+        grouped.append(fact)
+    if not grouped:
+        return []
+    renderers = {
+        "market": _market_table,
+        "rates": _rates_table,
+        "cross_asset": _cross_asset_table,
+        "macro": _macro_table,
+    }
+    return renderers[section](grouped)
 
 
 def _markdown(payload: dict[str, Any]) -> str:
@@ -264,25 +430,36 @@ def _markdown(payload: dict[str, Any]) -> str:
     if gaps:
         lines.extend([f"尚缺：{'、'.join(gaps)}。", ""])
     grouped = _group_claims(payload)
-    for key, title in RESEARCH_SECTION_TITLES.items():
+    report_sections = (
+        ("market", "美股市场表现"),
+        ("rates", "美债收益率"),
+        ("cross_asset", "布伦特、金银与比特币"),
+        ("drivers", "市场驱动因素"),
+        ("macro", "经济数据与美联储动态"),
+        ("company_news", "公司新闻"),
+        ("movers", "主要个股"),
+    )
+    for key, title in report_sections:
         lines.extend([f"## {title}", ""])
-        facts = _markdown_fact_lines(payload, key) if key in ("market", "macro") else []
+        facts = _markdown_fact_lines(payload, key)
         lines.extend(facts)
-        for claim in grouped[key]:
+        for claim in grouped.get(key, []):
             evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
-            lines.extend(
-                [f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - 来源：{', '.join(claim['sources'])}"]
+            sources = "、".join(
+                f"[来源{index}]({url})" for index, url in enumerate(claim["sources"], start=1)
             )
-        if not facts and not grouped[key]:
+            lines.extend([f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - {sources}"])
+        if not facts and not grouped.get(key, []):
             lines.append("暂无经核实内容。")
         lines.append("")
     if grouped["other"]:
         lines.extend(["## 其他已核实内容", ""])
         for claim in grouped["other"]:
             evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
-            lines.extend(
-                [f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - 来源：{', '.join(claim['sources'])}"]
+            sources = "、".join(
+                f"[来源{index}]({url})" for index, url in enumerate(claim["sources"], start=1)
             )
+            lines.extend([f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - {sources}"])
     lines.append("")
     return "\n".join(lines)
 
@@ -294,7 +471,8 @@ def _text_fact_lines(payload: dict[str, Any], prefix: str) -> list[str]:
         if not fact_id.startswith(prefix) or fact_id not in facts:
             continue
         fact = facts[fact_id]
-        value = f"{fact['value']:+.2f}" if prefix in ("index.", "treasury.") else f"{fact['value']:.2f}"
+        signed = fact_id.startswith("index.") or fact_id.endswith((".change_bp", ".change_percent"))
+        value = f"{fact['value']:+.2f}" if signed else f"{fact['value']:.2f}"
         suffix = unit if unit == "%" else f" {unit}"
         lines.extend(
             [
@@ -339,7 +517,9 @@ def _text_report(payload: dict[str, Any]) -> str:
     report_date = _date(payload)
     grouped = _group_claims(payload)
     market_facts = _text_fact_lines(payload, "index.")
-    macro_facts = _text_fact_lines(payload, "treasury.") + _text_fact_lines(payload, "macro.")
+    treasury_facts = _text_fact_lines(payload, "treasury.")
+    macro_facts = _text_fact_lines(payload, "macro.")
+    cross_asset_facts = _text_fact_lines(payload, "cross_asset.")
     lines = [
         f"美股市场日报｜{report_date} 美东报告日",
         f"报告生成时间：{payload['as_of']}；逐项显示原始观测日。",
@@ -348,17 +528,21 @@ def _text_report(payload: dict[str, Any]) -> str:
         *(market_facts or ["- 暂无经核实指数行情。"]),
         *(_text_claim_lines(grouped["market"]) if grouped["market"] else []),
         "",
-        "二、市场驱动因素",
+        "二、美债、布伦特、金银与比特币",
+        *(treasury_facts or ["- 暂无经核实的美债收益率水平或日变动。"]),
+        *(cross_asset_facts or ["- 暂无经核实的跨资产行情。"]),
+        "",
+        "三、市场驱动因素",
         *_text_claim_lines(grouped["drivers"]),
         "",
-        "三、经济数据与美联储动态",
+        "四、经济数据与美联储动态",
         *(macro_facts or ["- 暂无经核实利率与宏观数据。"]),
         *(_text_claim_lines(grouped["macro"]) if grouped["macro"] else []),
         "",
-        "四、公司新闻",
+        "五、公司新闻",
         *_text_claim_lines(grouped["company_news"]),
         "",
-        "五、主要上涨与下跌个股",
+        "六、主要上涨与下跌个股",
         *_text_claim_lines(grouped["movers"]),
         "",
     ]

@@ -7,6 +7,45 @@ import { formatEvidenceLine } from '../lib/evidence.mjs';
 const reports = loadReports();
 const summaries = loadSummaries(reports).sort((a, b) => b.date.localeCompare(a.date));
 const market = loadMarketDaily();
+const marketFacts = market?.facts || [];
+const factById = new Map(marketFacts.map((fact) => [fact.id, fact]));
+const marketClaims = market?.claims || [];
+const claimSections = new Map((market?.sections || []).map((section) => [section.key, section]));
+const factsFor = (ids) => ids.map((id) => factById.get(id)).filter(Boolean);
+const claimRows = (key, limit = 3) => {
+  const ids = claimSections.get(key)?.claims || [];
+  return ids.map((id) => marketClaims.find((claim) => claim.evidence_ids?.includes(id))
+    || marketClaims.find((claim) => claim.id === id)).filter(Boolean).slice(0, limit);
+};
+const factSource = (fact) => {
+  const href = fact?.source_url;
+  if (!/^https:\/\//.test(href || '')) return null;
+  const id = fact.id || '';
+  const label = href.startsWith('https://home.treasury.gov/') ? '美国财政部'
+    : href.startsWith('https://fred.stlouisfed.org/') ? 'FRED'
+      : href.startsWith('https://finance.yahoo.com/') ? 'Yahoo Finance'
+        : id.startsWith('index.') ? '核实报道' : '来源';
+  return { href, label };
+};
+const formatNumber = (value, digits = 2) => Number.isFinite(value)
+  ? value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '—';
+const indexFacts = factsFor(['index.spx.change_percent', 'index.dow.change_percent', 'index.nasdaq.change_percent', 'index.russell2000.change_percent']);
+const rateTenors = ['2y', '10y'];
+const rateRows = rateTenors.map((tenor) => ({
+  tenor,
+  level: factById.get(`treasury.${tenor}.level_percent`),
+  change: factById.get(`treasury.${tenor}.change_bp`),
+})).filter((row) => row.level || row.change);
+const assetNames = { brent: '布伦特原油', gold: '黄金', silver: '白银', bitcoin: '比特币' };
+const assets = Object.entries(assetNames).map(([key, name]) => ({
+  key, name,
+  close: factById.get(`cross_asset.${key}.close`),
+  change: factById.get(`cross_asset.${key}.change_percent`),
+})).filter((row) => row.close || row.change);
+const hasPrimaryData = indexFacts.length || rateRows.length || assets.length;
+const marketGeneratedLabel = market?.as_of ? new Intl.DateTimeFormat('zh-CN', {
+  timeZone: 'America/New_York', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+}).format(new Date(market.as_of)) : null;
 const insight = loadLatestInsight();
 const outcomes = readJson('data/insights.json')?.outcomes || [];
 const outcomeLabels = { pending: '待验证', met: '条件满足', not_met: '条件未满足', unverifiable: '数据不足，无法验证' };
@@ -37,7 +76,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <title>Quant 市场情报 · Quant Market Intel</title>
   </head>
   <body>
-    <header class="topbar"><a class="brand" href={`${base}/`}><span class="brand-mark">M</span><span>QUANT MARKET INTEL</span></a><span class="top-note">市场观察 · 每日更新</span></header>
+    <header class="topbar"><a class="brand" href={`${base}/`}><span class="brand-mark">M</span><span>QUANT MARKET INTEL</span></a><div class="top-actions"><span class="top-note">市场观察 · 每日更新</span><button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换深色模式" aria-pressed="false">深色</button></div></header>
     <main class="shell">
       <aside class="sidebar">
         <span class="eyebrow">DAILY BRIEFING</span>
@@ -53,9 +92,21 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <section class="hero"><span class="eyebrow">LATEST EDITION</span><h2>最近交易日的报告</h2><p>网页展示最近 5 个交易日。原报告生成时间和数据日期请以每份原文为准。</p></section>
         <section class="panel" aria-labelledby="market-title"><div class="section-heading"><span class="eyebrow">US MARKET DAILY</span><h2 id="market-title">美股市场日报</h2></div>
           {market?.markdown ? <>
-            <p class="section-note">{market.date} 美东报告日 · 逐项以正文标注原始观测日和来源。</p>
-            <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>查看 Markdown 版本</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>下载纯文本报告</a></div>
-            <details><summary>展开美股日报</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown, { compactSources: true })} /></details>
+            <p class="section-note">{market.date} 美东报告日{marketGeneratedLabel ? ` · 报告生成 ${marketGeneratedLabel}（美东）` : ''} · 行情按各项原始观测日展示。这里只呈现已核实字段，不以旧值填补缺项。</p>
+            <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>Markdown</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>纯文本</a></div>
+            {hasPrimaryData ? <div class="market-brief">
+              <h3>美股收盘</h3>
+              <div class="index-grid">{indexFacts.map((fact) => <article class="market-stat">
+                <span>{fact.instrument}</span><strong>{Number(fact.value) > 0 ? '+' : ''}{formatNumber(Number(fact.value))}%</strong>
+                <small>观测日 {fact.observation_date} · {factSource(fact) && <a href={factSource(fact).href} target="_blank" rel="noreferrer">来源</a>}</small>
+              </article>)}</div>
+              {rateRows.length > 0 && <><h3>美债收益率</h3><div class="table-scroll"><table class="market-table"><thead><tr><th>期限</th><th>收益率</th><th>日变动</th><th>观测日 / 来源</th></tr></thead><tbody>{rateRows.map(({ tenor, level, change }) => <tr><th>{tenor.replace('y', ' 年')}</th><td>{level ? `${formatNumber(Number(level.value), 3)}%` : '暂缺'}</td><td>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))} bp` : '暂缺'}</td><td>{(level || change)?.observation_date || '—'} · {[level, change].filter(Boolean).map((fact) => factSource(fact)).filter(Boolean).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</td></tr>)}</tbody></table></div></>}
+              {assets.length > 0 && <><h3>跨资产行情</h3><div class="asset-grid">{assets.map(({ name, close, change }) => <article class="market-stat"><span>{name}</span><strong>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))}%` : '涨跌暂缺'}</strong><small>{close ? `${formatNumber(Number(close.value))} ${close.unit}` : ''} {close?.observation_date || change?.observation_date ? `· 观测日 ${close?.observation_date || change?.observation_date}` : ''} · {[close, change].filter(Boolean).map((fact) => factSource(fact)).filter(Boolean).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</small></article>)}</div></>}
+              <h3>市场驱动</h3>
+              {claimRows('drivers').length ? <ul class="brief-claims">{claimRows('drivers').map((claim) => <li>{claim.claim} <span class="claim-sources">{(claim.sources || []).map((url, index) => /^https:\/\//.test(url) && <a href={url} target="_blank" rel="noreferrer">来源{index + 1}</a>)}</span></li>)}</ul> : <p class="section-note">暂无通过核验的市场驱动材料。</p>}
+              {claimRows('movers').length > 0 && <><h3>重点个股</h3><ul class="brief-claims">{claimRows('movers', 3).map((claim) => <li>{claim.claim} <span class="claim-sources">{(claim.sources || []).map((url, index) => /^https:\/\//.test(url) && <a href={url} target="_blank" rel="noreferrer">来源{index + 1}</a>)}</span></li>)}</ul></>}
+              <details class="secondary-report"><summary>经济数据、公司新闻与报告全文</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown || '', { compactSources: true })} /></details>
+            </div> : <div class="market-empty"><p>这份报告尚无可用于新版行情摘要的字段。</p><p>缺少的行情不会以估值或其他日期的数据补造。</p><details class="secondary-report"><summary>查看现有报告内容</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown || '', { compactSources: true })} /></details></div>}
           </> : <p class="empty">暂未取得可公开的美股日报。</p>}
         </section>
         <section class="panel" aria-labelledby="insight-title"><div class="section-heading"><span class="eyebrow">MARKET JOURNAL</span><h2 id="insight-title">市场解读与验证</h2></div>
@@ -89,6 +140,20 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       const date = document.querySelector('#date-filter');
       const cards = [...document.querySelectorAll('.report-tile')];
       const empty = document.querySelector('#no-reports');
+      const themeToggle = document.querySelector('#theme-toggle');
+      const themeKey = 'market-intel-theme';
+      const applyTheme = (theme) => {
+        document.documentElement.dataset.theme = theme;
+        themeToggle.setAttribute('aria-pressed', String(theme === 'dark'));
+        themeToggle.textContent = theme === 'dark' ? '浅色' : '深色';
+      };
+      const savedTheme = localStorage.getItem(themeKey);
+      applyTheme(savedTheme === 'dark' ? 'dark' : 'light');
+      themeToggle.addEventListener('click', () => {
+        const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        localStorage.setItem(themeKey, next);
+        applyTheme(next);
+      });
       const update = () => {
         let shown = 0;
         for (const card of cards) {
