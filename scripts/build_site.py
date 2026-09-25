@@ -123,23 +123,59 @@ def _validate(reports: list[dict], summaries: list[dict]) -> None:
         raise ValueError("public report snapshot exceeds five trading dates")
 
 
+def _validate_daily_history(history: object, daily_report: Path) -> list[dict]:
+    if not isinstance(history, dict):
+        raise ValueError("invalid US daily history index")
+    rows = history.get("reports")
+    if history.get("schema_version") != "market_intel_pages.us_daily_history.v1":
+        raise ValueError("invalid US daily history index")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= PUBLIC_SESSION_COUNT:
+        raise ValueError("invalid US daily history index")
+
+    dates = [str(row.get("run_id", "")).removeprefix("daily-") for row in rows]
+    if dates != sorted(set(dates), reverse=True):
+        raise ValueError("invalid US daily history dates")
+    if any(not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) for day in dates):
+        raise ValueError("invalid US daily history dates")
+    if not daily_report.is_file():
+        raise ValueError("latest US daily report does not match history")
+    latest = json.loads(daily_report.read_text(encoding="utf-8"))
+    if latest != rows[0]:
+        raise ValueError("latest US daily report does not match history")
+    return rows
+
+
+def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
+    run_id = payload.get("run_id", "")
+    if not isinstance(run_id, str) or not re.fullmatch(r"daily-\d{4}-\d{2}-\d{2}", run_id):
+        raise ValueError("invalid market daily report run_id")
+    report_date = run_id.removeprefix("daily-")
+    declared_formats = payload.get("report_formats", [])
+    for suffix in ("md", "txt"):
+        filename = f"reports/{report_date}-market-daily.{suffix}"
+        source = root / filename
+        if suffix in declared_formats and not source.is_file():
+            raise ValueError(f"claimed market daily format missing: {filename}")
+        if source.is_file():
+            shutil.copy2(source, output / filename)
+
+
 def _copy_daily_report(root: Path, output: Path) -> None:
     daily_report = root / "data/market_daily_report.json"
-    if daily_report.exists():
+    history_path = root / "data/market_daily_reports.json"
+    if history_path.is_file():
+        history = json.loads(history_path.read_text(encoding="utf-8"))
+        rows = _validate_daily_history(history, daily_report)
+        shutil.copy2(history_path, output / "data/market_daily_reports.json")
+    elif daily_report.is_file():
+        rows = [json.loads(daily_report.read_text(encoding="utf-8"))]
+    else:
+        rows = []
+
+    if daily_report.is_file():
         shutil.copy2(daily_report, output / "data/market_daily_report.json")
-        payload = json.loads(daily_report.read_text(encoding="utf-8"))
-        run_id = payload.get("run_id", "")
-        if not isinstance(run_id, str) or not re.fullmatch(r"daily-\d{4}-\d{2}-\d{2}", run_id):
-            raise ValueError("invalid market daily report run_id")
-        report_date = run_id.removeprefix("daily-")
-        declared_formats = payload.get("report_formats", [])
-        for suffix in ("md", "txt"):
-            filename = f"reports/{report_date}-market-daily.{suffix}"
-            source = root / filename
-            if suffix in declared_formats and not source.is_file():
-                raise ValueError(f"claimed market daily format missing: {filename}")
-            if source.is_file():
-                shutil.copy2(source, output / filename)
+    for payload in rows:
+        _copy_daily_report_formats(root, output, payload)
 
 
 def _build_site_contents(root: Path, output: Path, summaries_path: Path | None = None) -> None:
