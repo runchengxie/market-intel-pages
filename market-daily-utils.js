@@ -32,6 +32,12 @@ const YAHOO_SOURCES = {
   silver: /^https:\/\/finance\.yahoo\.com\/quote\/SI%3DF\/history\/$/,
   bitcoin: /^https:\/\/finance\.yahoo\.com\/quote\/BTC%3DF\/history\/$/,
 };
+const YAHOO_INDEX_SOURCES = {
+  spx: /^https:\/\/finance\.yahoo\.com\/quote\/%5EGSPC\/history\/$/,
+  dow: /^https:\/\/finance\.yahoo\.com\/quote\/%5EDJI\/history\/$/,
+  nasdaq: /^https:\/\/finance\.yahoo\.com\/quote\/%5EIXIC\/history\/$/,
+  russell2000: /^https:\/\/finance\.yahoo\.com\/quote\/%5ERUT\/history\/$/,
+};
 const MARKET_DAILY_GAPS = {
   rates_lag: "美债收益率当日变动", quotes: "指数行情", research: "研究解释", fred: "部分 FRED 数据",
   cross_asset: "布伦特、金银或比特币行情",
@@ -54,8 +60,13 @@ function validHttpSource(sourceUrl) {
 function validMarketDailyFact(id, fact, reportDate) {
   const url = fact.source_url ?? "";
   if (id.startsWith("index.")) {
-    return fact.quality === "reviewed" && validHttpSource(url)
-      && fact.observation_date === reportDate;
+    const key = id.split(".")[1];
+    return fact.observation_date === reportDate && (
+      (fact.quality === "reviewed" && validHttpSource(url))
+      || (fact.quality === "ok" && fact.source === "Yahoo Finance"
+        && fact.metric === "daily_return" && fact.unit === "percent"
+        && Boolean(YAHOO_INDEX_SOURCES[key]?.test(url)))
+    );
   }
   if (id.startsWith("treasury.")) {
     const isLevel = id.endsWith(".level_percent");
@@ -104,7 +115,7 @@ function summarizeMarketDaily(payload) {
       text: `${label} ${fact.value.toFixed(2)}${unit}`,
       observationDate: fact.observation_date,
       sourceUrl,
-      sourceLabel: isIndex ? "核实报道" : isTreasury && TREASURY_SOURCE.test(sourceUrl)
+      sourceLabel: isIndex ? (fact.source === "Yahoo Finance" ? "Yahoo Finance" : "核实报道") : isTreasury && TREASURY_SOURCE.test(sourceUrl)
         ? "美国财政部" : isCrossAsset ? "Yahoo Finance" : "FRED",
       metric: fact.metric ?? "",
       unit: fact.unit ?? "",
@@ -112,6 +123,8 @@ function summarizeMarketDaily(payload) {
     });
   }
   if (!rows.length) return null;
+  const yahooIndexRows = rows.filter((row) => row.id.startsWith("index.") && row.quality === "ok");
+  if (yahooIndexRows.length && yahooIndexRows.length !== Object.keys(YAHOO_INDEX_SOURCES).length) return null;
   const evidenceIds = new Set([...(payload.facts ?? []), ...(payload.events ?? [])].map((item) => item.id));
   const sectionByEvidence = new Map();
   for (const [key] of MARKET_DAILY_CLAIM_SECTIONS) {
@@ -225,10 +238,10 @@ function buildMarketDailyChartSvg(summary) {
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="${height}" viewBox="0 0 960 ${height}" role="img">`,
     `<title>${escapeSvgText(summary.date)} 美东交易日市场图表</title>`,
-    `<desc>展示报告日已核实的指数、收益率变动与跨资产行情，并列出美债水平、期货价格、观测日和来源。</desc>`,
+    `<desc>展示报告日来源和日期校验通过的指数、收益率变动与跨资产行情，并列出美债水平、期货价格、观测日和来源。</desc>`,
     `<rect width="960" height="${height}" fill="#fff9f2"/>`,
     `<text x="54" y="62" fill="#34271f" font-family="sans-serif" font-size="28" font-weight="700">${escapeSvgText(summary.date)} 美东交易日</text>`,
-    `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股市场速览 · 仅含已核实的同日数值</text>`,
+    `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股市场速览 · 仅含来源和日期校验通过的同日数值</text>`,
   ];
   for (const chart of charts) {
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">${escapeSvgText(chart.title)}（${escapeSvgText(chart.unit)}）</text>`);

@@ -49,6 +49,12 @@ YAHOO_URLS = {
     "silver": r"https://finance\.yahoo\.com/quote/SI%3DF/history/",
     "bitcoin": r"https://finance\.yahoo\.com/quote/BTC%3DF/history/",
 }
+YAHOO_INDEX_URLS = {
+    "spx": r"https://finance\.yahoo\.com/quote/%5EGSPC/history/",
+    "dow": r"https://finance\.yahoo\.com/quote/%5EDJI/history/",
+    "nasdaq": r"https://finance\.yahoo\.com/quote/%5EIXIC/history/",
+    "russell2000": r"https://finance\.yahoo\.com/quote/%5ERUT/history/",
+}
 MISSING_LABELS = {
     "quotes": "指数行情",
     "research": "研究解释",
@@ -144,11 +150,21 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
     source_url = str(fact.get("source_url") or "")
     unit = fact.get("unit")
     if fact_id.startswith("index."):
+        key = fact_id.removeprefix("index.").removesuffix(".change_percent")
+        yahoo_pattern = YAHOO_INDEX_URLS.get(key)
         return (
-            fact.get("quality") == "reviewed"
-            and unit == "percent"
+            unit == "percent"
             and observed == report_date
-            and source_url.startswith("https://")
+            and (
+                (fact.get("quality") == "reviewed" and source_url.startswith("https://"))
+                or (
+                    yahoo_pattern is not None
+                    and bool(re.fullmatch(yahoo_pattern, source_url))
+                    and fact.get("quality") == "ok"
+                    and fact.get("source") == "Yahoo Finance"
+                    and fact.get("metric") == "daily_return"
+                )
+            )
         )
     if fact_id.startswith("treasury."):
         is_level = fact_id.endswith(".level_percent")
@@ -201,6 +217,13 @@ def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
     if not all(_valid_market_fact(fact, report_date) for fact in known_facts):
         return False
     facts_by_id = {fact["id"]: fact for fact in known_facts}
+    yahoo_indices = [
+        fact for fact in known_facts if fact["id"].startswith("index.") and fact.get("quality") == "ok"
+    ]
+    if yahoo_indices and {fact["id"] for fact in yahoo_indices} != {
+        f"index.{key}.change_percent" for key in YAHOO_INDEX_URLS
+    }:
+        return False
     for tenor in ("2y", "5y", "10y", "30y"):
         level = facts_by_id.get(f"treasury.{tenor}.level_percent")
         change = facts_by_id.get(f"treasury.{tenor}.change_bp")
@@ -321,7 +344,7 @@ def _markdown_source(fact: dict[str, Any]) -> str:
     fact_id = str(fact["id"])
     url = str(fact["source_url"])
     if fact_id.startswith("index."):
-        name = "核实报道"
+        name = "Yahoo Finance" if fact.get("source") == "Yahoo Finance" else "核实报道"
     elif fact_id.startswith("cross_asset."):
         name = "Yahoo Finance"
     elif url.startswith("https://home.treasury.gov/"):

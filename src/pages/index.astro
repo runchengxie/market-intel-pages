@@ -92,7 +92,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <section class="hero"><span class="eyebrow">LATEST EDITION</span><h2>最近交易日的报告</h2><p>网页展示最近 5 个交易日。原报告生成时间和数据日期请以每份原文为准。</p></section>
         <section class="panel" aria-labelledby="market-title"><div class="section-heading"><span class="eyebrow">US MARKET DAILY</span><h2 id="market-title">美股市场日报</h2></div>
           {market?.markdown ? <>
-            <p class="section-note">{market.date} 美东报告日{marketGeneratedLabel ? ` · 报告生成 ${marketGeneratedLabel}（美东）` : ''} · 行情按各项原始观测日展示。这里只呈现已核实字段，不以旧值填补缺项。</p>
+            <p class="section-note">{market.date} 美东报告日{marketGeneratedLabel ? ` · 报告生成 ${marketGeneratedLabel}（美东）` : ''} · 行情按各项原始观测日展示。这里只呈现来源和日期校验通过的字段，不以旧值填补缺项。</p>
             <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>Markdown</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>纯文本</a></div>
             {hasPrimaryData ? <div class="market-brief">
               <h3>美股收盘</h3>
