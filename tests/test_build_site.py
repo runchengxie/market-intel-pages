@@ -307,7 +307,7 @@ def test_reviewed_chart_renders_static_values_only_on_matching_report(tmp_path: 
     report_id = reports[0]["id"]
     other_id = reports[1]["id"]
     chart = output / f"data/charts/{report_id}.json"
-    chart.parent.mkdir(parents=True)
+    chart.parent.mkdir(parents=True, exist_ok=True)
     payload = public_chart()
     payload["report_id"] = report_id
     payload["date"] = reports[0]["date"]
