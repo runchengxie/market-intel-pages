@@ -598,7 +598,9 @@ def import_report(source: Path, root: Path, manifest_path: Path) -> str:
     text_path = root / f"reports/{report_date}-market-daily.txt"
     if history_path.is_file():
         previous = json.loads(history_path.read_text(encoding="utf-8"))
-        if previous.get("schema_version") != "market_intel_pages.us_daily_history.v1" or not isinstance(previous.get("reports"), list):
+        if previous.get("schema_version") != "market_intel_pages.us_daily_history.v1" or not isinstance(
+            previous.get("reports"), list
+        ):
             raise ValueError("invalid US daily history index")
         reports = previous["reports"]
     elif data_path.is_file():
@@ -607,7 +609,9 @@ def import_report(source: Path, root: Path, manifest_path: Path) -> str:
         reports = []
     by_date = {_date(row): row for row in reports}
     older = by_date.get(report_date)
-    if older and datetime.fromisoformat(older["generated_at"]) > datetime.fromisoformat(payload["generated_at"]):
+    if older and datetime.fromisoformat(older["generated_at"]) > datetime.fromisoformat(
+        payload["generated_at"]
+    ):
         raise ValueError("older US daily revision cannot replace newer report")
     by_date[report_date] = payload
     dates = sorted(by_date, reverse=True)[:5]
@@ -620,7 +624,9 @@ def import_report(source: Path, root: Path, manifest_path: Path) -> str:
     data_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     history_path.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    data_path.write_text(json.dumps(history["reports"][0], ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    data_path.write_text(
+        json.dumps(history["reports"][0], ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
     report_path.write_text(_markdown(payload), encoding="utf-8")
     text_path.write_text(_text_report(payload), encoding="utf-8")
     return report_date

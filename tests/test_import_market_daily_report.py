@@ -85,8 +85,11 @@ def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp
 
     history = json.loads((output / "data/market_daily_reports.json").read_text())
     assert [row["run_id"] for row in history["reports"]] == [
-        "daily-2026-09-25", "daily-2026-09-24", "daily-2026-09-23",
-        "daily-2026-09-22", "daily-2026-09-21",
+        "daily-2026-09-25",
+        "daily-2026-09-24",
+        "daily-2026-09-23",
+        "daily-2026-09-22",
+        "daily-2026-09-21",
     ]
     assert json.loads((output / "data/market_daily_report.json").read_text())["run_id"] == "daily-2026-09-25"
 
@@ -98,7 +101,8 @@ def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp
         as_of="2026-09-25T15:00:00+00:00",
         generated_at="2026-09-25T15:00:00+00:00",
         quality_summary={"status": "degraded", "revision": "historical_backfill"},
-        facts=[], claims=[],
+        facts=[],
+        claims=[],
     )
     source, manifest = _source(work, payload)
     import_report(source, output, manifest)
