@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { readFileSync, existsSync, cpSync, writeFileSync, mkdtempSync, rmSync } = require('node:fs');
+const { readFileSync, existsSync, cpSync, writeFileSync, mkdtempSync, rmSync, readdirSync } = require('node:fs');
 const { execFileSync } = require('node:child_process');
 const path = require('node:path');
 
@@ -12,6 +12,12 @@ test('Astro emits a readable five-session static site with six chart states', ()
   const reports = JSON.parse(readFileSync(path.join(root, 'data/reports.json'), 'utf8')).reports;
   const reportId = reports[0].id;
   assert.match(index, /Quant 市场情报/);
+  assert.match(index, /id="theme-toggle"/);
+  assert.match(index, /市场驱动/);
+  assert.match(index, /经济数据、公司新闻与报告全文/);
+  const styles = readdirSync(path.join(root, 'dist/_astro')).filter((name) => name.endsWith('.css'))
+    .map((name) => readFileSync(path.join(root, `dist/_astro/${name}`), 'utf8')).join('\n');
+  assert.match(styles, /:root\[data-theme=?"?dark/);
   assert.ok(index.includes(reportId));
   const report = path.join(root, `dist/reports/${reportId}/index.html`);
   assert.ok(existsSync(report));
@@ -23,9 +29,49 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.doesNotMatch(html, /private-chat-target/);
   assert.doesNotMatch(index, /echarts\.|ChartIsland\.|\.png["']/);
   assert.doesNotMatch(html, /echarts\.|ChartIsland\.|\.png["']/);
-  assert.match(index, /来源：<a href="https:\/\//);
+  assert.match(index, /<a href="https:\/\/home\.treasury\.gov[^"]*"[^>]*>美国财政部<\/a>/);
   assert.doesNotMatch(index, /\| 流动性 \|/);
   assert.match(html, /<table>/);
+});
+
+test('Astro market brief shows verified primary facts, semantic sources and compact secondary content', () => {
+  const fixture = mkdtempSync(path.join(path.dirname(root), 'market-daily-brief-'));
+  try {
+    cpSync(path.join(root, 'data'), path.join(fixture, 'data'), { recursive: true });
+    cpSync(path.join(root, 'reports'), path.join(fixture, 'reports'), { recursive: true });
+    const file = path.join(fixture, 'data/market_daily_report.json');
+    const report = JSON.parse(readFileSync(file, 'utf8'));
+    const reportDate = report.run_id.slice(6);
+    const fact = (id, value, unit, source, source_url, metric, observation_date) => ({
+      id, value, unit, source, source_url, metric, observation_date,
+    });
+    report.facts.push(
+      fact('treasury.2y.level_percent', 3.85, 'percent', 'US Treasury', 'https://home.treasury.gov/data', 'yield_level', reportDate),
+      fact('cross_asset.brent.close', 68.25, 'USD/barrel', 'Yahoo Finance', 'https://finance.yahoo.com/quote/BZ=F/', 'close', reportDate),
+      fact('cross_asset.brent.change_percent', 1.25, 'percent', 'Yahoo Finance', 'https://finance.yahoo.com/quote/BZ=F/', 'daily_return', reportDate),
+    );
+    for (const rate of report.facts.filter((row) => row.id.startsWith('treasury.2y.'))) {
+      rate.source = 'FRED';
+      rate.source_url = 'https://fred.stlouisfed.org/series/DGS2';
+    }
+    writeFileSync(file, JSON.stringify(report));
+    execFileSync('npm', ['run', 'build', '--', '--outDir', path.join(fixture, 'built')], {
+      cwd: root, stdio: 'pipe', env: { ...process.env, ASTRO_DATA_ROOT: fixture },
+    });
+    const html = readFileSync(path.join(fixture, 'built/index.html'), 'utf8');
+    assert.match(html, /美股收盘/);
+    assert.match(html, /美债收益率/);
+    assert.match(html, /3\.850%/);
+    assert.match(html, /跨资产行情/);
+    assert.match(html, /68\.25 USD\/barrel/);
+    assert.match(html, />美国财政部</);
+    assert.match(html, /<a href="https:\/\/fred\.stlouisfed\.org\/series\/DGS2"[^>]*>FRED<\/a>/);
+    assert.match(html, />Yahoo Finance</);
+    assert.match(html, /来源1/);
+    assert.match(html, /经济数据、公司新闻与报告全文/);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });
 
 test('historical insight discloses timing, limitations and verification units', () => {
