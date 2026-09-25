@@ -15,6 +15,7 @@ def _payload():
         "facts": [
             {
                 "id": "index.spx.change_percent",
+                "unit": "percent",
                 "value": 0.16,
                 "quality": "reviewed",
                 "source_url": "https://example.test/report",
@@ -86,6 +87,7 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
         facts=[
             {
                 "id": "treasury.10y.change_bp",
+                "metric": "yield_change",
                 "value": -5.0,
                 "unit": "basis_points",
                 "source_url": "https://fred.stlouisfed.org/series/DGS10",
@@ -106,9 +108,9 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
     markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
-    assert "10 年期美债收益率日变动：-5.00 bp" in markdown
-    assert "CPI 同比：3.40%" in markdown
-    assert "观测日 2026-08-01" in markdown
+    assert "| 10 年期 | — | -5.00 bp | 2026-09-23 | [FRED]" in markdown
+    assert "| CPI 同比 | 3.40% | 2026-08-01 | [FRED]" in markdown
+    assert "| 2026-08-01 |" in markdown
     assert "https://fred.stlouisfed.org/series/CPIAUCNS" in markdown
     assert "指数行情" in markdown
     assert "美债收益率当日变动" in markdown
@@ -132,6 +134,7 @@ def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
         facts=[
             {
                 "id": "treasury.10y.change_bp",
+                "metric": "yield_change",
                 "value": 15.0,
                 "unit": "basis_points",
                 "quality": "ok",
@@ -140,8 +143,8 @@ def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
             },
             {
                 "id": "index.spx.change_percent",
-                "value": -0.8,
                 "unit": "percent",
+                "value": -0.8,
                 "quality": "reviewed",
                 "source_url": "https://abcnews.com/amp/Business/example",
                 "observation_date": "2026-09-23",
@@ -159,9 +162,135 @@ def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
     markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
     assert "报告生成时间：2026-09-24T08:30:00+00:00" in markdown
-    assert "标普 500 日涨跌：-0.80%" in markdown
-    assert "10 年期美债收益率日变动：15.00 bp" in markdown
+    assert "| 标普 500 | -0.80% | 2026-09-23 | [核实报道]" in markdown
+    assert "| 10 年期 | — | +15.00 bp | 2026-09-23 | [美国财政部]" in markdown
     assert "美国财政部" in markdown
+
+
+def _cross_asset_payload():
+    payload = _payload()
+    treasury_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve"
+    facts = []
+    for tenor, level, change in (("2y", 4.15, 5), ("10y", 4.25, 7)):
+        common = {
+            "instrument": f"US_TREASURY_{tenor.upper()}",
+            "source": "US Treasury",
+            "source_url": treasury_url,
+            "source_time": "2026-09-25T11:00:00+00:00",
+            "retrieved_at": "2026-09-25T11:00:00+00:00",
+            "quality": "ok",
+            "observation_date": "2026-09-24",
+        }
+        facts.extend(
+            [
+                {
+                    "id": f"treasury.{tenor}.level_percent",
+                    "metric": "yield_level",
+                    "value": level,
+                    "previous": level - change / 100,
+                    "change": None,
+                    "unit": "percent",
+                    **common,
+                },
+                {
+                    "id": f"treasury.{tenor}.change_bp",
+                    "metric": "yield_change",
+                    "value": change,
+                    "previous": None,
+                    "change": change,
+                    "unit": "basis_points",
+                    **common,
+                },
+            ]
+        )
+    for asset, ticker, metric, unit, value in (
+        ("brent", "BZ%3DF", "commodity_close", "USD/barrel", 71.25),
+        ("gold", "GC%3DF", "commodity_close", "USD/troy_ounce", 3980.5),
+        ("silver", "SI%3DF", "commodity_close", "USD/troy_ounce", 47.12),
+        ("bitcoin", "BTC%3DF", "crypto_futures_close", "USD/bitcoin", 108500),
+    ):
+        url = f"https://finance.yahoo.com/quote/{ticker}/history/"
+        common = {
+            "instrument": f"{asset} ({ticker})",
+            "source": "Yahoo Finance",
+            "source_url": url,
+            "source_time": "2026-09-25T11:00:00+00:00",
+            "retrieved_at": "2026-09-25T11:00:00+00:00",
+            "quality": "ok",
+            "observation_date": "2026-09-24",
+        }
+        facts.extend(
+            [
+                {
+                    "id": f"cross_asset.{asset}.close",
+                    "metric": metric,
+                    "value": value,
+                    "previous": None,
+                    "change": None,
+                    "unit": unit,
+                    **common,
+                },
+                {
+                    "id": f"cross_asset.{asset}.change_percent",
+                    "metric": "daily_return",
+                    "value": 1.2,
+                    "previous": None,
+                    "change": 1.2,
+                    "unit": "percent",
+                    **common,
+                },
+            ]
+        )
+    payload.update(
+        run_id="daily-2026-09-24",
+        as_of="2026-09-25T11:00:00+00:00",
+        generated_at="2026-09-25T11:00:00+00:00",
+        facts=facts,
+        claims=[],
+        source_status={"rates": {"quality": "ok"}, "cross_asset": {"quality": "ok"}},
+        missing_sources=[],
+    )
+    return payload
+
+
+def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
+    source, manifest = _source(tmp_path, _cross_asset_payload())
+
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    public = json.loads((tmp_path / "site/data/market_daily_report.json").read_text())
+
+    assert "| 2 年期 | 4.15% | +5.00 bp | 2026-09-24 | [美国财政部]" in markdown
+    assert "| 布伦特期货 | 71.25 美元/桶 | +1.20% | 2026-09-24 | [Yahoo Finance]" in markdown
+    assert "| CME 比特币期货 | 108,500.00 美元/BTC | +1.20% | 2026-09-24 | [Yahoo Finance]" in markdown
+    assert len(public["facts"]) == 12
+    assert public["source_status"]["cross_asset"]["quality"] == "ok"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"observation_date": "2026-09-23"},
+        {"unit": "USD/contract"},
+        {"source_url": "https://example.test/price"},
+    ],
+)
+def test_import_report_rejects_untrusted_cross_asset_fact(tmp_path, override):
+    payload = _cross_asset_payload()
+    payload["facts"][-2].update(override)
+    source, manifest = _source(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
+def test_import_report_rejects_incomplete_cross_asset_pair(tmp_path):
+    payload = _cross_asset_payload()
+    payload["facts"].remove(payload["facts"][-1])
+    source, manifest = _source(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
 
 
 def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_path):
@@ -173,6 +302,7 @@ def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_pa
         facts=[
             {
                 "id": "index.spx.change_percent",
+                "unit": "percent",
                 "value": -0.8,
                 "quality": "reviewed",
                 "source_url": "https://abcnews.com/amp/Business/example",
@@ -180,7 +310,9 @@ def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_pa
             },
             {
                 "id": "treasury.10y.change_bp",
+                "metric": "yield_change",
                 "value": 15.0,
+                "unit": "basis_points",
                 "quality": "ok",
                 "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
                 "observation_date": "2026-09-23",
@@ -202,10 +334,10 @@ def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_pa
     assert "报告生成时间：2026-09-24T08:30:00+00:00" in report
     assert "一、美股市场表现" in report
     assert "标普 500 日涨跌：-0.80%（观测日 2026-09-23）" in report
-    assert "二、市场驱动因素" in report
-    assert "三、经济数据与美联储动态" in report
+    assert "三、市场驱动因素" in report
+    assert "四、经济数据与美联储动态" in report
     assert "10 年期美债收益率日变动：+15.00 bp" in report
-    assert "暂无经核实内容" not in report.split("三、经济数据与美联储动态")[1].split("四、公司新闻")[0]
+    assert "暂无经核实内容" not in report.split("四、经济数据与美联储动态")[1].split("五、公司新闻")[0]
     assert "六、其他已核实内容" in report
     assert "报道认为收益率上升带来压力；这不是已证明的唯一因果。" in report
     assert "https://abcnews.com/amp/Business/example" in report
@@ -247,10 +379,10 @@ def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_
     import_report(source, tmp_path / "site", manifest)
 
     report = (tmp_path / "site/reports/2026-09-19-market-daily.txt").read_text()
-    assert "二、市场驱动因素" in report
-    assert "四、公司新闻" in report
-    assert report.index("二、市场驱动因素") < report.index("收盘报道将跌势")
-    assert report.index("四、公司新闻") < report.index("公司公告披露")
+    assert "三、市场驱动因素" in report
+    assert "五、公司新闻" in report
+    assert report.index("三、市场驱动因素") < report.index("收盘报道将跌势")
+    assert report.index("五、公司新闻") < report.index("公司公告披露")
     assert report.count("收盘报道将跌势") == 1
     assert report.count("公司公告披露") == 1
 
@@ -262,11 +394,11 @@ def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_
             "市场驱动因素",
             "经济数据与美联储动态",
             "公司新闻",
-            "主要上涨与下跌个股",
+            "主要个股",
         )
     ]
     assert all(heading in markdown for heading in headings)
-    assert markdown.index("## 美股市场表现") < markdown.index("标普 500 日涨跌")
+    assert markdown.index("## 美股市场表现") < markdown.index("| 标普 500 |")
     assert markdown.index("## 经济数据与美联储动态") < markdown.index("CPI 同比")
     assert markdown.index("## 公司新闻") < markdown.index("公司公告披露")
 

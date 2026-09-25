@@ -59,7 +59,7 @@ export function loadMarketDaily() {
   if (!report || !/^daily-\d{4}-\d{2}-\d{2}$/.test(report.run_id)) return null;
   const date = report.run_id.slice(6);
   const file = path.join(dataRoot(), `reports/${date}-market-daily.md`);
-  return { date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null };
+  return { ...report, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null };
 }
 
 export function loadLatestInsight() {
