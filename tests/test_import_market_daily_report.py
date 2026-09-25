@@ -253,6 +253,59 @@ def _cross_asset_payload():
     return payload
 
 
+def test_import_report_accepts_complete_same_day_yahoo_index_set(tmp_path):
+    payload = _cross_asset_payload()
+    for key, symbol, value in (
+        ("spx", "%5EGSPC", -0.02),
+        ("dow", "%5EDJI", -0.31),
+        ("nasdaq", "%5EIXIC", 0.01),
+        ("russell2000", "%5ERUT", 0.42),
+    ):
+        payload["facts"].append(
+            {
+                "id": f"index.{key}.change_percent",
+                "metric": "daily_return",
+                "instrument": key,
+                "value": value,
+                "unit": "percent",
+                "quality": "ok",
+                "source": "Yahoo Finance",
+                "source_url": f"https://finance.yahoo.com/quote/{symbol}/history/",
+                "observation_date": "2026-09-24",
+                "source_time": "2026-09-25T11:00:00+00:00",
+                "retrieved_at": "2026-09-25T11:00:00+00:00",
+            }
+        )
+    source, manifest = _source(tmp_path, payload)
+
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    assert "| 标普 500 | -0.02% | 2026-09-24 | [Yahoo Finance]" in markdown
+
+
+def test_import_report_rejects_partial_yahoo_index_set(tmp_path):
+    payload = _cross_asset_payload()
+    payload["facts"].append(
+        {
+            "id": "index.spx.change_percent",
+            "metric": "daily_return",
+            "instrument": "S&P 500",
+            "value": -0.02,
+            "unit": "percent",
+            "quality": "ok",
+            "source": "Yahoo Finance",
+            "source_url": "https://finance.yahoo.com/quote/%5EGSPC/history/",
+            "observation_date": "2026-09-24",
+            "source_time": "2026-09-25T11:00:00+00:00",
+            "retrieved_at": "2026-09-25T11:00:00+00:00",
+        }
+    )
+    source, manifest = _source(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
 def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
     source, manifest = _source(tmp_path, _cross_asset_payload())
 

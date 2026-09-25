@@ -59,6 +59,26 @@ test("market daily shows reviewed index returns, Treasury rates and cited explan
   assert.match(formatMarketDailyStatus(summary), /次日核实更新/);
 });
 
+test("market daily shows a complete same-day Yahoo index set with its source", () => {
+  const indices = [
+    ["spx", "%5EGSPC", -0.02], ["dow", "%5EDJI", -0.31],
+    ["nasdaq", "%5EIXIC", 0.01], ["russell2000", "%5ERUT", 0.42],
+  ].map(([key, symbol, value]) => ({
+    id: `index.${key}.change_percent`, metric: "daily_return", value,
+    unit: "percent", quality: "ok", source: "Yahoo Finance",
+    source_url: `https://finance.yahoo.com/quote/${symbol}/history/`,
+    observation_date: "2026-09-24",
+  }));
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-24", facts: indices,
+  });
+
+  assert.equal(summary.rows.length, 4);
+  assert.equal(summary.rows[0].sourceLabel, "Yahoo Finance");
+  assert.equal(buildMarketDailyCharts(summary)[0].rows.length, 4);
+  assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts: indices.slice(0, 3) }), null);
+});
+
 test("market daily accepts same-day Treasury levels and cross-asset futures facts only", () => {
   const treasuryUrl = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve";
   const summary = summarizeMarketDaily({
