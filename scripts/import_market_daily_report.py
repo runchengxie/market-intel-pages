@@ -212,8 +212,10 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
         is_level = fact_id.endswith(".level_percent")
         expected_unit = "percent" if is_level else "basis_points"
         expected_metric = "yield_level" if is_level else "yield_change"
-        source_valid = bool(re.fullmatch(TREASURY_URL, source_url)) or bool(
-            re.fullmatch(FRED_URL, source_url)
+        fresh = observed == report_date and fact.get("quality") in {"ok", "reviewed"}
+        lagged = isinstance(observed, str) and observed < report_date and fact.get("quality") == "lagged"
+        source_valid = (bool(re.fullmatch(TREASURY_URL, source_url)) and fresh) or (
+            bool(re.fullmatch(FRED_URL, source_url)) and (fresh or lagged)
         )
         return source_valid and unit == expected_unit and fact.get("metric") == expected_metric
     if fact_id.startswith("cross_asset."):

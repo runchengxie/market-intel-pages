@@ -5,6 +5,7 @@ import { renderMarkdown } from '../lib/markdown.mjs';
 import { formatEvidenceLine } from '../lib/evidence.mjs';
 import { buildEveningNotes } from '../lib/evening-notes.mjs';
 import { factSource, uniqueFactSources } from '../lib/market-sources.mjs';
+import marketDailyUtils from '../../market-daily-utils.js';
 
 const reports = loadReports();
 const summaries = loadSummaries(reports).sort((a, b) => b.date.localeCompare(a.date));
@@ -17,6 +18,8 @@ const latestEveningDate = reports.filter((row) => row.kind === 'evening')
 const latestEvening = reports.filter((row) => row.kind === 'evening')
   .sort((a, b) => b.date.localeCompare(a.date))[0];
 const market = loadMarketDaily();
+const marketChartSummary = market?.publication === 'public' ? marketDailyUtils.summarizeMarketDaily(market) : null;
+const marketChartSvg = marketChartSummary ? marketDailyUtils.buildMarketDailyChartSvg(marketChartSummary) : null;
 const marketHistory = loadMarketDailyHistory().filter((row) => row.date !== market?.date);
 const marketFacts = market?.facts || [];
 const factById = new Map(marketFacts.map((fact) => [fact.id, fact]));
@@ -105,6 +108,13 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
               </article>)}</div>
               {rateRows.length > 0 && <><h3>美债收益率</h3><div class="table-scroll"><table class="market-table"><thead><tr><th>期限</th><th>收益率</th><th>日变动</th><th>观测日 / 来源</th></tr></thead><tbody>{rateRows.map(({ tenor, level, change }) => <tr><th>{tenor.replace('y', ' 年')}</th><td>{level ? `${formatNumber(Number(level.value), 3)}%` : '暂缺'}</td><td>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))} bp` : '暂缺'}</td><td>{(level || change)?.observation_date || '—'} · {uniqueFactSources([level, change].filter(Boolean)).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</td></tr>)}</tbody></table></div></>}
               {assets.length > 0 && <><h3>跨资产行情</h3><div class="asset-grid">{assets.map(({ name, close, change }) => <article class="market-stat"><span>{name}</span><strong>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))}%` : '涨跌暂缺'}</strong><small>{close ? `${formatNumber(Number(close.value))} ${close.unit}` : ''} {close?.observation_date || change?.observation_date ? `· 观测日 ${close?.observation_date || change?.observation_date}` : ''} · {uniqueFactSources([close, change].filter(Boolean)).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</small></article>)}</div></>}
+              {marketChartSvg && <details class="market-chart">
+                <summary>行情图表 · 指数、美债与跨资产（可下载 PNG）</summary>
+                <div class="market-chart-heading"><button type="button" id="download-market-chart" data-report-date={market.date}>下载图表 PNG</button></div>
+                <p class="section-note">仅绘制报告日来源和日期校验通过的数据；原始数值与来源链接见上方行情及展开后的报告。</p>
+                <div class="market-chart-graphic" id="market-daily-chart" set:html={marketChartSvg} />
+                <p id="market-chart-download-status" class="section-note" role="status" aria-live="polite"></p>
+              </details>}
               <h3>市场驱动</h3>
               {claimRows('drivers').length ? <ul class="brief-claims">{claimRows('drivers').map((claim) => <li>{claim.claim} <span class="claim-sources">{(claim.sources || []).map((url, index) => /^https:\/\//.test(url) && <a href={url} target="_blank" rel="noreferrer">来源{index + 1}</a>)}</span></li>)}</ul> : <p class="section-note">暂无通过核验的市场驱动材料。</p>}
               {claimRows('movers').length > 0 && <><h3>重点个股</h3><ul class="brief-claims">{claimRows('movers', 3).map((claim) => <li>{claim.claim} <span class="claim-sources">{(claim.sources || []).map((url, index) => /^https:\/\//.test(url) && <a href={url} target="_blank" rel="noreferrer">来源{index + 1}</a>)}</span></li>)}</ul></>}
@@ -163,6 +173,23 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
         localStorage.setItem(themeKey, next);
         applyTheme(next);
+      });
+      const downloadChart = document.querySelector('#download-market-chart');
+      downloadChart?.addEventListener('click', async () => {
+        const chart = document.querySelector('#market-daily-chart svg');
+        const status = document.querySelector('#market-chart-download-status');
+        if (!chart || !status) return;
+        downloadChart.disabled = true;
+        status.textContent = '正在生成 PNG…';
+        try {
+          const { downloadMarketChartPng } = await import('../lib/market-chart-download.mjs');
+          await downloadMarketChartPng(chart, downloadChart.dataset.reportDate);
+          status.textContent = '图表 PNG 已生成。';
+        } catch {
+          status.textContent = 'PNG 生成失败；可继续查看网页图表与原始数值。';
+        } finally {
+          downloadChart.disabled = false;
+        }
       });
       const update = () => {
         let shown = 0;

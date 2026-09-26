@@ -161,6 +161,7 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
                 "metric": "yield_change",
                 "value": -5.0,
                 "unit": "basis_points",
+                "quality": "ok",
                 "source_url": "https://fred.stlouisfed.org/series/DGS10",
                 "observation_date": "2026-09-23",
             },
@@ -236,6 +237,26 @@ def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
     assert "| 标普 500 | -0.80% | 2026-09-23 | [核实报道]" in markdown
     assert "| 10 年期 | — | +15.00 bp | 2026-09-23 | [美国财政部]" in markdown
     assert "美国财政部" in markdown
+
+
+@pytest.mark.parametrize("quality", ["rejected", "lagged"])
+def test_import_report_rejects_same_day_unapproved_treasury_fact(tmp_path, quality):
+    payload = _payload()
+    payload["facts"] = [
+        {
+            "id": "treasury.2y.change_bp",
+            "metric": "yield_change",
+            "value": 10,
+            "unit": "basis_points",
+            "quality": quality,
+            "source_url": "https://fred.stlouisfed.org/series/DGS2",
+            "observation_date": "2026-09-19",
+        }
+    ]
+    payload["claims"] = []
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="daily report market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
 
 
 def _cross_asset_payload():

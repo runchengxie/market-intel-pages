@@ -21,6 +21,16 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.match(index, /市场驱动/);
   assert.match(index, /展开完整已核实报告/);
   assert.match(index, /Markdown 原文/);
+  assert.match(index, /id="market-daily-chart"/);
+  assert.match(index, /<details class="market-chart"/);
+  assert.match(index, /id="download-market-chart"/);
+  const chart = index.match(/<div class="market-chart-graphic" id="market-daily-chart">([\s\S]*?)<\/div>/)?.[1];
+  assert.ok(chart);
+  assert.match(chart, /2026-09-25 美东交易日市场图表/);
+  assert.match(chart, /观测日 2026-09-25/);
+  assert.match(chart, /home\.treasury\.gov/);
+  assert.match(chart, /BTC\/USD 现货/);
+  assert.doesNotMatch(chart, /2026-08-01|2026-07-01/);
   assert.doesNotMatch(index, /美国财政部<\/a><a[^>]*>美国财政部/);
   assert.doesNotMatch(index, /Yahoo Finance<\/a><a[^>]*>Yahoo Finance/);
   assert.doesNotMatch(index, /FMP<\/a><a[^>]*>FMP/);
@@ -41,6 +51,26 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.match(index, /<a href="https:\/\/home\.treasury\.gov[^"]*"[^>]*>美国财政部<\/a>/);
   assert.doesNotMatch(index, /\| 流动性 \|/);
   assert.match(html, /<table>/);
+});
+
+test('US daily chart is absent when the public report has no eligible market facts', () => {
+  const fixture = mkdtempSync(path.join(path.dirname(root), 'market-daily-empty-chart-'));
+  try {
+    cpSync(path.join(root, 'data'), path.join(fixture, 'data'), { recursive: true });
+    cpSync(path.join(root, 'reports'), path.join(fixture, 'reports'), { recursive: true });
+    const file = path.join(fixture, 'data/market_daily_report.json');
+    const report = JSON.parse(readFileSync(file, 'utf8'));
+    report.facts = report.facts.filter((fact) => fact.id.startsWith('macro.'));
+    writeFileSync(file, JSON.stringify(report));
+    execFileSync('npm', ['run', 'build', '--', '--outDir', path.join(fixture, 'built')], {
+      cwd: root, stdio: 'pipe', env: { ...process.env, ASTRO_DATA_ROOT: fixture },
+    });
+    const html = readFileSync(path.join(fixture, 'built/index.html'), 'utf8');
+    assert.doesNotMatch(html, /id="market-daily-chart"/);
+    assert.doesNotMatch(html, /id="download-market-chart"/);
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });
 
 test('Astro market brief shows verified primary facts, semantic sources and compact secondary content', () => {
