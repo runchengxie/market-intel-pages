@@ -58,6 +58,14 @@ FMP_COMMODITY_SYMBOLS = {"brent": "BZUSD", "gold": "GCUSD", "silver": "SIUSD"}
 FMP_CRYPTO_URL = (
     "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full"
 )
+BTC_SPOT_SOURCES = {
+    ("Financial Modeling Prep", FMP_CRYPTO_URL): "BTC/USD cryptocurrency EOD (FMP BTCUSD)",
+    (
+        "Data provided by CoinGecko",
+        "https://www.coingecko.com/en/api",
+    ): "BTC/USD spot at 16:00 ET (CoinGecko bitcoin/USD)",
+    ("Kraken", "https://www.kraken.com/prices/bitcoin"): "BTC/USD spot at 16:00 ET (Kraken XBT/USD)",
+}
 YAHOO_INDEX_URLS = {
     "spx": r"https://finance\.yahoo\.com/quote/%5EGSPC/history/",
     "dow": r"https://finance\.yahoo\.com/quote/%5EDJI/history/",
@@ -200,9 +208,8 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
         if asset == "bitcoin_spot":
             return (
                 field in {"close", "change_percent"}
-                and source_url == FMP_CRYPTO_URL
-                and fact.get("source") == "Financial Modeling Prep"
-                and "(FMP BTCUSD)" in str(fact.get("instrument") or "")
+                and (str(fact.get("source")), source_url) in BTC_SPOT_SOURCES
+                and fact.get("instrument") == BTC_SPOT_SOURCES[(str(fact.get("source")), source_url)]
                 and fact.get("quality") == "ok"
                 and observed == report_date
                 and unit == ("USD/bitcoin" if field == "close" else "percent")
@@ -411,7 +418,11 @@ def _markdown_source(fact: dict[str, Any]) -> str:
     if fact_id.startswith("index."):
         name = "Yahoo Finance" if fact.get("source") == "Yahoo Finance" else "核实报道"
     elif fact_id.startswith("cross_asset."):
-        name = "FMP" if fact.get("source") == "Financial Modeling Prep" else "Yahoo Finance"
+        name = {
+            "Financial Modeling Prep": "FMP",
+            "Data provided by CoinGecko": "Data provided by CoinGecko",
+            "Kraken": "Kraken",
+        }.get(fact.get("source"), "Yahoo Finance")
     elif url.startswith("https://home.treasury.gov/"):
         name = "美国财政部"
     else:
