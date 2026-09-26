@@ -56,6 +56,8 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
       fact('cross_asset.brent.change_percent', 1.25, 'percent', 'Yahoo Finance', 'https://finance.yahoo.com/quote/BZ=F/', 'daily_return', reportDate),
       fact('cross_asset.silver.close', 64.8, 'USD/troy_ounce', 'Financial Modeling Prep', 'https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full', 'commodity_close', reportDate),
       fact('cross_asset.silver.change_percent', 1.24, 'percent', 'Financial Modeling Prep', 'https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full', 'daily_return', reportDate),
+      fact('cross_asset.bitcoin_spot.close', 84093.13, 'USD/bitcoin', 'Financial Modeling Prep', 'https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full', 'crypto_spot_close', reportDate),
+      fact('cross_asset.bitcoin_spot.change_percent', -0.35, 'percent', 'Financial Modeling Prep', 'https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full', 'daily_return', reportDate),
     );
     for (const rate of report.facts.filter((row) => row.id.startsWith('treasury.2y.'))) {
       rate.source = 'FRED';
@@ -71,6 +73,8 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
     assert.match(html, /3\.850%/);
     assert.match(html, /跨资产行情/);
     assert.match(html, /68\.25 USD\/barrel/);
+    assert.match(html, /BTC\/USD 现货/);
+    assert.match(html, /84,093\.13 USD\/bitcoin/);
     assert.match(html, />美国财政部</);
     assert.match(html, /<a href="https:\/\/fred\.stlouisfed\.org\/series\/DGS2"[^>]*>FRED<\/a>/);
     assert.match(html, />Yahoo Finance</);

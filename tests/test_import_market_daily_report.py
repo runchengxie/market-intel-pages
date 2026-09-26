@@ -381,6 +381,59 @@ def test_import_report_accepts_fmp_commodity_pair_with_matching_symbol(tmp_path)
     assert "| 布伦特期货 | 71.25 美元/桶 | +1.20% | 2026-09-24 | [FMP]" in markdown
 
 
+def test_import_report_accepts_separate_fmp_btc_spot_pair(tmp_path):
+    payload = _cross_asset_payload()
+    base = payload["facts"][-1].copy()
+    base.update(
+        instrument="BTC/USD cryptocurrency EOD (FMP BTCUSD)",
+        source="Financial Modeling Prep",
+        source_url="https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full",
+    )
+    payload["facts"].extend(
+        [
+            {
+                **base,
+                "id": "cross_asset.bitcoin_spot.close",
+                "metric": "crypto_spot_close",
+                "value": 84093.13,
+                "unit": "USD/bitcoin",
+            },
+            {
+                **base,
+                "id": "cross_asset.bitcoin_spot.change_percent",
+                "metric": "daily_return",
+                "value": -0.35,
+                "unit": "percent",
+            },
+        ]
+    )
+    source, manifest = _source(tmp_path, payload)
+
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    assert "| BTC/USD 现货 | 84,093.13 美元/BTC | -0.35% | 2026-09-24 | [FMP]" in markdown
+    assert "| CME 比特币期货 |" in markdown
+
+
+def test_import_report_rejects_spot_fact_mislabeled_as_cme_future(tmp_path):
+    payload = _cross_asset_payload()
+    base = payload["facts"][-1].copy()
+    base.update(
+        id="cross_asset.bitcoin_spot.close",
+        metric="crypto_spot_close",
+        instrument="CME Bitcoin continuous futures (BTC=F)",
+        source="Financial Modeling Prep",
+        source_url="https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full",
+        value=84093.13,
+        unit="USD/bitcoin",
+    )
+    payload["facts"].append(base)
+    source, manifest = _source(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
 def test_import_report_rejects_fmp_commodity_with_wrong_symbol(tmp_path):
     payload = _cross_asset_payload()
     fmp_url = (

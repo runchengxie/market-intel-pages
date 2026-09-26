@@ -19,6 +19,8 @@ const MARKET_DAILY_FACTS = [
   ["cross_asset.silver.change_percent", "白银日涨跌", "%"],
   ["cross_asset.bitcoin.close", "CME 比特币期货收盘", " 美元/BTC"],
   ["cross_asset.bitcoin.change_percent", "比特币期货日涨跌", "%"],
+  ["cross_asset.bitcoin_spot.close", "BTC/USD 现货收盘", " 美元/BTC"],
+  ["cross_asset.bitcoin_spot.change_percent", "BTC/USD 现货日涨跌", "%"],
   ["macro.cpi_yoy", "CPI 同比", "%"],
   ["macro.pce_yoy", "PCE 同比", "%"],
   ["macro.unemployment_rate", "失业率", "%"],
@@ -33,6 +35,7 @@ const YAHOO_SOURCES = {
   bitcoin: /^https:\/\/finance\.yahoo\.com\/quote\/BTC%3DF\/history\/$/,
 };
 const FMP_COMMODITY_URL = "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full";
+const FMP_CRYPTO_URL = "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full";
 const FMP_COMMODITY_SYMBOLS = { brent: "BZUSD", gold: "GCUSD", silver: "SIUSD" };
 const YAHOO_INDEX_SOURCES = {
   spx: /^https:\/\/finance\.yahoo\.com\/quote\/%5EGSPC\/history\/$/,
@@ -80,6 +83,12 @@ function validMarketDailyFact(id, fact, reportDate) {
   }
   if (id.startsWith("cross_asset.")) {
     const [, asset, field] = id.split(".");
+    if (asset === "bitcoin_spot") return (field === "close" || field === "change_percent")
+      && url === FMP_CRYPTO_URL && fact.source === "Financial Modeling Prep"
+      && String(fact.instrument ?? "").includes("(FMP BTCUSD)")
+      && fact.quality === "ok" && fact.observation_date === reportDate
+      && fact.unit === (field === "close" ? "USD/bitcoin" : "percent")
+      && fact.metric === (field === "close" ? "crypto_spot_close" : "daily_return");
     const source = YAHOO_SOURCES[asset];
     const fmpSymbol = FMP_COMMODITY_SYMBOLS[asset];
     const isClose = field === "close";
@@ -162,7 +171,7 @@ function summarizeMarketDaily(payload) {
     if (level && change && (level.observationDate !== change.observationDate
         || level.sourceUrl !== change.sourceUrl || level.sourceLabel !== change.sourceLabel)) return null;
   }
-  for (const asset of Object.keys(YAHOO_SOURCES)) {
+  for (const asset of [...Object.keys(YAHOO_SOURCES), "bitcoin_spot"]) {
     const close = rows.some((row) => row.id === `cross_asset.${asset}.close`);
     const change = rows.some((row) => row.id === `cross_asset.${asset}.change_percent`);
     if (close !== change) return null;
@@ -178,7 +187,7 @@ function summarizeMarketDaily(payload) {
       sourceLabel: level?.sourceLabel ?? change?.sourceLabel,
     } : null;
   }).filter(Boolean);
-  const crossAssetRows = ["brent", "gold", "silver", "bitcoin"].map((name) => {
+  const crossAssetRows = ["brent", "gold", "silver", "bitcoin", "bitcoin_spot"].map((name) => {
     const close = rows.find((row) => row.id === `cross_asset.${name}.close`);
     const change = rows.find((row) => row.id === `cross_asset.${name}.change_percent`);
     return close && change ? { name, label: close.label, priceValue: close.value,
@@ -245,7 +254,7 @@ function buildMarketDailyChartSvg(summary) {
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="${height}" viewBox="0 0 960 ${height}" role="img">`,
     `<title>${escapeSvgText(summary.date)} 美东交易日市场图表</title>`,
-    `<desc>展示报告日来源和日期校验通过的指数、收益率变动与跨资产行情，并列出美债水平、期货价格、观测日和来源。</desc>`,
+    `<desc>展示报告日来源和日期校验通过的指数、收益率变动与跨资产行情，并列出美债水平、跨资产价格、观测日和来源。</desc>`,
     `<rect width="960" height="${height}" fill="#fff9f2"/>`,
     `<text x="54" y="62" fill="#34271f" font-family="sans-serif" font-size="28" font-weight="700">${escapeSvgText(summary.date)} 美东交易日</text>`,
     `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股市场速览 · 仅含来源和日期校验通过的同日数值</text>`,

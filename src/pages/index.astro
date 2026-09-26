@@ -47,7 +47,7 @@ const rateRows = rateTenors.map((tenor) => ({
   level: factById.get(`treasury.${tenor}.level_percent`),
   change: factById.get(`treasury.${tenor}.change_bp`),
 })).filter((row) => row.level || row.change);
-const assetNames = { brent: '布伦特原油', gold: '黄金', silver: '白银', bitcoin: '比特币' };
+const assetNames = { brent: '布伦特原油', gold: '黄金', silver: '白银', bitcoin: 'CME 比特币期货', bitcoin_spot: 'BTC/USD 现货' };
 const assets = Object.entries(assetNames).map(([key, name]) => ({
   key, name,
   close: factById.get(`cross_asset.${key}.close`),
