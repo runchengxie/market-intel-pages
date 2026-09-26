@@ -125,6 +125,25 @@ test("market daily charts preserve FMP commodity provenance", () => {
   assert.equal(summarizeMarketDaily({ ...payload, facts: pair.map((row) => ({ ...row, instrument: "Brent (FMP GCUSD, continuous)" })) }), null);
 });
 
+test("BTC/USD spot is shown separately from CME bitcoin futures", () => {
+  const fmpUrl = "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full";
+  const fmp = { source: "Financial Modeling Prep", source_url: fmpUrl,
+    instrument: "BTC/USD cryptocurrency EOD (FMP BTCUSD)", quality: "ok", observation_date: "2026-09-24" };
+  const yahoo = { source: "Yahoo Finance", source_url: "https://finance.yahoo.com/quote/BTC%3DF/history/",
+    instrument: "CME Bitcoin continuous futures (BTC=F)", quality: "ok", observation_date: "2026-09-24" };
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts: [
+    { ...yahoo, id: "cross_asset.bitcoin.close", metric: "crypto_futures_close", value: 83500, unit: "USD/bitcoin" },
+    { ...yahoo, id: "cross_asset.bitcoin.change_percent", metric: "daily_return", value: -0.8, unit: "percent" },
+    { ...fmp, id: "cross_asset.bitcoin_spot.close", metric: "crypto_spot_close", value: 84093.13, unit: "USD/bitcoin" },
+    { ...fmp, id: "cross_asset.bitcoin_spot.change_percent", metric: "daily_return", value: -0.35, unit: "percent" },
+  ] });
+
+  assert.ok(summary);
+  assert.deepEqual(summary.crossAssetRows.map((row) => row.name), ["bitcoin", "bitcoin_spot"]);
+  assert.equal(summary.crossAssetRows[1].sourceLabel, "FMP");
+  assert.match(buildMarketDailyChartSvg(summary), /BTC\/USD 现货收盘：84,093\.13 USD\/bitcoin/);
+});
+
 test("market daily rejects cross-asset facts with mismatched dates, units or sources", () => {
   for (const override of [
     { observation_date: "2026-09-23" },

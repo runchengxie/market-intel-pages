@@ -36,6 +36,8 @@ FACT_LABELS = {
     "cross_asset.silver.change_percent": ("白银日涨跌", "%"),
     "cross_asset.bitcoin.close": ("CME 比特币期货收盘", "美元/BTC"),
     "cross_asset.bitcoin.change_percent": ("比特币期货日涨跌", "%"),
+    "cross_asset.bitcoin_spot.close": ("BTC/USD 现货收盘", "美元/BTC"),
+    "cross_asset.bitcoin_spot.change_percent": ("BTC/USD 现货日涨跌", "%"),
     "macro.cpi_yoy": ("CPI 同比", "%"),
     "macro.pce_yoy": ("PCE 同比", "%"),
     "macro.unemployment_rate": ("失业率", "%"),
@@ -53,6 +55,9 @@ FMP_COMMODITY_URL = (
     "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full"
 )
 FMP_COMMODITY_SYMBOLS = {"brent": "BZUSD", "gold": "GCUSD", "silver": "SIUSD"}
+FMP_CRYPTO_URL = (
+    "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full"
+)
 YAHOO_INDEX_URLS = {
     "spx": r"https://finance\.yahoo\.com/quote/%5EGSPC/history/",
     "dow": r"https://finance\.yahoo\.com/quote/%5EDJI/history/",
@@ -192,6 +197,17 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
         if len(parts) != 3:
             return False
         _, asset, field = parts
+        if asset == "bitcoin_spot":
+            return (
+                field in {"close", "change_percent"}
+                and source_url == FMP_CRYPTO_URL
+                and fact.get("source") == "Financial Modeling Prep"
+                and "(FMP BTCUSD)" in str(fact.get("instrument") or "")
+                and fact.get("quality") == "ok"
+                and observed == report_date
+                and unit == ("USD/bitcoin" if field == "close" else "percent")
+                and fact.get("metric") == ("crypto_spot_close" if field == "close" else "daily_return")
+            )
         url_pattern = YAHOO_URLS.get(asset)
         is_close = field == "close"
         expected_unit = {
@@ -256,10 +272,19 @@ def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
             and any(level.get(key) != change.get(key) for key in ("observation_date", "source", "source_url"))
         ):
             return False
-    for asset in YAHOO_URLS:
+    for asset in (*YAHOO_URLS, "bitcoin_spot"):
         close = facts_by_id.get(f"cross_asset.{asset}.close")
         change = facts_by_id.get(f"cross_asset.{asset}.change_percent")
         if bool(close) != bool(change):
+            return False
+        if (
+            close
+            and change
+            and any(
+                close.get(key) != change.get(key)
+                for key in ("observation_date", "source", "source_url", "instrument")
+            )
+        ):
             return False
     return True
 
@@ -336,7 +361,7 @@ def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[s
         ),
         "source_status": {
             key: _select(payload.get("source_status", {}).get(key, {}), ("quality", "reason"))
-            for key in ("rates", "macro", "quotes", "research", "cross_asset")
+            for key in ("rates", "macro", "quotes", "research", "cross_asset", "btc_spot")
             if key in payload.get("source_status", {})
         },
         "content_hash": payload.get("content_hash"),
@@ -421,7 +446,7 @@ def _rates_table(facts: list[dict[str, Any]]) -> list[str]:
 
 
 def _cross_asset_table(facts: list[dict[str, Any]]) -> list[str]:
-    lines = ["| 品种 | 期货价格 | 日涨跌 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+    lines = ["| 品种 | 价格 | 日涨跌 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
     for fact in facts:
         if not fact["id"].endswith(".close"):
             continue
