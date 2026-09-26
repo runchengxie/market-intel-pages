@@ -4,6 +4,7 @@ import { loadReports, loadSummaries, loadMarketDaily, loadMarketDailyHistory, lo
 import { renderMarkdown } from '../lib/markdown.mjs';
 import { formatEvidenceLine } from '../lib/evidence.mjs';
 import { buildEveningNotes } from '../lib/evening-notes.mjs';
+import { factSource, uniqueFactSources } from '../lib/market-sources.mjs';
 
 const reports = loadReports();
 const summaries = loadSummaries(reports).sort((a, b) => b.date.localeCompare(a.date));
@@ -26,17 +27,6 @@ const claimRows = (key, limit = 3) => {
   const ids = claimSections.get(key)?.claims || [];
   return ids.map((id) => marketClaims.find((claim) => claim.evidence_ids?.includes(id))
     || marketClaims.find((claim) => claim.id === id)).filter(Boolean).slice(0, limit);
-};
-const factSource = (fact) => {
-  const href = fact?.source_url;
-  if (!/^https:\/\//.test(href || '')) return null;
-  const id = fact.id || '';
-  const label = href.startsWith('https://home.treasury.gov/') ? '美国财政部'
-    : href.startsWith('https://fred.stlouisfed.org/') ? 'FRED'
-      : href.startsWith('https://finance.yahoo.com/') ? 'Yahoo Finance'
-        : href.startsWith('https://site.financialmodelingprep.com/') ? 'FMP'
-        : id.startsWith('index.') ? '核实报道' : '来源';
-  return { href, label };
 };
 const formatNumber = (value, digits = 2) => Number.isFinite(value)
   ? value.toLocaleString('zh-CN', { minimumFractionDigits: digits, maximumFractionDigits: digits }) : '—';
@@ -106,21 +96,21 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <section class="panel" id="us-session" aria-labelledby="market-title"><div class="section-heading"><span class="eyebrow">07:00 · US CLOSE SESSION</span><h2 id="market-title">07:00 美股收盘复盘</h2></div>
           {market?.markdown ? <>
             <p class="section-note">{market.date} 美东报告日{marketGeneratedLabel ? ` · 报告生成 ${marketGeneratedLabel}（美东）` : ''} · 行情按各项原始观测日展示。这里只呈现来源和日期校验通过的字段，不以旧值填补缺项。</p>
-            <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>Markdown</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>纯文本</a></div>
+            <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>Markdown 原文</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>纯文本报告</a></div>
             {hasPrimaryData ? <div class="market-brief">
               <h3>美股收盘</h3>
               <div class="index-grid">{indexFacts.map((fact) => <article class="market-stat">
                 <span>{fact.instrument}</span><strong>{Number(fact.value) > 0 ? '+' : ''}{formatNumber(Number(fact.value))}%</strong>
                 <small>观测日 {fact.observation_date} · {factSource(fact) && <a href={factSource(fact).href} target="_blank" rel="noreferrer">来源</a>}</small>
               </article>)}</div>
-              {rateRows.length > 0 && <><h3>美债收益率</h3><div class="table-scroll"><table class="market-table"><thead><tr><th>期限</th><th>收益率</th><th>日变动</th><th>观测日 / 来源</th></tr></thead><tbody>{rateRows.map(({ tenor, level, change }) => <tr><th>{tenor.replace('y', ' 年')}</th><td>{level ? `${formatNumber(Number(level.value), 3)}%` : '暂缺'}</td><td>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))} bp` : '暂缺'}</td><td>{(level || change)?.observation_date || '—'} · {[level, change].filter(Boolean).map((fact) => factSource(fact)).filter(Boolean).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</td></tr>)}</tbody></table></div></>}
-              {assets.length > 0 && <><h3>跨资产行情</h3><div class="asset-grid">{assets.map(({ name, close, change }) => <article class="market-stat"><span>{name}</span><strong>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))}%` : '涨跌暂缺'}</strong><small>{close ? `${formatNumber(Number(close.value))} ${close.unit}` : ''} {close?.observation_date || change?.observation_date ? `· 观测日 ${close?.observation_date || change?.observation_date}` : ''} · {[close, change].filter(Boolean).map((fact) => factSource(fact)).filter(Boolean).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</small></article>)}</div></>}
+              {rateRows.length > 0 && <><h3>美债收益率</h3><div class="table-scroll"><table class="market-table"><thead><tr><th>期限</th><th>收益率</th><th>日变动</th><th>观测日 / 来源</th></tr></thead><tbody>{rateRows.map(({ tenor, level, change }) => <tr><th>{tenor.replace('y', ' 年')}</th><td>{level ? `${formatNumber(Number(level.value), 3)}%` : '暂缺'}</td><td>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))} bp` : '暂缺'}</td><td>{(level || change)?.observation_date || '—'} · {uniqueFactSources([level, change].filter(Boolean)).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</td></tr>)}</tbody></table></div></>}
+              {assets.length > 0 && <><h3>跨资产行情</h3><div class="asset-grid">{assets.map(({ name, close, change }) => <article class="market-stat"><span>{name}</span><strong>{change ? `${Number(change.value) > 0 ? '+' : ''}${formatNumber(Number(change.value))}%` : '涨跌暂缺'}</strong><small>{close ? `${formatNumber(Number(close.value))} ${close.unit}` : ''} {close?.observation_date || change?.observation_date ? `· 观测日 ${close?.observation_date || change?.observation_date}` : ''} · {uniqueFactSources([close, change].filter(Boolean)).map((source) => <a href={source.href} target="_blank" rel="noreferrer">{source.label}</a>)}</small></article>)}</div></>}
               <h3>市场驱动</h3>
               {claimRows('drivers').length ? <ul class="brief-claims">{claimRows('drivers').map((claim) => <li>{claim.claim} <span class="claim-sources">{(claim.sources || []).map((url, index) => /^https:\/\//.test(url) && <a href={url} target="_blank" rel="noreferrer">来源{index + 1}</a>)}</span></li>)}</ul> : <p class="section-note">暂无通过核验的市场驱动材料。</p>}
               {claimRows('movers').length > 0 && <><h3>重点个股</h3><ul class="brief-claims">{claimRows('movers', 3).map((claim) => <li>{claim.claim} <span class="claim-sources">{(claim.sources || []).map((url, index) => /^https:\/\//.test(url) && <a href={url} target="_blank" rel="noreferrer">来源{index + 1}</a>)}</span></li>)}</ul></>}
-              <details class="secondary-report"><summary>经济数据、公司新闻与报告全文</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown || '', { compactSources: true })} /></details>
+              <details class="secondary-report"><summary>展开完整已核实报告（含经济数据、公司新闻与质量说明）</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown || '', { compactSources: true })} /></details>
             </div> : <div class="market-empty"><p>这份报告尚无可用于新版行情摘要的字段。</p><p>缺少的行情不会以估值或其他日期的数据补造。</p><details class="secondary-report"><summary>查看现有报告内容</summary><div class="markdown-body" set:html={renderMarkdown(market.markdown || '', { compactSources: true })} /></details></div>}
-            {marketHistory.length > 0 && <div class="market-history"><h3>最近 5 个美东交易日</h3>{marketHistory.map((row) => <details class="secondary-report"><summary>{row.date}{row.quality_summary?.revision === 'historical_backfill' ? ' · 历史补报' : ''}</summary><div class="link-row"><a href={`${base}/reports/${row.date}-market-daily.md`}>Markdown</a><a href={`${base}/reports/${row.date}-market-daily.txt`}>纯文本</a></div><div class="markdown-body" set:html={renderMarkdown(row.markdown, { compactSources: true })} /></details>)}</div>}
+            {marketHistory.length > 0 && <div class="market-history"><h3>最近 5 个美东交易日</h3>{marketHistory.map((row) => <details class="secondary-report"><summary>{row.date}{row.quality_summary?.revision === 'historical_backfill' ? ' · 历史补报' : ''}</summary><div class="link-row"><a href={`${base}/reports/${row.date}-market-daily.md`}>Markdown 原文</a><a href={`${base}/reports/${row.date}-market-daily.txt`}>纯文本报告</a></div><div class="markdown-body" set:html={renderMarkdown(row.markdown, { compactSources: true })} /></details>)}</div>}
           </> : <p class="empty">暂未取得可公开的美股日报。</p>}
         </section>
         <section id="asia-session" class="session-group" aria-labelledby="asia-session-title">

@@ -69,6 +69,25 @@ def test_import_report_writes_public_json_and_markdown(tmp_path):
     assert "SPX rose" in (output / "reports/2026-09-19-market-daily.md").read_text()
 
 
+def test_markdown_includes_public_source_status_without_private_metadata(tmp_path):
+    payload = _payload()
+    payload["source_status"] = {
+        "quotes": {"quality": "ok", "reason": "all_indices_fresh"},
+        "research": {"quality": "reviewed", "reason": "source_audited"},
+    }
+    payload["quality_summary"]["reviewed_source_cutoff"] = "2026-09-19T23:59:59-04:00"
+    payload["private_review_notes"] = "DO_NOT_PUBLISH"
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    import_report(source, output, manifest)
+    markdown = (output / "reports/2026-09-19-market-daily.md").read_text()
+    assert "## 数据质量与核验说明" in markdown
+    assert "| 指数行情 | 已核实 | 目标交易日数据齐全 |" in markdown
+    assert "| 研究材料 | 已审阅 | 来源已逐条核查 |" in markdown
+    assert "2026-09-19T23:59:59-04:00" in markdown
+    assert "DO_NOT_PUBLISH" not in markdown
+
+
 def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp_path):
     output = tmp_path / "site"
     for day in ("2026-09-18", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"):
