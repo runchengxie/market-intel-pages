@@ -89,8 +89,8 @@ test("market daily accepts same-day Treasury levels and cross-asset futures fact
       { id: "treasury.10y.level_percent", metric: "yield_level", value: 4.2, unit: "percent", quality: "ok", observation_date: "2026-09-24", source_url: treasuryUrl },
       { id: "treasury.10y.change_bp", metric: "yield_change", value: 7, unit: "basis_points", quality: "ok", observation_date: "2026-09-24", source_url: treasuryUrl },
       ...[["brent", "BZ%3DF", "USD/barrel", 71], ["gold", "GC%3DF", "USD/troy_ounce", 3900], ["silver", "SI%3DF", "USD/troy_ounce", 47], ["bitcoin", "BTC%3DF", "USD/bitcoin", 108000]].flatMap(([name, ticker, unit, price]) => [
-        { id: `cross_asset.${name}.close`, metric: name === "bitcoin" ? "crypto_futures_close" : "commodity_close", value: price, unit, quality: "ok", observation_date: "2026-09-24", source_url: `https://finance.yahoo.com/quote/${ticker}/history/` },
-        { id: `cross_asset.${name}.change_percent`, metric: "daily_return", value: 1.2, unit: "percent", quality: "ok", observation_date: "2026-09-24", source_url: `https://finance.yahoo.com/quote/${ticker}/history/` },
+        { id: `cross_asset.${name}.close`, metric: name === "bitcoin" ? "crypto_futures_close" : "commodity_close", value: price, unit, quality: "ok", source: "Yahoo Finance", observation_date: "2026-09-24", source_url: `https://finance.yahoo.com/quote/${ticker}/history/` },
+        { id: `cross_asset.${name}.change_percent`, metric: "daily_return", value: 1.2, unit: "percent", quality: "ok", source: "Yahoo Finance", observation_date: "2026-09-24", source_url: `https://finance.yahoo.com/quote/${ticker}/history/` },
       ]),
     ],
   });
@@ -107,6 +107,22 @@ test("market daily accepts same-day Treasury levels and cross-asset futures fact
   assert.match(svg, /4\.20%/);
   assert.match(svg, /布伦特期货收盘：71 USD\/barrel/);
   assert.match(svg, /CME 比特币期货收盘：108,000 USD\/bitcoin/);
+});
+
+test("market daily charts preserve FMP commodity provenance", () => {
+  const fmpUrl = "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full";
+  const pair = [
+    { id: "cross_asset.brent.close", metric: "commodity_close", value: 71.25, unit: "USD/barrel" },
+    { id: "cross_asset.brent.change_percent", metric: "daily_return", value: 1.2, unit: "percent" },
+  ].map((row) => ({ ...row, instrument: "Brent (FMP BZUSD, continuous)", source: "Financial Modeling Prep",
+    source_url: fmpUrl, quality: "ok", observation_date: "2026-09-24" }));
+  const payload = { schema_version: "1.0", run_id: "daily-2026-09-24", facts: pair };
+  const summary = summarizeMarketDaily(payload);
+
+  assert.ok(summary);
+  assert.equal(summary.crossAssetRows[0].sourceLabel, "FMP");
+  assert.match(buildMarketDailyChartSvg(summary), /2026-09-24 · FMP/);
+  assert.equal(summarizeMarketDaily({ ...payload, facts: pair.map((row) => ({ ...row, instrument: "Brent (FMP GCUSD, continuous)" })) }), null);
 });
 
 test("market daily rejects cross-asset facts with mismatched dates, units or sources", () => {

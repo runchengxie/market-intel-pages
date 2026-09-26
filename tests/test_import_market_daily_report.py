@@ -362,6 +362,43 @@ def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
     assert public["source_status"]["cross_asset"]["quality"] == "ok"
 
 
+def test_import_report_accepts_fmp_commodity_pair_with_matching_symbol(tmp_path):
+    payload = _cross_asset_payload()
+    fmp_url = (
+        "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full"
+    )
+    for fact in payload["facts"]:
+        if fact["id"].startswith("cross_asset.brent."):
+            fact.update(
+                source="Financial Modeling Prep",
+                source_url=fmp_url,
+                instrument="Brent (FMP BZUSD, continuous)",
+            )
+    source, manifest = _source(tmp_path, payload)
+
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    assert "| 布伦特期货 | 71.25 美元/桶 | +1.20% | 2026-09-24 | [FMP]" in markdown
+
+
+def test_import_report_rejects_fmp_commodity_with_wrong_symbol(tmp_path):
+    payload = _cross_asset_payload()
+    fmp_url = (
+        "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full"
+    )
+    for fact in payload["facts"]:
+        if fact["id"].startswith("cross_asset.brent."):
+            fact.update(
+                source="Financial Modeling Prep",
+                source_url=fmp_url,
+                instrument="Brent (FMP GCUSD, continuous)",
+            )
+    source, manifest = _source(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
 def test_partial_cross_asset_gap_names_only_unavailable_contract(tmp_path):
     payload = _cross_asset_payload()
     payload["facts"] = [

@@ -34,6 +34,7 @@ const factSource = (fact) => {
   const label = href.startsWith('https://home.treasury.gov/') ? '美国财政部'
     : href.startsWith('https://fred.stlouisfed.org/') ? 'FRED'
       : href.startsWith('https://finance.yahoo.com/') ? 'Yahoo Finance'
+        : href.startsWith('https://site.financialmodelingprep.com/') ? 'FMP'
         : id.startsWith('index.') ? '核实报道' : '来源';
   return { href, label };
 };
