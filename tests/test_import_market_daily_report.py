@@ -362,6 +362,21 @@ def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
     assert public["source_status"]["cross_asset"]["quality"] == "ok"
 
 
+def test_partial_cross_asset_gap_names_only_unavailable_contract(tmp_path):
+    payload = _cross_asset_payload()
+    payload["facts"] = [
+        fact for fact in payload["facts"] if not fact["id"].startswith("cross_asset.bitcoin.")
+    ]
+    payload["missing_sources"] = ["cross_asset"]
+    payload["source_status"]["cross_asset"] = {"quality": "degraded"}
+    source, manifest = _source(tmp_path, payload)
+
+    import_report(source, tmp_path / "site", manifest)
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    assert "尚缺：比特币期货行情。" in markdown
+    assert "尚缺：布伦特、金银或比特币行情。" not in markdown
+
+
 def test_import_report_labels_late_historical_market_facts(tmp_path):
     payload = _cross_asset_payload()
     payload["as_of"] = "2026-09-25T15:00:00+00:00"
