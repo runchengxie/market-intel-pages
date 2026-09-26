@@ -13,6 +13,11 @@ test('Astro emits a readable five-session static site with six chart states', ()
   const reportId = reports[0].id;
   assert.match(index, /Quant 市场情报/);
   assert.match(index, /id="theme-toggle"/);
+  assert.match(index, /id="us-session"/);
+  assert.match(index, /id="asia-session"/);
+  assert.match(index, /07:00 美股收盘复盘/);
+  assert.match(index, /19:00 亚洲市场收盘复盘/);
+  assert.match(index, /旧晨报保留归档/);
   assert.match(index, /市场驱动/);
   assert.match(index, /经济数据、公司新闻与报告全文/);
   const styles = readdirSync(path.join(root, 'dist/_astro')).filter((name) => name.endsWith('.css'))

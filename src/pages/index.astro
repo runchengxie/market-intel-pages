@@ -13,6 +13,8 @@ const displayNotes = [...eveningNotes, ...summaries.filter((row) => !eveningNote
   .sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
 const latestEveningDate = reports.filter((row) => row.kind === 'evening')
   .map((row) => row.date).sort().at(-1);
+const latestEvening = reports.filter((row) => row.kind === 'evening')
+  .sort((a, b) => b.date.localeCompare(a.date))[0];
 const market = loadMarketDaily();
 const marketHistory = loadMarketDailyHistory().filter((row) => row.date !== market?.date);
 const marketFacts = market?.facts || [];
@@ -91,7 +93,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <aside class="sidebar">
         <span class="eyebrow">DAILY BRIEFING</span>
         <h1>Quant 市场情报</h1>
-        <p class="intro">中国时间晚报聚合当日盘面与必要隔夜信息；旧晨报保留归档。</p>
+        <p class="intro">每天两场：早上看美股收盘，晚上看亚洲收盘。旧晨报保留归档。</p>
         <label for="kind-filter">报告类型</label>
         <select id="kind-filter"><option value="all">全部</option><option value="morning">晨报</option><option value="evening">晚报</option></select>
         <label for="date-filter">查看日期</label>
@@ -99,8 +101,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <p class="sidebar-foot">目录更新 {reports.length > 0 ? reports[0].date : '暂无报告'} · 最近 {dates.length} 个交易日</p>
       </aside>
       <div class="content">
-        <section class="hero"><span class="eyebrow">LATEST EDITION</span><h2>最近交易日的报告</h2><p>网页展示最近 5 个交易日。原报告生成时间和数据日期请以每份原文为准。</p></section>
-        <section class="panel" aria-labelledby="market-title"><div class="section-heading"><span class="eyebrow">US MARKET DAILY</span><h2 id="market-title">美股市场日报</h2></div>
+        <section class="hero"><span class="eyebrow">TWO DAILY SESSIONS</span><h2>早上美股，晚上亚洲</h2><p>07:00 / 19:00 为中国时间首版目标；页面保留实际生成时间、原始观测日与后续修订记录。旧报告内容仍可在归档中阅读。</p><nav class="session-nav" aria-label="日报场次"><a href="#us-session">07:00 美股收盘复盘</a><a href="#asia-session">19:00 亚洲市场收盘复盘</a></nav></section>
+        <section class="panel" id="us-session" aria-labelledby="market-title"><div class="section-heading"><span class="eyebrow">07:00 · US CLOSE SESSION</span><h2 id="market-title">07:00 美股收盘复盘</h2></div>
           {market?.markdown ? <>
             <p class="section-note">{market.date} 美东报告日{marketGeneratedLabel ? ` · 报告生成 ${marketGeneratedLabel}（美东）` : ''} · 行情按各项原始观测日展示。这里只呈现来源和日期校验通过的字段，不以旧值填补缺项。</p>
             <div class="link-row"><a href={`${base}/reports/${market.date}-market-daily.md`}>Markdown</a><a href={`${base}/reports/${market.date}-market-daily.txt`}>纯文本</a></div>
@@ -120,6 +122,10 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
             {marketHistory.length > 0 && <div class="market-history"><h3>最近 5 个美东交易日</h3>{marketHistory.map((row) => <details class="secondary-report"><summary>{row.date}{row.quality_summary?.revision === 'historical_backfill' ? ' · 历史补报' : ''}</summary><div class="link-row"><a href={`${base}/reports/${row.date}-market-daily.md`}>Markdown</a><a href={`${base}/reports/${row.date}-market-daily.txt`}>纯文本</a></div><div class="markdown-body" set:html={renderMarkdown(row.markdown, { compactSources: true })} /></details>)}</div>}
           </> : <p class="empty">暂未取得可公开的美股日报。</p>}
         </section>
+        <section id="asia-session" class="session-group" aria-labelledby="asia-session-title">
+          <section class="panel"><div class="section-heading"><span class="eyebrow">19:00 · ASIA CLOSE SESSION</span><h2 id="asia-session-title">19:00 亚洲市场收盘复盘</h2></div>
+            {latestEvening ? <><p class="section-note">最近晚报 {latestEvening.date} · 19:00 是首版目标，以报告内的实际生成时间和数据日期为准。</p><h3><a href={`${base}/reports/${latestEvening.id}/`}>{latestEvening.title}</a></h3><p>{latestEvening.summary}</p><div class="link-row"><a href={`${base}/reports/${latestEvening.id}/`}>阅读完整复盘与六图</a><a href={`${base}/${latestEvening.source_url}`}>查看 Markdown 原文</a></div></> : <p class="empty">暂未取得可公开的亚洲收盘复盘。</p>}
+          </section>
         <section class="panel" aria-labelledby="insight-title"><div class="section-heading"><span class="eyebrow">MARKET JOURNAL</span><h2 id="insight-title">{insightArchived ? '历史市场解读与验证' : '市场解读与验证'}</h2></div>
           {insightArchived && <p class="backfill-note">此解读基于停用前的晨晚报配对，不代表最新晚报；请以晚报原文和下方事实提要为准。</p>}
           {insight?.analysis?.overview?.text ? <>
@@ -135,6 +141,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         </section>
         <section class="panel" aria-labelledby="summary-title"><div class="section-heading"><span class="eyebrow">DAILY NOTES</span><h2 id="summary-title">最近几天的晚报提要与市场简评</h2></div>
           {displayNotes.length ? <div class="notes-list">{displayNotes.map((row) => <article><time>{row.date}</time>{row.source === 'evening' && <a href={`${base}/reports/${row.reportId}/`}>晚报事实提要 · 查看依据</a>}<p>{row.text}</p></article>)}</div> : <p class="empty">暂无简评。</p>}
+        </section>
         </section>
         <section class="reports-section" aria-labelledby="reports-title"><div class="section-heading"><span class="eyebrow">REPORT ARCHIVE</span><h2 id="reports-title">晚报与历史晨报</h2></div>
           <div class="report-list" id="report-list">{reports.map((report) => <article class="report-tile" data-date={report.date} data-kind={report.kind}>
