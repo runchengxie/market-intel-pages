@@ -1,11 +1,11 @@
 # 美股市场日报（2026-09-25）
 
-数据状态：degraded
-报告生成时间：2026-09-26T03:14:09.338691+00:00（美东报告日 2026-09-25）
-新闻资料截止：2026-09-26T03:13:34.183361+00:00。
+数据状态：ok
+报告生成时间：2026-09-26T14:08:03.197295+00:00（美东报告日 2026-09-25）
+历史补报：按指定交易日数据事后重建，生成时间不代表当日已发布。
 
+新闻资料截止：2026-09-25T23:59:59-04:00。
 
-尚缺：比特币期货行情。
 
 ## 美股市场表现
 
@@ -30,11 +30,13 @@
 
 ## 布伦特、金银与比特币
 
-| 品种 | 期货价格 | 日涨跌 | 观测日 | 来源 |
+| 品种 | 价格 | 日涨跌 | 观测日 | 来源 |
 |---|---:|---:|---|---|
-| 布伦特期货 | 97.47 美元/桶 | -8.56% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/BZ%3DF/history/) |
-| COMEX 黄金期货 | 4,320.50 美元/金衡盎司 | +0.52% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/GC%3DF/history/) |
-| COMEX 白银期货 | 64.71 美元/金衡盎司 | +1.97% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/SI%3DF/history/) |
+| 布伦特期货 | 104.32 美元/桶 | -2.14% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/BZ%3DF/history/) |
+| COMEX 黄金期货 | 4,321.20 美元/金衡盎司 | +0.54% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/GC%3DF/history/) |
+| COMEX 白银期货 | 64.25 美元/金衡盎司 | +1.24% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/SI%3DF/history/) |
+| CME 比特币期货 | 83,672.00 美元/BTC | -0.82% | 2026-09-25 | [Yahoo Finance](https://finance.yahoo.com/quote/BTC%3DF/history/) |
+| BTC/USD 现货 | 84,093.13 美元/BTC | -0.35% | 2026-09-25 | [FMP](https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full) |
 
 ## 市场驱动因素
 
