@@ -434,6 +434,86 @@ def test_import_report_rejects_spot_fact_mislabeled_as_cme_future(tmp_path):
         import_report(source, tmp_path / "site", manifest)
 
 
+@pytest.mark.parametrize(
+    ("source_name", "source_url", "instrument", "label"),
+    [
+        (
+            "Data provided by CoinGecko",
+            "https://www.coingecko.com/en/api",
+            "BTC/USD spot at 16:00 ET (CoinGecko bitcoin/USD)",
+            "Data provided by CoinGecko",
+        ),
+        (
+            "Kraken",
+            "https://www.kraken.com/prices/bitcoin",
+            "BTC/USD spot at 16:00 ET (Kraken XBT/USD)",
+            "Kraken",
+        ),
+    ],
+)
+def test_import_report_accepts_authorized_btc_spot_fallbacks(
+    tmp_path, source_name, source_url, instrument, label
+):
+    payload = _cross_asset_payload()
+    base = payload["facts"][-1].copy()
+    base.update(source=source_name, source_url=source_url, instrument=instrument)
+    payload["facts"].extend(
+        [
+            {
+                **base,
+                "id": "cross_asset.bitcoin_spot.close",
+                "metric": "crypto_spot_close",
+                "value": 84012.8,
+                "unit": "USD/bitcoin",
+            },
+            {
+                **base,
+                "id": "cross_asset.bitcoin_spot.change_percent",
+                "metric": "daily_return",
+                "value": -0.43,
+                "unit": "percent",
+            },
+        ]
+    )
+    source, manifest = _source(tmp_path, payload)
+
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
+    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    assert f"[{label}]({source_url})" in markdown
+
+
+def test_import_report_rejects_spot_fallback_with_mismatched_attribution(tmp_path):
+    payload = _cross_asset_payload()
+    base = payload["facts"][-1].copy()
+    base.update(
+        source="Kraken",
+        source_url="https://www.coingecko.com/en/api",
+        instrument="BTC/USD spot at 16:00 ET (Kraken XBT/USD)",
+    )
+    payload["facts"].extend(
+        [
+            {
+                **base,
+                "id": "cross_asset.bitcoin_spot.close",
+                "metric": "crypto_spot_close",
+                "value": 84012.8,
+                "unit": "USD/bitcoin",
+            },
+            {
+                **base,
+                "id": "cross_asset.bitcoin_spot.change_percent",
+                "metric": "daily_return",
+                "value": -0.43,
+                "unit": "percent",
+            },
+        ]
+    )
+    source, manifest = _source(tmp_path, payload)
+
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
 def test_import_report_rejects_fmp_commodity_with_wrong_symbol(tmp_path):
     payload = _cross_asset_payload()
     fmp_url = (

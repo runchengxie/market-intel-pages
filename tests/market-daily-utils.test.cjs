@@ -144,6 +144,32 @@ test("BTC/USD spot is shown separately from CME bitcoin futures", () => {
   assert.match(buildMarketDailyChartSvg(summary), /BTC\/USD 现货收盘：84,093\.13 USD\/bitcoin/);
 });
 
+test("authorized BTC/USD spot fallbacks retain their own attribution", () => {
+  for (const [source, sourceUrl, instrument] of [
+    ["Data provided by CoinGecko", "https://www.coingecko.com/en/api", "BTC/USD spot at 16:00 ET (CoinGecko bitcoin/USD)"],
+    ["Kraken", "https://www.kraken.com/prices/bitcoin", "BTC/USD spot at 16:00 ET (Kraken XBT/USD)"],
+  ]) {
+    const pair = [
+      { id: "cross_asset.bitcoin_spot.close", metric: "crypto_spot_close", value: 84012.8, unit: "USD/bitcoin" },
+      { id: "cross_asset.bitcoin_spot.change_percent", metric: "daily_return", value: -0.43, unit: "percent" },
+    ].map((fact) => ({ ...fact, source, source_url: sourceUrl, instrument, quality: "ok", observation_date: "2026-09-24" }));
+    const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts: pair });
+    assert.ok(summary);
+    assert.equal(summary.crossAssetRows[0].sourceLabel, source);
+    assert.equal(summary.crossAssetRows[0].sourceUrl, sourceUrl);
+    assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts: pair.map((fact) => ({ ...fact, source: "Yahoo Finance" })) }), null);
+  }
+});
+
+test("BTC/USD spot rejects a price and return from different providers", () => {
+  const shared = { quality: "ok", observation_date: "2026-09-24" };
+  const facts = [
+    { ...shared, id: "cross_asset.bitcoin_spot.close", metric: "crypto_spot_close", value: 84012.8, unit: "USD/bitcoin", source: "Data provided by CoinGecko", source_url: "https://www.coingecko.com/en/api", instrument: "BTC/USD spot at 16:00 ET (CoinGecko bitcoin/USD)" },
+    { ...shared, id: "cross_asset.bitcoin_spot.change_percent", metric: "daily_return", value: -0.43, unit: "percent", source: "Kraken", source_url: "https://www.kraken.com/prices/bitcoin", instrument: "BTC/USD spot at 16:00 ET (Kraken XBT/USD)" },
+  ];
+  assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts }), null);
+});
+
 test("market daily rejects cross-asset facts with mismatched dates, units or sources", () => {
   for (const override of [
     { observation_date: "2026-09-23" },

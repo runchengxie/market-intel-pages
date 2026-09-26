@@ -36,6 +36,11 @@ const YAHOO_SOURCES = {
 };
 const FMP_COMMODITY_URL = "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full";
 const FMP_CRYPTO_URL = "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full";
+const BTC_SPOT_SOURCES = new Map([
+  ["Financial Modeling Prep|" + FMP_CRYPTO_URL, "BTC/USD cryptocurrency EOD (FMP BTCUSD)"],
+  ["Data provided by CoinGecko|https://www.coingecko.com/en/api", "BTC/USD spot at 16:00 ET (CoinGecko bitcoin/USD)"],
+  ["Kraken|https://www.kraken.com/prices/bitcoin", "BTC/USD spot at 16:00 ET (Kraken XBT/USD)"],
+]);
 const FMP_COMMODITY_SYMBOLS = { brent: "BZUSD", gold: "GCUSD", silver: "SIUSD" };
 const YAHOO_INDEX_SOURCES = {
   spx: /^https:\/\/finance\.yahoo\.com\/quote\/%5EGSPC\/history\/$/,
@@ -84,8 +89,8 @@ function validMarketDailyFact(id, fact, reportDate) {
   if (id.startsWith("cross_asset.")) {
     const [, asset, field] = id.split(".");
     if (asset === "bitcoin_spot") return (field === "close" || field === "change_percent")
-      && url === FMP_CRYPTO_URL && fact.source === "Financial Modeling Prep"
-      && String(fact.instrument ?? "").includes("(FMP BTCUSD)")
+      && BTC_SPOT_SOURCES.has(`${fact.source}|${url}`)
+      && fact.instrument === BTC_SPOT_SOURCES.get(`${fact.source}|${url}`)
       && fact.quality === "ok" && fact.observation_date === reportDate
       && fact.unit === (field === "close" ? "USD/bitcoin" : "percent")
       && fact.metric === (field === "close" ? "crypto_spot_close" : "daily_return");
@@ -131,8 +136,9 @@ function summarizeMarketDaily(payload) {
       text: `${label} ${fact.value.toFixed(2)}${unit}`,
       observationDate: fact.observation_date,
       sourceUrl,
+      instrument: fact.instrument ?? "",
       sourceLabel: isIndex ? (fact.source === "Yahoo Finance" ? "Yahoo Finance" : "核实报道") : isTreasury && TREASURY_SOURCE.test(sourceUrl)
-        ? "美国财政部" : isCrossAsset ? (fact.source === "Financial Modeling Prep" ? "FMP" : "Yahoo Finance") : "FRED",
+        ? "美国财政部" : isCrossAsset ? ({ "Financial Modeling Prep": "FMP", "Data provided by CoinGecko": "Data provided by CoinGecko", Kraken: "Kraken" }[fact.source] ?? "Yahoo Finance") : "FRED",
       metric: fact.metric ?? "",
       unit: fact.unit ?? "",
       quality: fact.quality,
@@ -172,9 +178,12 @@ function summarizeMarketDaily(payload) {
         || level.sourceUrl !== change.sourceUrl || level.sourceLabel !== change.sourceLabel)) return null;
   }
   for (const asset of [...Object.keys(YAHOO_SOURCES), "bitcoin_spot"]) {
-    const close = rows.some((row) => row.id === `cross_asset.${asset}.close`);
-    const change = rows.some((row) => row.id === `cross_asset.${asset}.change_percent`);
-    if (close !== change) return null;
+    const close = rows.find((row) => row.id === `cross_asset.${asset}.close`);
+    const change = rows.find((row) => row.id === `cross_asset.${asset}.change_percent`);
+    if (Boolean(close) !== Boolean(change)) return null;
+    if (close && change && (close.observationDate !== change.observationDate
+      || close.sourceUrl !== change.sourceUrl || close.sourceLabel !== change.sourceLabel
+      || close.instrument !== change.instrument)) return null;
   }
   const rateRows = ["2y", "5y", "10y", "30y"].map((tenor) => {
     const level = rows.find((row) => row.id === `treasury.${tenor}.level_percent`);
