@@ -49,6 +49,10 @@ YAHOO_URLS = {
     "silver": r"https://finance\.yahoo\.com/quote/SI%3DF/history/",
     "bitcoin": r"https://finance\.yahoo\.com/quote/BTC%3DF/history/",
 }
+FMP_COMMODITY_URL = (
+    "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full"
+)
+FMP_COMMODITY_SYMBOLS = {"brent": "BZUSD", "gold": "GCUSD", "silver": "SIUSD"}
 YAHOO_INDEX_URLS = {
     "spx": r"https://finance\.yahoo\.com/quote/%5EGSPC/history/",
     "dow": r"https://finance\.yahoo\.com/quote/%5EDJI/history/",
@@ -201,10 +205,20 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
             if is_close
             else "daily_return"
         )
-        return (
+        yahoo_source = (
             url_pattern is not None
             and bool(re.fullmatch(url_pattern, source_url))
             and fact.get("source") == "Yahoo Finance"
+        )
+        fmp_symbol = FMP_COMMODITY_SYMBOLS.get(asset)
+        fmp_source = (
+            fmp_symbol is not None
+            and source_url == FMP_COMMODITY_URL
+            and fact.get("source") == "Financial Modeling Prep"
+            and f"(FMP {fmp_symbol}, continuous)" in str(fact.get("instrument") or "")
+        )
+        return (
+            (yahoo_source or fmp_source)
             and fact.get("quality") == "ok"
             and observed == report_date
             and unit == (expected_unit if is_close else "percent")
@@ -372,7 +386,7 @@ def _markdown_source(fact: dict[str, Any]) -> str:
     if fact_id.startswith("index."):
         name = "Yahoo Finance" if fact.get("source") == "Yahoo Finance" else "核实报道"
     elif fact_id.startswith("cross_asset."):
-        name = "Yahoo Finance"
+        name = "FMP" if fact.get("source") == "Financial Modeling Prep" else "Yahoo Finance"
     elif url.startswith("https://home.treasury.gov/"):
         name = "美国财政部"
     else:

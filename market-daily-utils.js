@@ -32,6 +32,8 @@ const YAHOO_SOURCES = {
   silver: /^https:\/\/finance\.yahoo\.com\/quote\/SI%3DF\/history\/$/,
   bitcoin: /^https:\/\/finance\.yahoo\.com\/quote\/BTC%3DF\/history\/$/,
 };
+const FMP_COMMODITY_URL = "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full";
+const FMP_COMMODITY_SYMBOLS = { brent: "BZUSD", gold: "GCUSD", silver: "SIUSD" };
 const YAHOO_INDEX_SOURCES = {
   spx: /^https:\/\/finance\.yahoo\.com\/quote\/%5EGSPC\/history\/$/,
   dow: /^https:\/\/finance\.yahoo\.com\/quote\/%5EDJI\/history\/$/,
@@ -79,10 +81,15 @@ function validMarketDailyFact(id, fact, reportDate) {
   if (id.startsWith("cross_asset.")) {
     const [, asset, field] = id.split(".");
     const source = YAHOO_SOURCES[asset];
+    const fmpSymbol = FMP_COMMODITY_SYMBOLS[asset];
     const isClose = field === "close";
     const units = { brent: "USD/barrel", gold: "USD/troy_ounce", silver: "USD/troy_ounce", bitcoin: "USD/bitcoin" };
     const metric = isClose ? (asset === "bitcoin" ? "crypto_futures_close" : "commodity_close") : "daily_return";
-    return Boolean(source) && source.test(url) && fact.quality === "ok"
+    const yahooValid = Boolean(source) && source.test(url) && fact.source === "Yahoo Finance";
+    const fmpValid = Boolean(fmpSymbol) && url === FMP_COMMODITY_URL
+      && fact.source === "Financial Modeling Prep"
+      && String(fact.instrument ?? "").includes(`(FMP ${fmpSymbol}, continuous)`);
+    return (yahooValid || fmpValid) && fact.quality === "ok"
       && fact.observation_date === reportDate
       && fact.unit === (isClose ? units[asset] : "percent")
       && fact.metric === metric;
@@ -116,7 +123,7 @@ function summarizeMarketDaily(payload) {
       observationDate: fact.observation_date,
       sourceUrl,
       sourceLabel: isIndex ? (fact.source === "Yahoo Finance" ? "Yahoo Finance" : "核实报道") : isTreasury && TREASURY_SOURCE.test(sourceUrl)
-        ? "美国财政部" : isCrossAsset ? "Yahoo Finance" : "FRED",
+        ? "美国财政部" : isCrossAsset ? (fact.source === "Financial Modeling Prep" ? "FMP" : "Yahoo Finance") : "FRED",
       metric: fact.metric ?? "",
       unit: fact.unit ?? "",
       quality: fact.quality,
@@ -279,7 +286,7 @@ function buildMarketDailyChartSvg(summary) {
     for (const row of summary.crossAssetRows) {
       const price = `${row.priceValue.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${row.priceUnit}`;
       const change = `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)}%`;
-      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(price)} · ${escapeSvgText(change)} · ${escapeSvgText(row.observationDate)} · Yahoo Finance</text>`);
+      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(price)} · ${escapeSvgText(change)} · ${escapeSvgText(row.observationDate)} · ${escapeSvgText(row.sourceLabel)}</text>`);
       y += 27;
     }
     y += 12;
