@@ -88,6 +88,16 @@ def test_markdown_includes_public_source_status_without_private_metadata(tmp_pat
     assert "DO_NOT_PUBLISH" not in markdown
 
 
+def test_markdown_explains_unavailable_research_without_implying_a_source_exists(tmp_path):
+    payload = _payload()
+    payload["source_status"] = {"research": {"quality": "degraded", "reason": "not_connected"}}
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    import_report(source, output, manifest)
+    markdown = (output / "reports/2026-09-19-market-daily.md").read_text()
+    assert "| 研究材料 | 有缺项 | 研究材料尚未接入，不提供未经核实的解释 |" in markdown
+
+
 def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp_path):
     output = tmp_path / "site"
     for day in ("2026-09-18", "2026-09-21", "2026-09-22", "2026-09-23", "2026-09-24", "2026-09-25"):

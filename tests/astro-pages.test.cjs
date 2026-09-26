@@ -90,6 +90,18 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
   }
 });
 
+test('all visible US daily Markdown editions disclose public source quality', () => {
+  const history = JSON.parse(readFileSync(path.join(root, 'data/market_daily_reports.json'), 'utf8'));
+  for (const report of history.reports) {
+    const date = report.run_id.slice(6);
+    const markdown = readFileSync(path.join(root, `reports/${date}-market-daily.md`), 'utf8');
+    assert.match(markdown, /## 数据质量与核验说明/);
+    if (report.source_status.research?.reason === 'not_connected') {
+      assert.match(markdown, /研究材料尚未接入，不提供未经核实的解释/);
+    }
+  }
+});
+
 test('historical insight discloses timing, limitations and verification units', () => {
   const insight = JSON.parse(readFileSync(path.join(root, 'data/insights.json'), 'utf8')).insights[0];
   if (!insight) return;

@@ -8,6 +8,7 @@ export const factSource = (fact) => {
         : href.startsWith('https://site.financialmodelingprep.com/') ? 'FMP'
           : href.startsWith('https://www.coingecko.com/') ? 'CoinGecko'
             : href.startsWith('https://www.kraken.com/') ? 'Kraken'
+              : href.startsWith('https://www-cdn.abcnews.com/') ? 'ABC News'
               : id.startsWith('index.') ? '核实报道' : '来源';
   return { href, label };
 };

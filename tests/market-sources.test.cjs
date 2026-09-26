@@ -20,3 +20,11 @@ test('crypto source links retain provider names', async () => {
     { source_url: 'https://www.kraken.com/prices/bitcoin' },
   ]).map((item) => item.label), ['CoinGecko', 'Kraken']);
 });
+
+test('reviewed historical index source names the publisher', async () => {
+  const { uniqueFactSources } = await import('../src/lib/market-sources.mjs');
+  assert.equal(uniqueFactSources([{
+    id: 'index.spx.change_percent',
+    source_url: 'https://www-cdn.abcnews.com/Business/wireStory/example',
+  }])[0].label, 'ABC News');
+});

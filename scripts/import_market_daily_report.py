@@ -98,6 +98,7 @@ SOURCE_REASON_LABELS = {
     "all_indices_fresh": "目标交易日数据齐全",
     "all_contracts_fresh": "目标交易日合约数据齐全",
     "source_audited": "来源已逐条核查",
+    "not_connected": "研究材料尚未接入，不提供未经核实的解释",
     "ok": "来源状态正常",
 }
 PUBLIC_FACT_FIELDS = (
