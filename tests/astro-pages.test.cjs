@@ -19,7 +19,11 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.match(index, /19:00 亚洲市场收盘复盘/);
   assert.match(index, /旧晨报保留归档/);
   assert.match(index, /市场驱动/);
-  assert.match(index, /经济数据、公司新闻与报告全文/);
+  assert.match(index, /展开完整已核实报告/);
+  assert.match(index, /Markdown 原文/);
+  assert.doesNotMatch(index, /美国财政部<\/a><a[^>]*>美国财政部/);
+  assert.doesNotMatch(index, /Yahoo Finance<\/a><a[^>]*>Yahoo Finance/);
+  assert.doesNotMatch(index, /FMP<\/a><a[^>]*>FMP/);
   const styles = readdirSync(path.join(root, 'dist/_astro')).filter((name) => name.endsWith('.css'))
     .map((name) => readFileSync(path.join(root, `dist/_astro/${name}`), 'utf8')).join('\n');
   assert.match(styles, /:root\[data-theme=?"?dark/);
@@ -80,9 +84,21 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
     assert.match(html, />Yahoo Finance</);
     assert.match(html, />FMP</);
     assert.match(html, /Yahoo Finance/);
-    assert.match(html, /经济数据、公司新闻与报告全文/);
+    assert.match(html, /展开完整已核实报告/);
   } finally {
     rmSync(fixture, { recursive: true, force: true });
+  }
+});
+
+test('all visible US daily Markdown editions disclose public source quality', () => {
+  const history = JSON.parse(readFileSync(path.join(root, 'data/market_daily_reports.json'), 'utf8'));
+  for (const report of history.reports) {
+    const date = report.run_id.slice(6);
+    const markdown = readFileSync(path.join(root, `reports/${date}-market-daily.md`), 'utf8');
+    assert.match(markdown, /## 数据质量与核验说明/);
+    if (report.source_status.research?.reason === 'not_connected') {
+      assert.match(markdown, /研究材料尚未接入，不提供未经核实的解释/);
+    }
   }
 });
 

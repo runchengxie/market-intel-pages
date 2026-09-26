@@ -85,6 +85,22 @@ ASSET_GAP_LABELS = {
     "silver": "白银期货行情",
     "bitcoin": "比特币期货行情",
 }
+SOURCE_STATUS_LABELS = {
+    "rates": "美债收益率",
+    "macro": "宏观数据",
+    "quotes": "指数行情",
+    "research": "研究材料",
+    "cross_asset": "跨资产行情",
+    "btc_spot": "比特币现货",
+}
+SOURCE_QUALITY_LABELS = {"ok": "已核实", "reviewed": "已审阅", "degraded": "有缺项"}
+SOURCE_REASON_LABELS = {
+    "all_indices_fresh": "目标交易日数据齐全",
+    "all_contracts_fresh": "目标交易日合约数据齐全",
+    "source_audited": "来源已逐条核查",
+    "not_connected": "研究材料尚未接入，不提供未经核实的解释",
+    "ok": "来源状态正常",
+}
 PUBLIC_FACT_FIELDS = (
     "id",
     "metric",
@@ -514,6 +530,20 @@ def _markdown_fact_lines(payload: dict[str, Any], section: str) -> list[str]:
     return renderers[section](grouped)
 
 
+def _source_status_lines(statuses: dict[str, Any]) -> list[str]:
+    if not statuses:
+        return []
+    lines = ["## 数据质量与核验说明", "", "| 数据链路 | 状态 | 说明 |", "|---|---|---|"]
+    for key, label in SOURCE_STATUS_LABELS.items():
+        status = statuses.get(key)
+        if not isinstance(status, dict):
+            continue
+        quality = SOURCE_QUALITY_LABELS.get(status.get("quality"), "未确认")
+        reason = SOURCE_REASON_LABELS.get(status.get("reason"), "详见逐项观测日与来源")
+        lines.append(f"| {label} | {quality} | {reason} |")
+    return [*lines, "", "证据编号对应已审阅材料；公开报告不包含私有核验工作底稿。", ""]
+
+
 def _markdown(payload: dict[str, Any]) -> str:
     lines = [
         f"# 美股市场日报（{_date(payload)}）",
@@ -561,7 +591,10 @@ def _markdown(payload: dict[str, Any]) -> str:
                 f"[来源{index}]({url})" for index, url in enumerate(claim["sources"], start=1)
             )
             lines.extend([f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - {sources}"])
-    lines.append("")
+    source_status = _source_status_lines(payload.get("source_status", {}))
+    lines.extend(source_status)
+    if not source_status:
+        lines.append("")
     return "\n".join(lines)
 
 
