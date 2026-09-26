@@ -23,6 +23,32 @@ test("market daily keeps the observation date and lagged yield state", () => {
   assert.equal(summary.hasTextReport, false);
 });
 
+test("same-day Treasury facts must be accepted quality before appearing in a chart", () => {
+  for (const quality of ["rejected", "lagged"]) {
+    const summary = summarizeMarketDaily({
+      schema_version: "1.0", run_id: "daily-2026-09-24", facts: [
+        { id: "treasury.2y.change_bp", metric: "yield_change", value: 10, unit: "basis_points", quality,
+          observation_date: "2026-09-24", source_url: "https://fred.stlouisfed.org/series/DGS2" },
+      ],
+    });
+    assert.equal(summary, null);
+  }
+});
+
+test("a verified same-day Treasury level alone still produces a sourced image", () => {
+  const summary = summarizeMarketDaily({
+    schema_version: "1.0", run_id: "daily-2026-09-24", facts: [
+      { id: "treasury.2y.level_percent", metric: "yield_level", value: 4.25, unit: "percent", quality: "ok",
+        observation_date: "2026-09-24", source_url: "https://fred.stlouisfed.org/series/DGS2" },
+    ],
+  });
+  assert.ok(summary);
+  const svg = buildMarketDailyChartSvg(summary);
+  assert.match(svg, /4\.25%/);
+  assert.match(svg, /2026-09-24/);
+  assert.match(svg, /FRED/);
+});
+
 test("market daily status calls a report date a report date, including missing sources", () => {
   assert.equal(
     formatMarketDailyStatus({ date: "2026-09-23", gaps: ["指数行情"] }),

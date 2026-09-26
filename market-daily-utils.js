@@ -82,9 +82,11 @@ function validMarketDailyFact(id, fact, reportDate) {
     const isLevel = id.endsWith(".level_percent");
     const expectedUnit = isLevel ? "percent" : "basis_points";
     const expectedMetric = isLevel ? "yield_level" : "yield_change";
+    const fresh = fact.observation_date === reportDate && ["ok", "reviewed"].includes(fact.quality);
+    const lagged = fact.observation_date < reportDate && fact.quality === "lagged";
     return fact.unit === expectedUnit
       && fact.metric === expectedMetric
-      && ((TREASURY_SOURCE.test(url) && fact.quality === "ok") || FRED_SOURCE.test(url));
+      && ((TREASURY_SOURCE.test(url) && fresh) || (FRED_SOURCE.test(url) && (fresh || lagged)));
   }
   if (id.startsWith("cross_asset.")) {
     const [, asset, field] = id.split(".");
@@ -253,8 +255,8 @@ function escapeSvgText(value) {
 
 function buildMarketDailyChartSvg(summary) {
   const charts = buildMarketDailyCharts(summary);
-  if (!charts.length) return null;
   const freshRates = summary.rateRows.filter((row) => row.observationDate === summary.date);
+  if (!charts.length && !freshRates.length && !summary.crossAssetRows.length) return null;
   const supplementalHeight = (freshRates.length ? 54 + freshRates.length * 27 : 0)
     + (summary.crossAssetRows.length ? 54 + summary.crossAssetRows.length * 27 : 0);
   const height = 134 + charts.reduce((total, chart) => total + 54 + chart.rows.length * 58, 0)
@@ -263,7 +265,7 @@ function buildMarketDailyChartSvg(summary) {
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="${height}" viewBox="0 0 960 ${height}" role="img">`,
     `<title>${escapeSvgText(summary.date)} 美东交易日市场图表</title>`,
-    `<desc>展示报告日来源和日期校验通过的指数、收益率变动与跨资产行情，并列出美债水平、跨资产价格、观测日和来源。</desc>`,
+    `<desc>展示报告日来源和日期校验通过的可用行情，并列出美债水平、跨资产价格、观测日和来源。</desc>`,
     `<rect width="960" height="${height}" fill="#fff9f2"/>`,
     `<text x="54" y="62" fill="#34271f" font-family="sans-serif" font-size="28" font-weight="700">${escapeSvgText(summary.date)} 美东交易日</text>`,
     `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股市场速览 · 仅含来源和日期校验通过的同日数值</text>`,
