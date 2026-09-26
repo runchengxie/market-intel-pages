@@ -1,6 +1,7 @@
 美股市场日报｜2026-09-25 美东报告日
-报告生成时间：2026-09-26T03:14:09.338691+00:00；逐项显示原始观测日。
-新闻资料截止：2026-09-26T03:13:34.183361+00:00。
+报告生成时间：2026-09-26T14:08:03.197295+00:00；逐项显示原始观测日。
+历史补报：本次事后重建，非当日已发布报告。
+新闻资料截止：2026-09-25T23:59:59-04:00。
 
 一、美股市场表现
 - 标普 500 日涨跌：+0.51%（观测日 2026-09-25）
@@ -31,18 +32,26 @@
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
 - 30 年期美债收益率水平：5.49%（观测日 2026-09-25）
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
-- 布伦特期货收盘：97.47 美元/桶（观测日 2026-09-25）
+- 布伦特期货收盘：104.32 美元/桶（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/BZ%3DF/history/
-- 布伦特日涨跌：-8.56%（观测日 2026-09-25）
+- 布伦特日涨跌：-2.14%（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/BZ%3DF/history/
-- COMEX 黄金期货收盘：4320.50 美元/金衡盎司（观测日 2026-09-25）
+- COMEX 黄金期货收盘：4321.20 美元/金衡盎司（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/GC%3DF/history/
-- 黄金日涨跌：+0.52%（观测日 2026-09-25）
+- 黄金日涨跌：+0.54%（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/GC%3DF/history/
-- COMEX 白银期货收盘：64.71 美元/金衡盎司（观测日 2026-09-25）
+- COMEX 白银期货收盘：64.25 美元/金衡盎司（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/SI%3DF/history/
-- 白银日涨跌：+1.97%（观测日 2026-09-25）
+- 白银日涨跌：+1.24%（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/SI%3DF/history/
+- CME 比特币期货收盘：83672.00 美元/BTC（观测日 2026-09-25）
+  来源：https://finance.yahoo.com/quote/BTC%3DF/history/
+- 比特币期货日涨跌：-0.82%（观测日 2026-09-25）
+  来源：https://finance.yahoo.com/quote/BTC%3DF/history/
+- BTC/USD 现货收盘：84093.13 美元/BTC（观测日 2026-09-25）
+  来源：https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full
+- BTC/USD 现货日涨跌：-0.35%（观测日 2026-09-25）
+  来源：https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full
 
 三、市场驱动因素
 1、路透社将当日美股上涨部分归于微软等 AI 相关股票的支撑，并称有关美伊继续讨论的报道改善了市场情绪；这是该报道的归因，并非独立证明的单一原因。
@@ -68,7 +77,5 @@
 2、据路透社 9 月 25 日收盘报道，Akamai 上涨约 3.2%；报道将涨势与其此前宣布的 Anthropic 云服务协议联系起来。
    来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
 
-
-尚缺：比特币期货行情。
 
 风险提示：市场有风险，投资需谨慎。
