@@ -299,7 +299,7 @@ function buildMarketDailyChartSvg(summary) {
     y += 12;
   }
   if (summary.crossAssetRows.length) {
-    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="18" font-weight="700">跨资产期货价格</text>`);
+    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="18" font-weight="700">跨资产价格</text>`);
     y += 27;
     for (const row of summary.crossAssetRows) {
       const price = `${row.priceValue.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${row.priceUnit}`;

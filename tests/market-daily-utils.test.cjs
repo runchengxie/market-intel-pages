@@ -157,6 +157,8 @@ test("authorized BTC/USD spot fallbacks retain their own attribution", () => {
     assert.ok(summary);
     assert.equal(summary.crossAssetRows[0].sourceLabel, source);
     assert.equal(summary.crossAssetRows[0].sourceUrl, sourceUrl);
+    assert.match(buildMarketDailyChartSvg(summary), /跨资产价格/);
+    assert.doesNotMatch(buildMarketDailyChartSvg(summary), /跨资产期货价格/);
     assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts: pair.map((fact) => ({ ...fact, source: "Yahoo Finance" })) }), null);
   }
 });
