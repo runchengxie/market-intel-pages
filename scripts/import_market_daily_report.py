@@ -60,7 +60,13 @@ MISSING_LABELS = {
     "research": "研究解释",
     "fred": "部分 FRED 数据",
     "rates_lag": "美债收益率当日变动",
-    "cross_asset": "布伦特、金银或比特币行情",
+    "cross_asset": "部分跨资产行情",
+}
+ASSET_GAP_LABELS = {
+    "brent": "布伦特期货行情",
+    "gold": "黄金期货行情",
+    "silver": "白银期货行情",
+    "bitcoin": "比特币期货行情",
 }
 PUBLIC_FACT_FIELDS = (
     "id",
@@ -331,6 +337,23 @@ def _date(payload: dict[str, Any]) -> str:
     return str(payload["as_of"])[:10]
 
 
+def _missing_labels(payload: dict[str, Any]) -> list[str]:
+    labels = []
+    facts = {str(fact.get("id")) for fact in payload.get("facts", [])}
+    for item in payload.get("missing_sources", []):
+        if item == "cross_asset":
+            unavailable = [
+                name
+                for asset, name in ASSET_GAP_LABELS.items()
+                if f"cross_asset.{asset}.close" not in facts
+                or f"cross_asset.{asset}.change_percent" not in facts
+            ]
+            labels.extend(unavailable or [MISSING_LABELS[item]])
+        elif item in MISSING_LABELS:
+            labels.append(MISSING_LABELS[item])
+    return labels
+
+
 def _fact_category(fact_id: str) -> str:
     for prefix, category in (
         ("index.", "market"),
@@ -454,7 +477,7 @@ def _markdown(payload: dict[str, Any]) -> str:
         lines[4:4] = [f"新闻资料截止：{cutoff}。", ""]
     if payload.get("quality_summary", {}).get("revision") == "historical_backfill":
         lines[4:4] = ["历史补报：按指定交易日数据事后重建，生成时间不代表当日已发布。", ""]
-    gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
+    gaps = _missing_labels(payload)
     if gaps:
         lines.extend([f"尚缺：{'、'.join(gaps)}。", ""])
     grouped = _group_claims(payload)
@@ -581,7 +604,7 @@ def _text_report(payload: dict[str, Any]) -> str:
         lines[2:2] = ["历史补报：本次事后重建，非当日已发布报告。"]
     if grouped["other"]:
         lines.extend(["六、其他已核实内容", *_text_claim_lines(grouped["other"])])
-    gaps = [MISSING_LABELS[item] for item in payload.get("missing_sources", []) if item in MISSING_LABELS]
+    gaps = _missing_labels(payload)
     if gaps:
         lines.extend(["", f"尚缺：{'、'.join(gaps)}。"])
     lines.extend(["", "风险提示：市场有风险，投资需谨慎。", ""])
