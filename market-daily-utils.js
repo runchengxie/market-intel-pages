@@ -136,6 +136,7 @@ function summarizeMarketDaily(payload) {
       text: `${label} ${fact.value.toFixed(2)}${unit}`,
       observationDate: fact.observation_date,
       sourceUrl,
+      instrument: fact.instrument ?? "",
       sourceLabel: isIndex ? (fact.source === "Yahoo Finance" ? "Yahoo Finance" : "核实报道") : isTreasury && TREASURY_SOURCE.test(sourceUrl)
         ? "美国财政部" : isCrossAsset ? ({ "Financial Modeling Prep": "FMP", "Data provided by CoinGecko": "Data provided by CoinGecko", Kraken: "Kraken" }[fact.source] ?? "Yahoo Finance") : "FRED",
       metric: fact.metric ?? "",
@@ -177,9 +178,12 @@ function summarizeMarketDaily(payload) {
         || level.sourceUrl !== change.sourceUrl || level.sourceLabel !== change.sourceLabel)) return null;
   }
   for (const asset of [...Object.keys(YAHOO_SOURCES), "bitcoin_spot"]) {
-    const close = rows.some((row) => row.id === `cross_asset.${asset}.close`);
-    const change = rows.some((row) => row.id === `cross_asset.${asset}.change_percent`);
-    if (close !== change) return null;
+    const close = rows.find((row) => row.id === `cross_asset.${asset}.close`);
+    const change = rows.find((row) => row.id === `cross_asset.${asset}.change_percent`);
+    if (Boolean(close) !== Boolean(change)) return null;
+    if (close && change && (close.observationDate !== change.observationDate
+      || close.sourceUrl !== change.sourceUrl || close.sourceLabel !== change.sourceLabel
+      || close.instrument !== change.instrument)) return null;
   }
   const rateRows = ["2y", "5y", "10y", "30y"].map((tenor) => {
     const level = rows.find((row) => row.id === `treasury.${tenor}.level_percent`);

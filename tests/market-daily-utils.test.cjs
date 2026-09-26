@@ -161,6 +161,15 @@ test("authorized BTC/USD spot fallbacks retain their own attribution", () => {
   }
 });
 
+test("BTC/USD spot rejects a price and return from different providers", () => {
+  const shared = { quality: "ok", observation_date: "2026-09-24" };
+  const facts = [
+    { ...shared, id: "cross_asset.bitcoin_spot.close", metric: "crypto_spot_close", value: 84012.8, unit: "USD/bitcoin", source: "Data provided by CoinGecko", source_url: "https://www.coingecko.com/en/api", instrument: "BTC/USD spot at 16:00 ET (CoinGecko bitcoin/USD)" },
+    { ...shared, id: "cross_asset.bitcoin_spot.change_percent", metric: "daily_return", value: -0.43, unit: "percent", source: "Kraken", source_url: "https://www.kraken.com/prices/bitcoin", instrument: "BTC/USD spot at 16:00 ET (Kraken XBT/USD)" },
+  ];
+  assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-24", facts }), null);
+});
+
 test("market daily rejects cross-asset facts with mismatched dates, units or sources", () => {
   for (const override of [
     { observation_date: "2026-09-23" },
