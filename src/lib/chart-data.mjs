@@ -1,4 +1,4 @@
-const BASE = '/market-intel-pages';
+const BASE = '/quant-intel-pages';
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => ({

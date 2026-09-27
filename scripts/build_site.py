@@ -44,12 +44,11 @@ LEGACY_CONTINUOUS_REPORT_HASHES = {
     "f75dfc294d87366de8357c2d203c16b7581ecf540b969f045058ab1d1980484a",
 }
 PUBLIC_SESSION_COUNT = 5
-STATIC_FILES = (
+LEGACY_FILES = (
     "index.html",
     "app.js",
     "summary-utils.js",
     "report-markdown.js",
-    "market-daily-utils.js",
     "theme-utils.js",
     "styles.css",
 )
@@ -219,8 +218,11 @@ def _build_site_contents(root: Path, output: Path, summaries_path: Path | None =
         raise ValueError("build output must not contain the repository")
     (output / "data").mkdir(parents=True)
     (output / "reports").mkdir()
-    for filename in STATIC_FILES:
-        shutil.copy2(root / filename, output / filename)
+    legacy = output / "legacy"
+    legacy.mkdir()
+    for filename in LEGACY_FILES:
+        shutil.copy2(root / "src/legacy" / filename, legacy / filename)
+    shutil.copy2(root / "src/lib/market-daily-utils.js", legacy / "market-daily-utils.js")
     shutil.copy2(public_root / "data/reports.json", output / "data/reports.json")
     copy_public_charts(root, output, {str(report["id"]) for report in reports})
     _copy_daily_report(root, output)

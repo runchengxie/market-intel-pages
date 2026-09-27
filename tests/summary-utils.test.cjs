@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { selectVisibleSummaries, selectVisibleReports } = require("../summary-utils.js");
-const { selectVisibleInsights, isHealthDelayed } = require("../summary-utils.js");
+const { selectVisibleSummaries, selectVisibleReports } = require("../src/legacy/summary-utils.js");
+const { selectVisibleInsights, isHealthDelayed } = require("../src/legacy/summary-utils.js");
 
 function report(date, kind) {
   return { id: `${date}-${kind}`, date, kind };

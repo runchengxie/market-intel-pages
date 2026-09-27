@@ -35,7 +35,7 @@ function renderMarketDaily(payload) {
   status.textContent = window.marketDailyUtils.formatMarketDailyStatus(summary);
   files.replaceChildren(...(summary.hasTextReport ? [["下载纯文本报告", "txt"], ["查看 Markdown 版本", "md"]] : []).map(([label, suffix]) => {
     const link = makeElement("a", "market-daily-file", label);
-    link.href = `reports/${summary.date}-market-daily.${suffix}`;
+    link.href = `../reports/${summary.date}-market-daily.${suffix}`;
     if (suffix === "txt") link.setAttribute("download", "");
     return link;
   }));
@@ -234,7 +234,7 @@ function renderReport(report) {
   }
   if (/^reports\/[a-zA-Z0-9._-]+\.md$/.test(report.source_url ?? "")) {
     const source = makeElement("a", "source-link", "查看完整原文（Markdown）");
-    source.href = report.source_url;
+    source.href = `../${report.source_url}`;
     source.setAttribute("download", "");
     body.append(source);
   }
@@ -315,7 +315,7 @@ function evidenceDetails(refs, evidence) {
     const report = state.reports.find((row) => row.id === item.report_id);
     if (report && /^reports\/[a-zA-Z0-9._-]+\.md$/.test(report.source_url ?? "")) {
       const source = makeElement("a", "source-link", "原报告");
-      source.href = report.source_url;
+      source.href = `../${report.source_url}`;
       box.append(source);
     }
     details.append(box);
@@ -408,7 +408,7 @@ async function optionalIndex(path, schema) {
 
 async function loadReports() {
   try {
-    const response = await fetch("data/reports.json", { cache: "no-store" });
+    const response = await fetch("../data/reports.json", { cache: "no-store" });
     if (!response.ok) throw new Error("report index unavailable");
     const data = await response.json();
     if (data.schema_version !== "market_intel_pages.reports.v1" || !Array.isArray(data.reports)) {
@@ -416,9 +416,9 @@ async function loadReports() {
     }
     state.reports = [...data.reports].sort((a, b) => b.date.localeCompare(a.date));
     const [insights, health, marketDaily] = await Promise.allSettled([
-      optionalIndex("data/insights.json", "market_intel_pages.insights.v1"),
-      optionalIndex("data/health.json", "market_intel_pages.health.v1"),
-      fetch("data/market_daily_report.json", { cache: "no-store" }).then((response) => {
+      optionalIndex("../data/insights.json", "market_intel_pages.insights.v1"),
+      optionalIndex("../data/health.json", "market_intel_pages.health.v1"),
+      fetch("../data/market_daily_report.json", { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("market daily unavailable");
         return response.json();
       }),
@@ -433,7 +433,7 @@ async function loadReports() {
     }
     renderHealth(health.status === "fulfilled" ? health.value : null);
     try {
-      const summaryResponse = await fetch("data/daily_summaries.json", { cache: "no-store" });
+      const summaryResponse = await fetch("../data/daily_summaries.json", { cache: "no-store" });
       if (summaryResponse.ok) {
         const summaryData = await summaryResponse.json();
         if (summaryData.schema_version === "market_intel_pages.daily_summaries.v1"

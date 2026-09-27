@@ -52,8 +52,8 @@ jobs:
         run: |
           python -m pytest --cov-report=xml
           node --test tests/*.cjs
-          node --check app.js
-          node --check summary-utils.js
+          node --check src/legacy/app.js
+          node --check src/legacy/summary-utils.js
           python scripts/build_site.py --output "${{ runner.temp }}/market-intel-check"
       - name: Audit dependencies and structure
         run: |
@@ -96,7 +96,7 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Build site artifact
         env:
-          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+          SITE_OUTPUT: ${{ runner.temp }}/quant-intel-pages-site
         run: python3 scripts/build_site.py --output "$SITE_OUTPUT"
       - name: Generate evidence-linked commentary
         env:
@@ -109,13 +109,13 @@ jobs:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
           FORCE_INSIGHTS: ${{ inputs.force_insights }}
-          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+          SITE_OUTPUT: ${{ runner.temp }}/quant-intel-pages-site
           LEDGER_OUTPUT: ${{ runner.temp }}/market-intel-ledger
         run: |
           force_flag=""
           if [ "$FORCE_INSIGHTS" = "true" ]; then force_flag="--force"; fi
           for provider in gemini deepseek minimax; do
-            status=$(python3 scripts/generate_insights.py --provider "$provider" --reports data/reports.json --history "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
+            status=$(python3 scripts/generate_insights.py --provider "$provider" --reports artifacts/public/data/reports.json --history "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/insights.json' --output "$SITE_OUTPUT/data/insights.json" --archive-dir "$LEDGER_OUTPUT" $force_flag | python3 -c 'import json,sys; print(json.load(sys.stdin)["status"])')
             echo "Insight provider $provider: $status"
             if [ "$status" = "generated" ] || [ "$status" = "cached" ] || [ "$status" = "no_source_pair" ]; then break; fi
           done
@@ -123,14 +123,14 @@ jobs:
         env:
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           MINIMAX_MODEL: ${{ vars.MINIMAX_MODEL }}
-          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+          SITE_OUTPUT: ${{ runner.temp }}/quant-intel-pages-site
         run: |
           force_flag=""
           if [ "${{ inputs.force_summary }}" = "true" ]; then force_flag="--force"; fi
-          python3 scripts/generate_daily_summary.py --reports data/reports.json --summaries data/daily_summaries.json --insights "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
+          python3 scripts/generate_daily_summary.py --reports artifacts/public/data/reports.json --summaries artifacts/public/data/daily_summaries.json --insights "$SITE_OUTPUT/data/insights.json" --history-url '${{ steps.pages.outputs.base_url }}/data/daily_summaries.json' --output "$SITE_OUTPUT/data/daily_summaries.json" $force_flag
       - name: Render pages with final commentary snapshot
         env:
-          SITE_OUTPUT: ${{ runner.temp }}/market-intel-pages-site
+          SITE_OUTPUT: ${{ runner.temp }}/quant-intel-pages-site
         run: python3 scripts/build_site.py --output "$SITE_OUTPUT" --refresh-astro
       - name: Preserve commentary revisions and verification receipts
         uses: actions/upload-artifact@v4
@@ -142,7 +142,7 @@ jobs:
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: ${{ runner.temp }}/market-intel-pages-site
+          path: ${{ runner.temp }}/quant-intel-pages-site
       - name: Deploy site
         id: deployment
         uses: actions/deploy-pages@v4

@@ -2,7 +2,7 @@
 
 Quant 市场情报是一个静态报告阅读网站。首页按北京时间 07:00 美股收盘复盘、19:00 亚洲市场收盘复盘组织入口；原晨报与晚报框架、每日简评和带来源的市场解读继续留在归档中。公开页面和仓库快照保留最近五个有报告的日期，完整报告与历次解读存放在仓库外的私有归档中。
 
-[打开公开网站](https://runchengxie.github.io/market-intel-pages/)。
+[打开公开网站](https://runchengxie.github.io/quant-intel-pages/)。
 
 ## 已有功能
 
@@ -18,7 +18,7 @@ Quant 市场情报是一个静态报告阅读网站。首页按北京时间 07:0
 
 ## 项目边界
 
-本仓库负责报告导入、公开快照、模型解读、静态展示和 GitHub Pages 发布。相邻的 `quant-intel-platform` 负责行情与报告能力，私有仓库 `quant-intel-deploy` 维护生产部署和定时任务。后两者位于服务器 `/home/richard/code/quant/` 下，三个仓库独立管理，本项目没有 Git submodule。
+本仓库负责报告导入、公开快照、模型解读、静态展示和 GitHub Pages 发布。相邻的 `quant-intel-platform` 负责行情与报告能力，私有仓库 `quant-intel-deploy` 维护生产部署和定时任务。三个仓库分别位于服务器 `/home/richard/code/quant/` 下，独立管理，本项目没有 Git submodule。
 
 Pages 部署成功只说明网站构建和发布完成。数据是否及时，应查看页面中的原报告时间与数据状态。上游交接方式、已知缺口和运行记录见[每日生成与维护说明](docs/daily-generation-options.md)。
 
@@ -29,11 +29,11 @@ Pages 部署成功只说明网站构建和发布完成。数据是否及时，�
 ```bash
 npm ci
 preview_root=$(mktemp -d /tmp/qmi-preview.XXXXXX)
-python3 scripts/build_site.py --output "$preview_root/market-intel-pages"
+python3 scripts/build_site.py --output "$preview_root/quant-intel-pages"
 python3 -m http.server 8000 --directory "$preview_root"
 ```
 
-打开 <http://localhost:8000/market-intel-pages/>。构建产物内链接按 GitHub Pages `/market-intel-pages/` 生成，构建目录必须位于仓库外。直接检查静态 HTML 可运行 `npm run build`，其 `dist/` 仅供开发验证。
+打开 <http://localhost:8000/quant-intel-pages/>。构建产物内链接按 GitHub Pages `/quant-intel-pages/` 生成，构建目录必须位于仓库外。直接检查静态 HTML 可运行 `npm run build`，其 `dist/` 仅供开发验证。
 
 ## 导入与归档
 
@@ -72,22 +72,22 @@ Actions 部署会保留有效的 Codex 记录；如无记录，结构化解读�
 
 本地单独测试可通过 `--provider` 选择 Gemini、DeepSeek 或 MiniMax；GitHub Actions 使用固定的回退顺序。密钥通过本地进程环境或 GitHub Actions Secret 提供，浏览器只读取生成结果。模型输出通过格式校验并不等于新闻事实获得独立核实。
 
-本地模型环境可以复制 `.env.example` 为 `.env`，再加载后运行：
+本地模型配置样例在 `configs/.env.example`。将它复制到仓库外的私有配置目录并填写密钥，再加载后运行。Richard 的服务器可沿用 `~/.config/richard/`；其他机器使用各自的配置目录，不在脚本中固定用户名。
 
 ```bash
-cp .env.example .env
-set -a; . ./.env; set +a
-python3 scripts/generate_insights.py --reports data/reports.json --output /tmp/insights.json --provider deepseek --force
+cp configs/.env.example /path/to/private/model.env
+set -a; . /path/to/private/model.env; set +a
+python3 scripts/generate_insights.py --reports artifacts/public/data/reports.json --output /tmp/insights.json --provider deepseek --force
 ```
 
-Astro 页面目前统一使用暖色浅色主题；旧版主题按钮仅保留在回退页面中。
+正式页面和旧版回退页面都支持深色模式切换，浅色模式使用暖色调。
 
 本地生成示例：
 
 ```bash
 python3 scripts/generate_insights.py \
-  --reports data/reports.json \
-  --history data/insights.json \
+  --reports artifacts/public/data/reports.json \
+  --history artifacts/public/data/insights.json \
   --output /tmp/quant-market-intel-insights.json \
   --archive-dir /path/to/private-archive
 ```
@@ -103,12 +103,13 @@ Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产�
 | 路径 | 用途 |
 |---|---|
 | `src/pages/`、`src/components/`、`src/lib/`、`src/styles/` | Astro 首页、逐期静态正文、六图状态与安全 Markdown 渲染 |
-| `index.html`、`app.js`、`report-markdown.js`、`summary-utils.js`、`market-daily-utils.js`、`styles.css` | 迁移期间保留的旧页面回退材料，不再作为正式构建的首页 |
-| `data/charts/` | 仅收录逐点审核后 `publication: public` 的按期六图 JSON；无批准文件时静态页显示缺项 |
-| `data/reports.json`、`reports/` | 公开报告索引、正文与 Markdown 原文 |
-| `data/daily_summaries.json` | 每日简评及配对来源 |
-| `data/insights.json` | 带来源的解读、生成状态和观察条件结果 |
-| `data/market_daily_report.json` | 最近一次美股宏观日报；仅在上游产出并经导入校验后存在 |
+| `src/legacy/` | 旧页面回退材料，仅发布到 `/legacy/`，不作为正式首页；共用图表辅助函数在 `src/lib/` |
+| `artifacts/public/data/charts/` | 仅收录逐点审核后 `publication: public` 的按期六图 JSON；无批准文件时静态页显示缺项 |
+| `artifacts/public/data/reports.json`、`artifacts/public/reports/` | 公开报告索引、正文与 Markdown 原文；网页仍使用 `/data/`、`/reports/` 下载路径 |
+| `artifacts/public/data/daily_summaries.json` | 每日简评及配对来源 |
+| `artifacts/public/data/insights.json` | 带来源的解读、生成状态和观察条件结果 |
+| `artifacts/public/data/market_daily_report.json` | 最近一次美股宏观日报；仅在上游产出并经导入校验后存在 |
+| `configs/.env.example` | 无密钥配置样例；实际密钥留在仓库外 |
 | `prompts/` | 两套生成入口使用的提示词 |
 | `scripts/` | 导入、归档、生成、比较、健康检查与构建脚本 |
 | `tests/` | Python 数据与流水线测试、Node.js 展示辅助函数测试 |
@@ -142,8 +143,8 @@ ty check
 vulture scripts tests tools --min-confidence 80
 python3 -m pytest
 node --test tests/*.cjs
-node --check app.js
-node --check report-markdown.js
+node --check src/legacy/app.js
+node --check src/legacy/report-markdown.js
 python3 scripts/build_site.py --output /tmp/quant-market-intel-check
 pip-audit --strict
 python3 tools/audit_structure.py --output /tmp/market-intel-structure.json

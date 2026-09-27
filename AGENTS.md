@@ -11,10 +11,10 @@
 
 ## 目录职责
 
-- `app.js`、`summary-utils.js` 和页面文件负责展示。继续使用文本节点渲染报告和模型内容。
+- `src/` 中的 Astro 页面负责正式展示；`src/legacy/` 保留旧页面回退材料。继续使用文本节点渲染报告和模型内容。
 - `scripts/` 负责导入、构建、生成、健康检查和归档。明确区分输入数据校验失败与模型服务不可用。
 - `prompts/` 维护生成口径。修改提示词后核对缓存、来源引用和数字校验行为。
-- `data/` 与 `reports/` 仅保存可公开的近期快照。`docs/` 记录当前用法和有日期的历史决策。
+- `artifacts/public/data/` 与 `artifacts/public/reports/` 仅保存可公开的近期快照，构建后的公开 URL 仍为 `/data/` 与 `/reports/`。`configs/` 仅放无密钥样例，`docs/` 记录当前用法和有日期的历史决策。
 
 ## 数据与运行边界
 
@@ -37,7 +37,7 @@ ty check
 vulture scripts tests tools --min-confidence 80
 python3 -m pytest
 node --test tests/*.cjs
-node --check app.js
+node --check src/legacy/app.js
 python3 scripts/build_site.py --output /tmp/quant-market-intel-check
 pip-audit --strict
 python3 tools/audit_structure.py --output /tmp/market-intel-structure.json

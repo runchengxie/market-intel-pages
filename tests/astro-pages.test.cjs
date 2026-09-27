@@ -6,12 +6,25 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 
+test('legacy page reads public data and reports from the site root', () => {
+  const app = readFileSync(path.join(root, 'src/legacy/app.js'), 'utf8');
+  assert.match(app, /fetch\("\.\.\/data\/reports\.json"/);
+  assert.match(app, /fetch\("\.\.\/data\/market_daily_report\.json"/);
+  assert.match(app, /fetch\("\.\.\/data\/daily_summaries\.json"/);
+  assert.match(app, /optionalIndex\("\.\.\/data\/insights\.json"/);
+  assert.match(app, /optionalIndex\("\.\.\/data\/health\.json"/);
+  assert.match(app, /link\.href = `\.\.\/reports\//);
+  assert.match(app, /source\.href = `\.\.\/\$\{report\.source_url\}`/);
+});
+
 test('Astro emits a readable five-session static site with six chart states', () => {
   execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
   const index = readFileSync(path.join(root, 'dist/index.html'), 'utf8');
   const reports = JSON.parse(readFileSync(path.join(root, 'artifacts/public/data/reports.json'), 'utf8')).reports;
   const reportId = reports[0].id;
   assert.match(index, /Quant 市场情报/);
+  assert.ok(index.includes('/quant-intel-pages/'));
+  assert.ok(!index.includes('/market-intel-pages/'));
   assert.match(index, /id="theme-toggle"/);
   assert.match(index, /id="us-session"/);
   assert.match(index, /id="asia-session"/);
@@ -49,7 +62,7 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.match(html, /class="panel report-body markdown-body"/);
   assert.match(html, /data-chart-key="dashboard"/);
   assert.match(html, /data-chart-key="weekly_chart"/);
-  assert.ok(html.includes(`/market-intel-pages/reports/${reportId}.md`));
+  assert.ok(html.includes(`/quant-intel-pages/reports/${reportId}.md`));
   assert.doesNotMatch(html, /private-chat-target/);
   assert.doesNotMatch(index, /echarts\.|ChartIsland\.|\.png["']/);
   assert.doesNotMatch(html, /echarts\.|ChartIsland\.|\.png["']/);

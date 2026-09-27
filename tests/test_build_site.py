@@ -50,16 +50,18 @@ def create_site(root: Path, session_count: int = 6) -> None:
     public_root = root / "artifacts/public"
     (public_root / "data").mkdir(parents=True)
     (public_root / "reports").mkdir()
+    (root / "src/legacy").mkdir(parents=True)
+    (root / "src/lib").mkdir(parents=True)
     for name in (
         "index.html",
         "app.js",
         "styles.css",
         "summary-utils.js",
         "report-markdown.js",
-        "market-daily-utils.js",
         "theme-utils.js",
     ):
-        (root / name).write_text(name, encoding="utf-8")
+        (root / "src/legacy" / name).write_text(name, encoding="utf-8")
+    (root / "src/lib/market-daily-utils.js").write_text("market-daily-utils.js", encoding="utf-8")
 
     reports = []
     for day in range(1, session_count + 1):
@@ -115,6 +117,8 @@ class BuildSiteTests(unittest.TestCase):
         build_site(self.root, self.output)
         self.assertTrue((self.output / "data/charts/2026-09-02-morning.json").is_file())
         self.assertFalse((self.output / "data/charts/2026-09-01-morning.json").exists())
+        self.assertTrue((self.output / "legacy/index.html").is_file())
+        self.assertTrue((self.output / "legacy/market-daily-utils.js").is_file())
 
     def test_build_rejects_candidate_chart_in_current_window(self) -> None:
         sync_snapshot(self.root, self.archive)
@@ -305,9 +309,9 @@ class BuildSiteTests(unittest.TestCase):
         expected = {report["source_url"] for report in report_data["reports"]}
         self.assertEqual(expected, copied)
         self.assertEqual(10, len(report_data["reports"]))
-        self.assertTrue((self.output / "summary-utils.js").is_file())
-        self.assertTrue((self.output / "market-daily-utils.js").is_file())
-        self.assertTrue((self.output / "report-markdown.js").is_file())
+        self.assertTrue((self.output / "legacy/summary-utils.js").is_file())
+        self.assertTrue((self.output / "legacy/market-daily-utils.js").is_file())
+        self.assertTrue((self.output / "legacy/report-markdown.js").is_file())
         self.assertEqual(
             "market_intel_pages.daily_summaries.v1",
             json.loads((self.output / "data/daily_summaries.json").read_text())["schema_version"],
@@ -349,7 +353,7 @@ def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path
     report_id = index_data["reports"][0]["id"]
     index = (output / "index.html").read_text(encoding="utf-8")
     assert "REPORT ARCHIVE" in index
-    assert f"/market-intel-pages/reports/{report_id}/" in index
+    assert f"/quant-intel-pages/reports/{report_id}/" in index
     assert (output / f"reports/{report_id}/index.html").is_file()
     market = json.loads((output / "data/market_daily_report.json").read_text(encoding="utf-8"))
     market_date = market["run_id"].removeprefix("daily-")
@@ -362,7 +366,7 @@ def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path
         assert f"# 美股市场日报（{date}）" in reading
         assert "https://" not in reading
         assert "证据：" not in reading
-        assert f"/market-intel-pages/reports/{date}-market-daily-no-citations.md" in index
+        assert f"/quant-intel-pages/reports/{date}-market-daily-no-citations.md" in index
     assert "| 5 年期 | 4.98% | -5.00 bp | 2026-09-25 |" in (
         output / "reports/2026-09-25-market-daily-no-citations.md"
     ).read_text(encoding="utf-8")
