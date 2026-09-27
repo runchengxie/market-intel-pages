@@ -3,12 +3,31 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.build_site import build_site, refresh_astro
+import pytest
+
+from scripts.build_site import _copy_daily_report_formats, build_site, refresh_astro
 from scripts.sync_public_snapshot import sync_snapshot
 from tests.test_chart_contract import public_chart, rehash
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
+
+
+def test_new_public_copy_cannot_reuse_legacy_continuous_commodity_exception(tmp_path: Path) -> None:
+    root = Path(__file__).resolve().parents[1]
+    payload = json.loads((root / "data/market_daily_report.json").read_text(encoding="utf-8"))
+    payload["content_hash"] = "different-new-report-hash"
+    output = tmp_path / "site"
+    (output / "reports").mkdir(parents=True)
+    with pytest.raises(ValueError, match="invalid sourced market fact"):
+        _copy_daily_report_formats(root, output, payload)
+
+    payload["content_hash"] = json.loads(
+        (root / "data/market_daily_report.json").read_text(encoding="utf-8")
+    )["content_hash"]
+    next(fact for fact in payload["facts"] if fact["id"] == "cross_asset.brent.close")["value"] += 1
+    with pytest.raises(ValueError, match="invalid sourced market fact"):
+        _copy_daily_report_formats(root, output, payload)
 
 
 def create_site(root: Path, session_count: int = 6) -> None:

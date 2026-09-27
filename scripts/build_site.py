@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -33,6 +34,13 @@ except ImportError:
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
+LEGACY_CONTINUOUS_REPORT_HASHES = {
+    "2fd2991a411a709f40328a0fcdc0f1f382367276ca6ff07bc435bd4a46288c5c",
+    "fc12070998d95440d9933b540b181d0b3f8f9c56d4e4b0397df341e542bcd4f7",
+    "43adcc92a27dd7e8bea7de4b7299bc3b450fb1c84e0f1e63776d6b699786a3aa",
+    "5a2a8ff17e0d51bcd8ce26f512444dfa6b9b9ea6d827577f467c4c36d4cd674b",
+    "f75dfc294d87366de8357c2d203c16b7581ecf540b969f045058ab1d1980484a",
+}
 PUBLIC_SESSION_COUNT = 5
 STATIC_FILES = (
     "index.html",
@@ -162,7 +170,18 @@ def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
             shutil.copy2(source, output / filename)
     if payload.get("publication") == "public":
         reading = output / f"reports/{report_date}-market-daily-no-citations.md"
-        reading.write_text(render_market_daily_markdown(payload, include_references=False), encoding="utf-8")
+        # Only exact already-published editions predate the dated-contract rule.
+        projection_hash = hashlib.sha256(
+            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
+        ).hexdigest()
+        reading.write_text(
+            render_market_daily_markdown(
+                payload,
+                include_references=False,
+                allow_legacy_commodity=projection_hash in LEGACY_CONTINUOUS_REPORT_HASHES,
+            ),
+            encoding="utf-8",
+        )
 
 
 def _copy_daily_report(root: Path, output: Path) -> None:
