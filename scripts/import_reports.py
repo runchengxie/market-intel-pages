@@ -13,10 +13,12 @@ from pathlib import Path
 try:
     from .generate_daily_summary import CHINA_TZ, report_generated_at
     from .generate_insights import archive_once, write_json
+    from .public_paths import public_snapshot_root, safe_public_report_path
     from .sync_public_snapshot import _safe_report_path, sync_snapshot
 except ImportError:
     from generate_daily_summary import CHINA_TZ, report_generated_at
     from generate_insights import archive_once, write_json
+    from public_paths import public_snapshot_root, safe_public_report_path
     from sync_public_snapshot import _safe_report_path, sync_snapshot
 
 
@@ -86,7 +88,8 @@ def import_reports(root: Path, manifest_path: Path, archive_dir: Path, *, apply=
     if archive_dir.is_relative_to(root) or root.is_relative_to(archive_dir):
         raise ValueError("archive and public repository must be separate directories")
     incoming, markdown = _read_manifest(manifest_path)
-    index = json.loads((root / "data/reports.json").read_text(encoding="utf-8"))
+    public_root = public_snapshot_root(root)
+    index = json.loads((public_root / "data/reports.json").read_text(encoding="utf-8"))
     if index.get("schema_version") != "market_intel_pages.reports.v1":
         raise ValueError("invalid report index")
     existing = {r["id"]: r for r in index["reports"]}
@@ -94,8 +97,8 @@ def import_reports(root: Path, manifest_path: Path, archive_dir: Path, *, apply=
         key
         for key, row in incoming.items()
         if existing.get(key) != row
-        or not _safe_report_path(root, row["source_url"]).exists()
-        or _safe_report_path(root, row["source_url"]).read_text(encoding="utf-8") != markdown[key]
+        or not safe_public_report_path(root, row["source_url"]).exists()
+        or safe_public_report_path(root, row["source_url"]).read_text(encoding="utf-8") != markdown[key]
     ]
     result = {"changed": len(changed), "report_ids": sorted(incoming), "applied": False}
     if not apply or not changed:
@@ -122,25 +125,29 @@ def _apply_import(
     # Stage the entire snapshot; source parsing and validation precede public writes.
     with tempfile.TemporaryDirectory(prefix="market-intel-import-") as temporary:
         stage = Path(temporary)
-        (stage / "data").mkdir()
-        (stage / "reports").mkdir()
+        stage_public = public_snapshot_root(stage)
+        (stage_public / "data").mkdir(parents=True)
+        (stage_public / "reports").mkdir()
         for row in existing.values():
-            source = _safe_report_path(root, row["source_url"])
-            destination = _safe_report_path(stage, row["source_url"])
+            source = safe_public_report_path(root, row["source_url"])
+            destination = safe_public_report_path(stage, row["source_url"])
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
         for key, row in incoming.items():
-            (stage / row["source_url"]).write_text(markdown[key], encoding="utf-8")
+            safe_public_report_path(stage, row["source_url"]).write_text(markdown[key], encoding="utf-8")
         merged = {**existing, **incoming}
         write_json(
-            stage / "data/reports.json",
+            stage_public / "data/reports.json",
             {
                 **index,
                 "generated_at": datetime.now(CHINA_TZ).isoformat(timespec="seconds"),
                 "reports": sorted(merged.values(), key=lambda r: (r["date"], r["id"])),
             },
         )
-        shutil.copy2(root / "data/daily_summaries.json", stage / "data/daily_summaries.json")
+        shutil.copy2(
+            public_snapshot_root(root) / "data/daily_summaries.json",
+            stage_public / "data/daily_summaries.json",
+        )
         for key in changed:
             for old_index, old_root in ((existing, root), (archived, archive_dir)):
                 if key in old_index:
@@ -149,26 +156,31 @@ def _apply_import(
                         "report_revisions",
                         {
                             "report": old_index[key],
-                            "markdown": _safe_report_path(old_root, old_index[key]["source_url"]).read_text(
-                                encoding="utf-8"
-                            ),
+                            "markdown": (
+                                safe_public_report_path(old_root, old_index[key]["source_url"])
+                                if old_root == root
+                                else _safe_report_path(old_root, old_index[key]["source_url"])
+                            ).read_text(encoding="utf-8"),
                         },
                     )
             archive_once(
                 archive_dir, "report_revisions", {"report": incoming[key], "markdown": markdown[key]}
             )
         sync_snapshot(stage, archive_dir)
-        public = json.loads((stage / "data/reports.json").read_text(encoding="utf-8"))
+        public = json.loads((stage_public / "data/reports.json").read_text(encoding="utf-8"))
         for row in public["reports"]:
-            destination = _safe_report_path(root, row["source_url"])
+            destination = safe_public_report_path(root, row["source_url"])
             destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(stage / row["source_url"], destination)
+            shutil.copy2(safe_public_report_path(stage, row["source_url"]), destination)
         for name in ("daily_summaries.json", "reports.json"):
-            write_json(root / "data" / name, json.loads((stage / "data" / name).read_text(encoding="utf-8")))
+            write_json(
+                public_snapshot_root(root) / "data" / name,
+                json.loads((stage_public / "data" / name).read_text(encoding="utf-8")),
+            )
         retained = {r["source_url"] for r in public["reports"]}
         for row in existing.values():
             if row["source_url"] not in retained:
-                _safe_report_path(root, row["source_url"]).unlink(missing_ok=True)
+                safe_public_report_path(root, row["source_url"]).unlink(missing_ok=True)
 
 
 def main():

@@ -47,8 +47,9 @@ def test_new_public_copy_cannot_reuse_legacy_continuous_commodity_exception(
 
 
 def create_site(root: Path, session_count: int = 6) -> None:
-    (root / "data").mkdir(parents=True)
-    (root / "reports").mkdir()
+    public_root = root / "artifacts/public"
+    (public_root / "data").mkdir(parents=True)
+    (public_root / "reports").mkdir()
     for name in (
         "index.html",
         "app.js",
@@ -77,9 +78,9 @@ def create_site(root: Path, session_count: int = 6) -> None:
                     "source_url": source_url,
                 }
             )
-            (root / source_url).write_text(f"# {report_id}\n", encoding="utf-8")
+            (public_root / source_url).write_text(f"# {report_id}\n", encoding="utf-8")
 
-    (root / "data/reports.json").write_text(
+    (public_root / "data/reports.json").write_text(
         json.dumps(
             {
                 "schema_version": REPORT_SCHEMA,
@@ -89,7 +90,7 @@ def create_site(root: Path, session_count: int = 6) -> None:
         ),
         encoding="utf-8",
     )
-    (root / "data/daily_summaries.json").write_text(
+    (public_root / "data/daily_summaries.json").write_text(
         json.dumps(
             {
                 "schema_version": SUMMARY_SCHEMA,
@@ -103,7 +104,7 @@ def create_site(root: Path, session_count: int = 6) -> None:
 class BuildSiteTests(unittest.TestCase):
     def test_build_copies_only_indexed_public_charts(self) -> None:
         sync_snapshot(self.root, self.archive)
-        chart_dir = self.root / "data/charts"
+        chart_dir = self.root / "artifacts/public/data/charts"
         chart_dir.mkdir()
         current = public_chart()
         current["date"] = "2026-09-02"
@@ -117,7 +118,7 @@ class BuildSiteTests(unittest.TestCase):
 
     def test_build_rejects_candidate_chart_in_current_window(self) -> None:
         sync_snapshot(self.root, self.archive)
-        chart_dir = self.root / "data/charts"
+        chart_dir = self.root / "artifacts/public/data/charts"
         chart_dir.mkdir()
         current = public_chart()
         current["date"] = "2026-09-02"
@@ -132,8 +133,10 @@ class BuildSiteTests(unittest.TestCase):
         sync_snapshot(self.root, self.archive)
         build_site(self.root, self.output)
         (self.output / "index.html").write_text("published artifact", encoding="utf-8")
-        (self.root / "data/charts").mkdir()
-        (self.root / "data/charts/2026-09-02-morning.json").write_text('{"publication":"candidate"}')
+        (self.root / "artifacts/public/data/charts").mkdir()
+        (self.root / "artifacts/public/data/charts/2026-09-02-morning.json").write_text(
+            '{"publication":"candidate"}'
+        )
         with self.assertRaises(ValueError):
             build_site(self.root, self.output)
         self.assertEqual("published artifact", (self.output / "index.html").read_text(encoding="utf-8"))
@@ -151,12 +154,18 @@ class BuildSiteTests(unittest.TestCase):
     def test_build_copies_imported_market_daily_data(self) -> None:
         sync_snapshot(self.root, self.archive)
         payload = {"schema_version": "1.0", "run_id": "daily-2026-09-23"}
-        (self.root / "data/market_daily_report.json").write_text(json.dumps(payload), encoding="utf-8")
-        (self.root / "reports/2026-09-23-market-daily.txt").write_text("verified text\n", encoding="utf-8")
-        (self.root / "reports/2026-09-23-market-daily.md").write_text(
+        (self.root / "artifacts/public/data/market_daily_report.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+        (self.root / "artifacts/public/reports/2026-09-23-market-daily.txt").write_text(
+            "verified text\n", encoding="utf-8"
+        )
+        (self.root / "artifacts/public/reports/2026-09-23-market-daily.md").write_text(
             "# verified markdown\n", encoding="utf-8"
         )
-        (self.root / "reports/2026-09-22-market-daily.txt").write_text("stale\n", encoding="utf-8")
+        (self.root / "artifacts/public/reports/2026-09-22-market-daily.txt").write_text(
+            "stale\n", encoding="utf-8"
+        )
         build_site(self.root, self.output)
         self.assertEqual(
             payload,
@@ -174,10 +183,10 @@ class BuildSiteTests(unittest.TestCase):
         rows = []
         for day in ("2026-09-23", "2026-09-24"):
             rows.append({"schema_version": "1.0", "run_id": f"daily-{day}", "report_formats": ["md", "txt"]})
-            (self.root / f"reports/{day}-market-daily.md").write_text(f"# {day}\n")
-            (self.root / f"reports/{day}-market-daily.txt").write_text(f"{day}\n")
-        (self.root / "data/market_daily_report.json").write_text(json.dumps(rows[-1]))
-        (self.root / "data/market_daily_reports.json").write_text(
+            (self.root / f"artifacts/public/reports/{day}-market-daily.md").write_text(f"# {day}\n")
+            (self.root / f"artifacts/public/reports/{day}-market-daily.txt").write_text(f"{day}\n")
+        (self.root / "artifacts/public/data/market_daily_report.json").write_text(json.dumps(rows[-1]))
+        (self.root / "artifacts/public/data/market_daily_reports.json").write_text(
             json.dumps(
                 {
                     "schema_version": "market_intel_pages.us_daily_history.v1",
@@ -196,11 +205,11 @@ class BuildSiteTests(unittest.TestCase):
 
     def test_build_rejects_claimed_text_format_without_file(self) -> None:
         sync_snapshot(self.root, self.archive)
-        (self.root / "data/market_daily_report.json").write_text(
+        (self.root / "artifacts/public/data/market_daily_report.json").write_text(
             json.dumps({"run_id": "daily-2026-09-23", "report_formats": ["md", "txt"]}),
             encoding="utf-8",
         )
-        (self.root / "reports/2026-09-23-market-daily.md").write_text("# report\n")
+        (self.root / "artifacts/public/reports/2026-09-23-market-daily.md").write_text("# report\n")
         with self.assertRaisesRegex(ValueError, "claimed market daily format missing"):
             build_site(self.root, self.output)
 
@@ -219,12 +228,12 @@ class BuildSiteTests(unittest.TestCase):
         sync_snapshot(self.root, self.archive)
 
         local = json.loads((self.archive / "data/reports.json").read_text())
-        public = json.loads((self.root / "data/reports.json").read_text())
+        public = json.loads((self.root / "artifacts/public/data/reports.json").read_text())
         self.assertEqual(12, len(local["reports"]))
         self.assertEqual(10, len(public["reports"]))
         self.assertEqual("2026-09-02", min(r["date"] for r in public["reports"]))
         self.assertTrue((self.archive / "reports/2026-09-01-morning.md").exists())
-        self.assertFalse((self.root / "reports/2026-09-01-morning.md").exists())
+        self.assertFalse((self.root / "artifacts/public/reports/2026-09-01-morning.md").exists())
 
     def test_sync_is_idempotent_for_report_ids(self) -> None:
         sync_snapshot(self.root, self.archive)
@@ -247,7 +256,7 @@ class BuildSiteTests(unittest.TestCase):
                     "prompt_version": "daily-note-v1",
                 }
             )
-        (self.root / "data/daily_summaries.json").write_text(
+        (self.root / "artifacts/public/data/daily_summaries.json").write_text(
             json.dumps(
                 {
                     "schema_version": SUMMARY_SCHEMA,
@@ -274,11 +283,11 @@ class BuildSiteTests(unittest.TestCase):
             sync_snapshot(self.root, self.root / "archive")
 
     def test_sync_counts_a_report_date_even_before_its_morning_report_exists(self) -> None:
-        index_path = self.root / "data/reports.json"
+        index_path = self.root / "artifacts/public/data/reports.json"
         index = json.loads(index_path.read_text())
         index["reports"] = [row for row in index["reports"] if row["id"] != "2026-09-06-morning"]
         index_path.write_text(json.dumps(index), encoding="utf-8")
-        (self.root / "reports/2026-09-06-morning.md").unlink()
+        (self.root / "artifacts/public/reports/2026-09-06-morning.md").unlink()
 
         sync_snapshot(self.root, self.archive)
 
@@ -289,7 +298,7 @@ class BuildSiteTests(unittest.TestCase):
 
     def test_build_site_copies_only_indexed_reports_and_markdown(self) -> None:
         sync_snapshot(self.root, self.archive)
-        build_site(self.root, self.output, self.root / "data/daily_summaries.json")
+        build_site(self.root, self.output, self.root / "artifacts/public/data/daily_summaries.json")
 
         report_data = json.loads((self.output / "data/reports.json").read_text())
         copied = {path.relative_to(self.output).as_posix() for path in (self.output / "reports").glob("*.md")}
@@ -305,7 +314,7 @@ class BuildSiteTests(unittest.TestCase):
         )
 
     def test_build_rejects_summary_with_unknown_source(self) -> None:
-        (self.root / "data/daily_summaries.json").write_text(
+        (self.root / "artifacts/public/data/daily_summaries.json").write_text(
             json.dumps(
                 {
                     "schema_version": SUMMARY_SCHEMA,
@@ -325,7 +334,7 @@ class BuildSiteTests(unittest.TestCase):
             encoding="utf-8",
         )
         with self.assertRaisesRegex(ValueError, "source report"):
-            build_site(self.root, self.output, self.root / "data/daily_summaries.json")
+            build_site(self.root, self.output, self.root / "artifacts/public/data/daily_summaries.json")
 
 
 if __name__ == "__main__":

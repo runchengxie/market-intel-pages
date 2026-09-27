@@ -21,6 +21,7 @@ try:
     from .import_market_daily_report import _markdown as render_market_daily_markdown
     from .insight_contract import evaluate_watchpoints
     from .pipeline_health import health_report
+    from .public_paths import public_snapshot_root, safe_public_report_path
 except ImportError:
     from audit_chart_artifact import audit_chart_artifact
     from chart_contract import validate_public_chart
@@ -30,6 +31,7 @@ except ImportError:
     from import_market_daily_report import _markdown as render_market_daily_markdown
     from insight_contract import evaluate_watchpoints
     from pipeline_health import health_report
+    from public_paths import public_snapshot_root, safe_public_report_path
 
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
@@ -55,10 +57,10 @@ STATIC_FILES = (
 
 def copy_public_charts(root: Path, output: Path, report_ids: set[str]) -> list[str]:
     """Copy only indexed and fully validated public chart manifests."""
-    source_dir = (root / "data/charts").resolve()
+    source_dir = (public_snapshot_root(root) / "data/charts").resolve()
     copied: list[str] = []
     for report_id in sorted(report_ids):
-        source = root / "data/charts" / f"{report_id}.json"
+        source = public_snapshot_root(root) / "data/charts" / f"{report_id}.json"
         if not source.exists():
             continue
         if not source.resolve().is_relative_to(source_dir) or not source.is_file():
@@ -163,7 +165,7 @@ def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
     declared_formats = payload.get("report_formats", [])
     for suffix in ("md", "txt"):
         filename = f"reports/{report_date}-market-daily.{suffix}"
-        source = root / filename
+        source = public_snapshot_root(root) / filename
         if suffix in declared_formats and not source.is_file():
             raise ValueError(f"claimed market daily format missing: {filename}")
         if source.is_file():
@@ -185,8 +187,8 @@ def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
 
 
 def _copy_daily_report(root: Path, output: Path) -> None:
-    daily_report = root / "data/market_daily_report.json"
-    history_path = root / "data/market_daily_reports.json"
+    daily_report = public_snapshot_root(root) / "data/market_daily_report.json"
+    history_path = public_snapshot_root(root) / "data/market_daily_reports.json"
     if history_path.is_file():
         history = json.loads(history_path.read_text(encoding="utf-8"))
         rows = _validate_daily_history(history, daily_report)
@@ -205,8 +207,9 @@ def _copy_daily_report(root: Path, output: Path) -> None:
 def _build_site_contents(root: Path, output: Path, summaries_path: Path | None = None) -> None:
     root = root.resolve()
     output = output.resolve()
-    summaries_path = (summaries_path or root / "data/daily_summaries.json").resolve()
-    report_data, reports = _read_index(root / "data/reports.json", REPORT_SCHEMA, "reports")
+    public_root = public_snapshot_root(root)
+    summaries_path = (summaries_path or public_root / "data/daily_summaries.json").resolve()
+    report_data, reports = _read_index(public_root / "data/reports.json", REPORT_SCHEMA, "reports")
     summary_data, summaries = _read_index(summaries_path, SUMMARY_SCHEMA, "summaries")
     _validate(reports, summaries)
 
@@ -218,7 +221,7 @@ def _build_site_contents(root: Path, output: Path, summaries_path: Path | None =
     (output / "reports").mkdir()
     for filename in STATIC_FILES:
         shutil.copy2(root / filename, output / filename)
-    shutil.copy2(root / "data/reports.json", output / "data/reports.json")
+    shutil.copy2(public_root / "data/reports.json", output / "data/reports.json")
     copy_public_charts(root, output, {str(report["id"]) for report in reports})
     _copy_daily_report(root, output)
     summary_data["summaries"] = current_summaries(reports, summaries)
@@ -229,7 +232,7 @@ def _build_site_contents(root: Path, output: Path, summaries_path: Path | None =
     (output / "data/health.json").write_text(
         json.dumps(health, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
-    insight_path = root / "data/insights.json"
+    insight_path = public_root / "data/insights.json"
     insights = {
         "schema_version": INSIGHT_SCHEMA,
         "generation": {"status": "not_configured"},
@@ -250,10 +253,10 @@ def _build_site_contents(root: Path, output: Path, summaries_path: Path | None =
         source_url = report.get("source_url")
         if not isinstance(source_url, str):
             raise ValueError("report source_url must be a string")
-        source = (root / source_url).resolve()
-        if not source.is_relative_to((root / "reports").resolve()) or not source.is_file():
+        source = safe_public_report_path(root, source_url)
+        if not source.is_file():
             raise ValueError(f"report Markdown is missing or unsafe: {source_url}")
-        destination = output / source.relative_to(root)
+        destination = output / source_url
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
     _overlay_astro_pages(root, output, {str(report["id"]) for report in reports})

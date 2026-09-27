@@ -8,7 +8,7 @@ export const CHART_TITLES = {
 };
 
 export function dataRoot() {
-  return path.resolve(process.env.ASTRO_DATA_ROOT || process.cwd());
+  return path.resolve(process.env.ASTRO_DATA_ROOT || path.join(process.cwd(), 'artifacts/public'));
 }
 
 export function readJson(relativePath) {

@@ -17,8 +17,8 @@ from tests.test_chart_contract import public_chart, rehash
 @pytest.fixture
 def site_root(tmp_path: Path) -> Path:
     root = tmp_path / "site"
-    (root / "data").mkdir(parents=True)
-    (root / "data/reports.json").write_text(
+    (root / "artifacts/public/data").mkdir(parents=True)
+    (root / "artifacts/public/data/reports.json").write_text(
         json.dumps(
             {
                 "schema_version": "market_intel_pages.reports.v1",
@@ -58,7 +58,7 @@ def test_preview_does_not_write(site_root: Path, public_chart_path: Path, review
     archive = tmp_path / "archive"
     result = import_charts(site_root, public_chart_path, archive, review=review_path)
     assert result == {"changed": 1, "report_id": "2026-09-18-morning", "applied": False}
-    assert not (site_root / "data/charts/2026-09-18-morning.json").exists()
+    assert not (site_root / "artifacts/public/data/charts/2026-09-18-morning.json").exists()
     assert not archive.exists()
 
 
@@ -68,7 +68,8 @@ def test_apply_archives_prior_version_and_is_idempotent(
     archive = tmp_path / "archive"
     first = import_charts(site_root, public_chart_path, archive, review=review_path, apply=True)
     assert first["applied"] is True
-    destination = site_root / "data/charts/2026-09-18-morning.json"
+    assert (site_root / "artifacts/public/data/charts/2026-09-18-morning.json").is_file()
+    destination = site_root / "artifacts/public/data/charts/2026-09-18-morning.json"
     old = destination.read_bytes()
     assert (
         import_charts(site_root, public_chart_path, archive, review=review_path, apply=True)["changed"] == 0
@@ -124,7 +125,7 @@ def test_candidate_and_wrong_report_are_rejected(
     public_chart_path.write_text(json.dumps(rehash(candidate)), encoding="utf-8")
     with pytest.raises(ValueError, match="public"):
         import_charts(site_root, public_chart_path, tmp_path / "archive", review=review_path, apply=True)
-    assert not (site_root / "data/charts").exists()
+    assert not (site_root / "artifacts/public/data/charts").exists()
 
 
 def test_public_hash_alone_cannot_bypass_review(site_root: Path, public_chart_path: Path, tmp_path: Path):

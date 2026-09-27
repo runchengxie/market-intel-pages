@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const reports = require("../data/reports.json").reports;
+const reports = require("../artifacts/public/data/reports.json").reports;
 const { renderReportBlocks } = require("../report-markdown.js");
 
 function element(tagName) {

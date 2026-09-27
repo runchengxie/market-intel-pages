@@ -9,7 +9,7 @@ const root = path.join(__dirname, '..');
 test('Astro emits a readable five-session static site with six chart states', () => {
   execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
   const index = readFileSync(path.join(root, 'dist/index.html'), 'utf8');
-  const reports = JSON.parse(readFileSync(path.join(root, 'data/reports.json'), 'utf8')).reports;
+  const reports = JSON.parse(readFileSync(path.join(root, 'artifacts/public/data/reports.json'), 'utf8')).reports;
   const reportId = reports[0].id;
   assert.match(index, /Quant 市场情报/);
   assert.match(index, /id="theme-toggle"/);
@@ -61,8 +61,8 @@ test('Astro emits a readable five-session static site with six chart states', ()
 test('US daily chart is absent when the public report has no eligible market facts', () => {
   const fixture = mkdtempSync(path.join(path.dirname(root), 'market-daily-empty-chart-'));
   try {
-    cpSync(path.join(root, 'data'), path.join(fixture, 'data'), { recursive: true });
-    cpSync(path.join(root, 'reports'), path.join(fixture, 'reports'), { recursive: true });
+    cpSync(path.join(root, 'artifacts/public/data'), path.join(fixture, 'data'), { recursive: true });
+    cpSync(path.join(root, 'artifacts/public/reports'), path.join(fixture, 'reports'), { recursive: true });
     const file = path.join(fixture, 'data/market_daily_report.json');
     const report = JSON.parse(readFileSync(file, 'utf8'));
     report.facts = report.facts.filter((fact) => fact.id.startsWith('macro.'));
@@ -81,8 +81,8 @@ test('US daily chart is absent when the public report has no eligible market fac
 test('Astro market brief shows verified primary facts, semantic sources and compact secondary content', () => {
   const fixture = mkdtempSync(path.join(path.dirname(root), 'market-daily-brief-'));
   try {
-    cpSync(path.join(root, 'data'), path.join(fixture, 'data'), { recursive: true });
-    cpSync(path.join(root, 'reports'), path.join(fixture, 'reports'), { recursive: true });
+    cpSync(path.join(root, 'artifacts/public/data'), path.join(fixture, 'data'), { recursive: true });
+    cpSync(path.join(root, 'artifacts/public/reports'), path.join(fixture, 'reports'), { recursive: true });
     const file = path.join(fixture, 'data/market_daily_report.json');
     const report = JSON.parse(readFileSync(file, 'utf8'));
     const reportDate = report.run_id.slice(6);
@@ -126,10 +126,10 @@ test('Astro market brief shows verified primary facts, semantic sources and comp
 });
 
 test('all visible US daily Markdown editions disclose public source quality', () => {
-  const history = JSON.parse(readFileSync(path.join(root, 'data/market_daily_reports.json'), 'utf8'));
+  const history = JSON.parse(readFileSync(path.join(root, 'artifacts/public/data/market_daily_reports.json'), 'utf8'));
   for (const report of history.reports) {
     const date = report.run_id.slice(6);
-    const markdown = readFileSync(path.join(root, `reports/${date}-market-daily.md`), 'utf8');
+    const markdown = readFileSync(path.join(root, `artifacts/public/reports/${date}-market-daily.md`), 'utf8');
     assert.match(markdown, /## 数据质量与核验说明/);
     if (report.source_status.research?.reason === 'not_connected') {
       assert.match(markdown, /研究材料尚未接入，不提供未经核实的解释/);
@@ -138,7 +138,7 @@ test('all visible US daily Markdown editions disclose public source quality', ()
 });
 
 test('historical insight discloses timing, limitations and verification units', () => {
-  const insight = JSON.parse(readFileSync(path.join(root, 'data/insights.json'), 'utf8')).insights[0];
+  const insight = JSON.parse(readFileSync(path.join(root, 'artifacts/public/data/insights.json'), 'utf8')).insights[0];
   if (!insight) return;
   const index = readFileSync(path.join(root, 'dist/index.html'), 'utf8');
   assert.match(index, /信息截至/);
@@ -182,8 +182,8 @@ test('single table-row evidence is labelled instead of showing raw Markdown pipe
 test('verified watchpoint outcome shows labelled table evidence', () => {
   const fixture = mkdtempSync(path.join(path.dirname(root), 'market-insight-outcome-'));
   try {
-    cpSync(path.join(root, 'data'), path.join(fixture, 'data'), { recursive: true });
-    cpSync(path.join(root, 'reports'), path.join(fixture, 'reports'), { recursive: true });
+    cpSync(path.join(root, 'artifacts/public/data'), path.join(fixture, 'data'), { recursive: true });
+    cpSync(path.join(root, 'artifacts/public/reports'), path.join(fixture, 'reports'), { recursive: true });
     const file = path.join(fixture, 'data/insights.json');
     const insights = JSON.parse(readFileSync(file, 'utf8'));
     const outcome = insights.outcomes[0];
