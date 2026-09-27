@@ -33,6 +33,13 @@ except ImportError:
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
+LEGACY_CONTINUOUS_REPORT_HASHES = {
+    "2d25066f295b991f26d8e9b3f5a03cd6d4af709fdfca71ed65679c853cdadac2",
+    "00da3162a5d88b44fa609c5db86592917935d20f75bffecd679b2b42427f5fc1",
+    "5755808414425d11c9311934063ccc020059043a717067974ea756e90da498bf",
+    "c4d01be60beab841c320ec1a3c09640e9e2ec2848364283b017e980c2bf06150",
+    "41cf3c97e9e782e8edab53e76e5e5b0ee031cb562e299f60302ebf6c38978df0",
+}
 PUBLIC_SESSION_COUNT = 5
 STATIC_FILES = (
     "index.html",
@@ -162,10 +169,13 @@ def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
             shutil.copy2(source, output / filename)
     if payload.get("publication") == "public":
         reading = output / f"reports/{report_date}-market-daily-no-citations.md"
-        # Archived public editions predate the dated-contract rule. Re-render
-        # their reading copy without treating them as new import candidates.
+        # Only exact already-published editions predate the dated-contract rule.
         reading.write_text(
-            render_market_daily_markdown(payload, include_references=False, allow_legacy_commodity=True),
+            render_market_daily_markdown(
+                payload,
+                include_references=False,
+                allow_legacy_commodity=payload.get("content_hash") in LEGACY_CONTINUOUS_REPORT_HASHES,
+            ),
             encoding="utf-8",
         )
 
