@@ -42,6 +42,21 @@ const BTC_SPOT_SOURCES = new Map([
   ["Kraken|https://www.kraken.com/prices/bitcoin", "BTC/USD spot at 16:00 ET (Kraken XBT/USD)"],
 ]);
 const FMP_COMMODITY_SYMBOLS = { brent: "BZUSD", gold: "GCUSD", silver: "SIUSD" };
+const FUTURES_MONTH_CODES = "FGHJKMNQUVXZ";
+const COMMODITY_MONTHS = { gold: [2, 4, 6, 8, 12], silver: [3, 5, 7, 9, 12] };
+
+function datedCommoditySymbol(asset, reportDate) {
+  if (!Object.hasOwn(COMMODITY_MONTHS, asset) && asset !== "brent") return null;
+  const [year, month] = reportDate.split("-").map(Number);
+  const offset = asset === "brent" ? 2 : Array.from({ length: 12 }, (_, i) => i + 1)
+    .find((step) => COMMODITY_MONTHS[asset].includes((month - 1 + step) % 12 + 1));
+  const absoluteMonth = month - 1 + offset;
+  const deliveryMonth = absoluteMonth % 12 + 1;
+  const deliveryYear = year + Math.floor(absoluteMonth / 12);
+  const root = { brent: "BZ", gold: "GC", silver: "SI" }[asset];
+  const exchange = asset === "brent" ? "NYM" : "CMX";
+  return `${root}${FUTURES_MONTH_CODES[deliveryMonth - 1]}${String(deliveryYear % 100).padStart(2, "0")}.${exchange}`;
+}
 const YAHOO_INDEX_SOURCES = {
   spx: /^https:\/\/finance\.yahoo\.com\/quote\/%5EGSPC\/history\/$/,
   dow: /^https:\/\/finance\.yahoo\.com\/quote\/%5EDJI\/history\/$/,
@@ -116,7 +131,11 @@ function validMarketDailyFact(id, fact, reportDate) {
     const isClose = field === "close";
     const units = { brent: "USD/barrel", gold: "USD/troy_ounce", silver: "USD/troy_ounce", bitcoin: "USD/bitcoin" };
     const metric = isClose ? (asset === "bitcoin" ? "crypto_futures_close" : "commodity_close") : "daily_return";
-    const yahooValid = Boolean(source) && source.test(url) && fact.source === "Yahoo Finance";
+    const datedSymbol = datedCommoditySymbol(asset, reportDate);
+    const datedValid = datedSymbol && url === `https://finance.yahoo.com/quote/${datedSymbol}/history/`
+      && String(fact.instrument ?? "").includes(`(${datedSymbol})`);
+    const yahooValid = fact.source === "Yahoo Finance"
+      && ((Boolean(source) && source.test(url)) || datedValid);
     const fmpValid = Boolean(fmpSymbol) && url === FMP_COMMODITY_URL
       && fact.source === "Financial Modeling Prep"
       && String(fact.instrument ?? "").includes(`(FMP ${fmpSymbol}, continuous)`);

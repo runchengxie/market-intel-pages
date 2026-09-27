@@ -261,6 +261,27 @@ test("market daily charts preserve FMP commodity provenance", () => {
   assert.equal(summarizeMarketDaily({ ...payload, facts: pair.map((row) => ({ ...row, instrument: "Brent (FMP GCUSD, continuous)" })) }), null);
 });
 
+test("dated commodity contracts keep the US report chart visible", () => {
+  const specs = [
+    ["brent", "BZX26.NYM", "USD/barrel", 104.32],
+    ["gold", "GCZ26.CMX", "USD/troy_ounce", 4321.2],
+    ["silver", "SIZ26.CMX", "USD/troy_ounce", 64.801],
+  ];
+  const facts = specs.flatMap(([asset, ticker, unit, price]) => [
+    { id: `cross_asset.${asset}.close`, metric: "commodity_close", value: price, unit },
+    { id: `cross_asset.${asset}.change_percent`, metric: "daily_return", value: 1.2, unit: "percent" },
+  ].map((fact) => ({ ...fact, instrument: `${asset} (${ticker})`, source: "Yahoo Finance",
+    source_url: `https://finance.yahoo.com/quote/${ticker}/history/`, quality: "ok", observation_date: "2026-09-25" })));
+  const payload = { schema_version: "1.0", run_id: "daily-2026-09-25", facts };
+  const summary = summarizeMarketDaily(payload);
+  assert.ok(summary);
+  assert.equal(summary.crossAssetRows.length, 3);
+  assert.match(buildMarketDailyChartSvg(summary), /104\.32 美元\/桶/);
+  const wrongMonth = facts.map((fact) => fact.id.startsWith("cross_asset.brent.")
+    ? { ...fact, instrument: "brent (BZZ26.NYM)", source_url: "https://finance.yahoo.com/quote/BZZ26.NYM/history/" } : fact);
+  assert.equal(summarizeMarketDaily({ ...payload, facts: wrongMonth }), null);
+});
+
 test("BTC/USD spot is shown separately from CME bitcoin futures", () => {
   const fmpUrl = "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full";
   const fmp = { source: "Financial Modeling Prep", source_url: fmpUrl,
