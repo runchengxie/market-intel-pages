@@ -74,6 +74,7 @@ YAHOO_INDEX_URLS = {
 }
 EQUITY_ID = re.compile(r"equity\.([a-z]{1,5})\.(close|change_percent)")
 ALPACA_STOCK_BARS_URL = "https://docs.alpaca.markets/us/reference/stockbars"
+CORE_EQUITIES = {"MSFT", "AAPL", "NVDA", "AMZN", "GOOGL", "META"}
 MISSING_LABELS = {
     "quotes": "指数行情",
     "research": "研究解释",
@@ -104,6 +105,8 @@ SOURCE_REASON_LABELS = {
     "source_audited": "来源已逐条核查",
     "not_connected": "研究材料尚未接入，不提供未经核实的解释",
     "ok": "来源状态正常",
+    "all_equities_fresh": "核心观察股票行情齐全",
+    "one_or_more_equities_unavailable": "部分股票行情暂缺",
 }
 PUBLIC_FACT_FIELDS = (
     "id",
@@ -209,6 +212,10 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
             and observed == report_date
             and fact.get("metric") == ("stock_close" if field == "close" else "daily_return")
             and unit == ("USD/share" if field == "close" else "percent")
+            and isinstance(fact.get("value"), (int, float))
+            and not isinstance(fact.get("value"), bool)
+            and math.isfinite(fact["value"])
+            and (fact["value"] > 0 if field == "close" else abs(fact["value"]) <= 100)
         )
     if fact_id.startswith("index."):
         key = fact_id.removeprefix("index.").removesuffix(".change_percent")
@@ -289,8 +296,32 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
     return False
 
 
-def _valid_equity_pairs(facts_by_id: dict[str, dict[str, Any]]) -> bool:
+def _valid_equity_pairs(facts_by_id: dict[str, dict[str, Any]], payload: dict[str, Any]) -> bool:
     symbols = {match.group(1) for fact_id in facts_by_id if (match := EQUITY_ID.fullmatch(fact_id))}
+    equities_status = payload.get("source_status", {}).get("equities", {})
+    if equities_status.get("quality") == "ok" and not CORE_EQUITIES <= {symbol.upper() for symbol in symbols}:
+        return False
+    reviewed_movers = equities_status.get("reviewed_movers", [])
+    if not isinstance(reviewed_movers, list):
+        return False
+    mover_ids = {
+        claim_id
+        for section in payload.get("sections", [])
+        if section.get("key") == "movers"
+        for claim_id in section.get("claims", [])
+    }
+    if reviewed_movers and payload.get("source_status", {}).get("research", {}).get("quality") != "reviewed":
+        return False
+    if any(
+        not isinstance(row, dict)
+        or not re.fullmatch(r"[A-Z]{1,5}", str(row.get("ticker", "")))
+        or row.get("evidence_id") not in mover_ids
+        for row in reviewed_movers
+    ):
+        return False
+    allowed = CORE_EQUITIES | {row["ticker"] for row in reviewed_movers}
+    if {symbol.upper() for symbol in symbols} - allowed:
+        return False
     for symbol in symbols:
         close = facts_by_id.get(f"equity.{symbol}.close")
         change = facts_by_id.get(f"equity.{symbol}.change_percent")
@@ -334,6 +365,11 @@ def _valid_rate_and_asset_pairs(facts_by_id: dict[str, dict[str, Any]]) -> bool:
 
 
 def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
+    if any(
+        str(fact.get("id", "")).startswith("equity.") and not EQUITY_ID.fullmatch(str(fact.get("id")))
+        for fact in payload["facts"]
+    ):
+        return False
     if not any(
         fact.get("id") in FACT_LABELS or EQUITY_ID.fullmatch(str(fact.get("id"))) for fact in payload["facts"]
     ):
@@ -349,7 +385,7 @@ def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
     if not all(_valid_market_fact(fact, report_date) for fact in known_facts):
         return False
     facts_by_id = {fact["id"]: fact for fact in known_facts}
-    if not _valid_equity_pairs(facts_by_id):
+    if not _valid_equity_pairs(facts_by_id, payload):
         return False
     yahoo_indices = [
         fact for fact in known_facts if fact["id"].startswith("index.") and fact.get("quality") == "ok"
@@ -436,7 +472,10 @@ def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[s
             ("status", "revision", "reviewed_source_cutoff"),
         ),
         "source_status": {
-            key: _select(payload.get("source_status", {}).get(key, {}), ("quality", "reason"))
+            key: _select(
+                payload.get("source_status", {}).get(key, {}),
+                ("quality", "reason", "reviewed_movers") if key == "equities" else ("quality", "reason"),
+            )
             for key in ("rates", "macro", "quotes", "research", "cross_asset", "btc_spot", "equities")
             if key in payload.get("source_status", {})
         },

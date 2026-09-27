@@ -50,6 +50,7 @@ const YAHOO_INDEX_SOURCES = {
 };
 const EQUITY_ID = /^equity\.([a-z]{1,5})\.(close|change_percent)$/;
 const ALPACA_STOCK_BARS_URL = "https://docs.alpaca.markets/us/reference/stockbars";
+const CORE_EQUITIES = new Set(["MSFT", "AAPL", "NVDA", "AMZN", "GOOGL", "META"]);
 const MARKET_DAILY_GAPS = {
   rates_lag: "美债收益率当日变动", quotes: "指数行情", research: "研究解释", fred: "部分 FRED 数据",
   cross_asset: "布伦特、金银或比特币行情",
@@ -76,6 +77,7 @@ function validMarketDailyFact(id, fact, reportDate) {
   if (equity) {
     const [, symbol, field] = equity;
     return fact.observation_date === reportDate && fact.quality === "ok"
+      && (field === "close" ? fact.value > 0 : Math.abs(fact.value) <= 100)
       && fact.instrument === symbol.toUpperCase()
       && ((fact.source === "Yahoo Finance" && url === `https://finance.yahoo.com/quote/${symbol.toUpperCase()}/history/`)
         || (fact.source === "Alpaca SIP" && url === ALPACA_STOCK_BARS_URL))
@@ -132,6 +134,8 @@ function summarizeMarketDaily(payload) {
       || payload.quality_summary?.status === "fixture"
       || !/^daily-\d{4}-\d{2}-\d{2}$/.test(payload.run_id ?? "")
       || !Array.isArray(payload.facts)) return null;
+  if (payload.facts.some((fact) => String(fact.id ?? "").startsWith("equity.")
+      && !EQUITY_ID.test(fact.id))) return null;
   const date = payload.run_id.slice(6);
   const rows = [];
   for (const [id, label, unit] of MARKET_DAILY_FACTS) {
@@ -239,12 +243,16 @@ function summarizeMarketDaily(payload) {
       changeValue: change.value, observationDate: close.observationDate,
       sourceUrl: close.sourceUrl, sourceLabel: close.sourceLabel });
   }
-  const parts = payload.as_of
-    ? new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(payload.as_of))
-    : [];
-  const updatedDate = parts.length
-    ? ["year", "month", "day"].map((type) => parts.find((part) => part.type === type).value).join("-")
-    : date;
+  const equityStatus = payload.source_status?.equities;
+  if (equityStatus?.quality === "ok" && [...CORE_EQUITIES].some((symbol) => !equityRows.some((row) => row.symbol === symbol))) return null;
+  const reviewedMovers = equityStatus?.reviewed_movers ?? [];
+  const moverEvidence = new Set((payload.sections ?? []).filter((section) => section.key === "movers")
+    .flatMap((section) => section.claims ?? []));
+  if (!Array.isArray(reviewedMovers)
+    || (reviewedMovers.length && payload.source_status?.research?.quality !== "reviewed")
+    || reviewedMovers.some((row) => !/^[A-Z]{1,5}$/.test(row?.ticker ?? "") || !moverEvidence.has(row?.evidence_id))) return null;
+  const allowedEquities = new Set([...CORE_EQUITIES, ...reviewedMovers.map((row) => row.ticker)]);
+  if (equityRows.some((row) => !allowedEquities.has(row.symbol))) return null;
   const hasTextReport = Array.isArray(payload.report_formats)
     && payload.report_formats.includes("txt") && payload.report_formats.includes("md");
   const primaryClaims = claimSections
@@ -254,7 +262,8 @@ function summarizeMarketDaily(payload) {
     .filter((section) => !["drivers", "movers"].includes(section.key));
   const secondaryRows = rows.filter((row) => row.id.startsWith("macro."));
   return { date, rows, rateRows, crossAssetRows, equityRows, claims, claimSections, primaryClaims,
-    secondaryClaimSections, secondaryRows, gaps, hasTextReport, nextMorningRevision: updatedDate !== date,
+    secondaryClaimSections, secondaryRows, gaps, hasTextReport,
+    nextMorningRevision: payload.quality_summary?.revision === "next_morning_rechecked",
     historicalBackfill: payload.quality_summary?.revision === "historical_backfill" };
 }
 
@@ -324,6 +333,19 @@ function buildMarketDailyChartSvg(summary) {
   const firstRates = charts.findIndex((chart) => chart.title.startsWith("美债"));
   const firstCross = charts.findIndex((chart) => chart.title.startsWith("跨资产"));
   const moverInsertAt = firstRates >= 0 ? firstRates : firstCross >= 0 ? firstCross : charts.length;
+  const laggedRates = summary.rateRows.filter((row) => row.observationDate !== summary.date);
+  const addLaggedRates = () => {
+    if (!laggedRates.length) return;
+    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">美债较早观测值</text>`);
+    y += 30;
+    for (const row of laggedRates) {
+      const level = row.levelValue === null ? "收益率暂缺" : `${row.levelValue.toFixed(2)}%`;
+      const change = row.changeValue === null ? "日变动暂缺" : `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)} bp`;
+      parts.push(`<text x="54" y="${y}" fill="#715f52" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(level)} · ${escapeSvgText(change)} · 观测日 ${escapeSvgText(row.observationDate)}，非报告日</text>`);
+      y += 27;
+    }
+    y += 12;
+  };
   const addEquityPrices = () => {
     if (!summary.equityRows.length) return;
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">美股个股收盘价</text>`);
@@ -350,6 +372,7 @@ function buildMarketDailyChartSvg(summary) {
   };
   for (const [chartIndex, chart] of charts.entries()) {
     if (chartIndex === moverInsertAt) addMovers();
+    if (chartIndex === firstCross) addLaggedRates();
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">${escapeSvgText(chart.title)}（${escapeSvgText(chart.unit)}）</text>`);
     y += 34;
     for (const row of chart.rows) {
@@ -368,6 +391,7 @@ function buildMarketDailyChartSvg(summary) {
     y += 20;
   }
   if (moverInsertAt === charts.length) addMovers();
+  if (firstCross < 0) addLaggedRates();
   if (summary.crossAssetRows.length) {
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="18" font-weight="700">跨资产价格</text>`);
     y += 27;
@@ -416,6 +440,7 @@ function buildMarketDailyChartSvg(summary) {
 
 function formatMarketDailyStatus(summary) {
   return `${summary.date} 美东报告日 · 逐项显示原始观测日。`
+    + (summary.historicalBackfill ? " 事后整理。" : "")
     + (summary.nextMorningRevision ? " 次日核实更新。" : "")
     + (summary.gaps.length ? ` 尚缺：${summary.gaps.join("、")}。` : "");
 }

@@ -132,6 +132,31 @@ test("image includes verified stock quotes and every substantive report section"
   assert.doesNotMatch(svg, /example\.test|finance\.yahoo\.com|fred\.stlouisfed\.org|来源/);
 });
 
+test("market daily does not accept malformed or impossible stock quote facts", () => {
+  const common = { instrument: "MSFT", source: "Yahoo Finance", quality: "ok",
+    source_url: "https://finance.yahoo.com/quote/MSFT/history/", observation_date: "2026-09-25" };
+  const pair = [
+    { ...common, id: "equity.msft.close", metric: "stock_close", unit: "USD/share", value: 200.5 },
+    { ...common, id: "equity.msft.change_percent", metric: "daily_return", unit: "percent", value: 1.25 },
+  ];
+  for (const facts of [
+    [...pair, { ...common, id: "equity.msft.foo", value: 1 }],
+    [{ ...pair[0], value: -1 }, pair[1]],
+    [pair[0], { ...pair[1], value: 999 }],
+  ]) assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts }), null);
+  const akam = pair.map((row) => ({ ...row, id: row.id.replace("msft", "akam"), instrument: "AKAM",
+    source_url: "https://finance.yahoo.com/quote/AKAM/history/" }));
+  assert.equal(summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts: akam }), null);
+});
+
+test("backfill status is not presented as a next-morning verification", () => {
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25",
+    as_of: "2026-09-27T12:00:00+00:00", quality_summary: { revision: "historical_backfill" },
+    facts: [{ id: "index.spx.change_percent", value: 0.51, quality: "reviewed", observation_date: "2026-09-25", source_url: "https://example.test/close" }] });
+  assert.match(formatMarketDailyStatus(summary), /事后整理/);
+  assert.doesNotMatch(formatMarketDailyStatus(summary), /次日核实更新/);
+});
+
 test("market daily status calls a report date a report date, including missing sources", () => {
   assert.equal(
     formatMarketDailyStatus({ date: "2026-09-23", gaps: ["指数行情"] }),
@@ -148,7 +173,7 @@ test("market daily hides fixture and invalid source data", () => {
 test("market daily shows reviewed index returns, Treasury rates and cited explanations", () => {
   const summary = summarizeMarketDaily({
     schema_version: "1.0", run_id: "daily-2026-09-23",
-    as_of: "2026-09-24T08:30:00+00:00", quality_summary: { status: "ok" },
+    as_of: "2026-09-24T08:30:00+00:00", quality_summary: { status: "ok", revision: "next_morning_rechecked" },
     report_formats: ["md", "txt"],
     missing_sources: [],
     facts: [
@@ -381,7 +406,8 @@ test("chart image uses reviewed report-date facts with dates and units but no so
   assert.match(svg, /\+15\.00 bp/);
   assert.match(svg, /观测日 2026-09-23/);
   assert.doesNotMatch(svg, /abcnews\.com|home\.treasury\.gov|来源/);
-  assert.doesNotMatch(svg, /2026-09-22|FRED 原始数据|<script>/);
+  assert.match(svg, /2026-09-22，非报告日/);
+  assert.doesNotMatch(svg, /FRED 原始数据|<script>/);
 });
 
 test("chart image has no invented marks when no report-date chart facts exist", () => {
@@ -391,4 +417,15 @@ test("chart image has no invented marks when no report-date chart facts exist", 
     ],
   });
   assert.equal(buildMarketDailyChartSvg?.(summary) ?? null, null);
+});
+
+test("image discloses lagged Treasury readings without plotting them as same-day bars", () => {
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts: [
+    { id: "index.spx.change_percent", value: 0.5, quality: "reviewed", observation_date: "2026-09-25", source_url: "https://example.test/close" },
+    { id: "treasury.2y.level_percent", metric: "yield_level", value: 4.25, unit: "percent", quality: "lagged", observation_date: "2026-09-24", source_url: "https://fred.stlouisfed.org/series/DGS2" },
+  ] });
+  const svg = buildMarketDailyChartSvg(summary);
+  assert.match(svg, /2 年期美债：4\.25%/);
+  assert.match(svg, /观测日 2026-09-24，非报告日/);
+  assert.doesNotMatch(svg, /美债收益率水平（%）/);
 });

@@ -218,6 +218,14 @@ def test_equity_pairs_appear_in_public_json_and_both_markdown_editions(tmp_path)
         )
 
 
+def test_complete_equity_status_requires_six_core_symbols(tmp_path):
+    payload = _payload()
+    payload["source_status"]["equities"] = {"quality": "ok"}
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
 def test_equity_price_without_matching_return_is_rejected(tmp_path):
     payload = _payload()
     payload["facts"].append(
@@ -236,6 +244,76 @@ def test_equity_price_without_matching_return_is_rejected(tmp_path):
     source, manifest = _source(tmp_path, payload)
     with pytest.raises(ValueError, match="market date mismatch"):
         import_report(source, tmp_path / "site", manifest)
+
+
+@pytest.mark.parametrize(
+    "bad_id,bad_value",
+    [
+        ("equity.msft.foo", 200.5),
+        ("equity.msft.close", -200.5),
+        ("equity.msft.change_percent", 999),
+    ],
+)
+def test_invalid_equity_ids_or_values_are_rejected(tmp_path, bad_id, bad_value):
+    payload = _payload()
+    for field, value, metric, unit in (
+        ("close", 200.5, "stock_close", "USD/share"),
+        ("change_percent", 1.25, "daily_return", "percent"),
+    ):
+        payload["facts"].append(
+            {
+                "id": f"equity.msft.{field}",
+                "instrument": "MSFT",
+                "value": value,
+                "metric": metric,
+                "unit": unit,
+                "source": "Yahoo Finance",
+                "quality": "ok",
+                "source_url": "https://finance.yahoo.com/quote/MSFT/history/",
+                "observation_date": "2026-09-19",
+            }
+        )
+    if bad_id == "equity.msft.foo":
+        payload["facts"].append({"id": bad_id, "value": bad_value})
+    else:
+        next(row for row in payload["facts"] if row["id"] == bad_id)["value"] = bad_value
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
+def test_mover_quote_needs_audited_ticker_evidence(tmp_path):
+    payload = _payload()
+    for field, value, metric, unit in (
+        ("close", 113.94, "stock_close", "USD/share"),
+        ("change_percent", 3.2, "daily_return", "percent"),
+    ):
+        payload["facts"].append(
+            {
+                "id": f"equity.akam.{field}",
+                "instrument": "AKAM",
+                "value": value,
+                "metric": metric,
+                "unit": unit,
+                "source": "Yahoo Finance",
+                "quality": "ok",
+                "source_url": "https://finance.yahoo.com/quote/AKAM/history/",
+                "observation_date": "2026-09-19",
+            }
+        )
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+    payload["source_status"]["research"] = {"quality": "reviewed"}
+    payload["source_status"]["equities"] = {
+        "quality": "degraded",
+        "reviewed_movers": [
+            {"ticker": "AKAM", "evidence_id": "index.spx.change_percent"},
+        ],
+    }
+    payload["sections"] = [{"key": "movers", "claims": ["index.spx.change_percent"]}]
+    source, manifest = _source(tmp_path, payload)
+    import_report(source, tmp_path / "site", manifest)
 
 
 def test_markdown_explains_unavailable_research_without_implying_a_source_exists(tmp_path):
