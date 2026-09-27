@@ -6,7 +6,7 @@
 
 | 仓库 | 职责 |
 |---|---|
-| `market-intel-pages` | 导入明确可公开的报告，维护近期快照、模型解读、来源核验和静态网站 |
+| `quant-intel-pages` | 导入明确可公开的报告，维护近期快照、模型解读、来源核验和静态网站 |
 | `quant-intel-platform` | 提供行情处理和报告生产能力 |
 | `quant-intel-deploy` | 私有部署配置、生产定时器和恢复任务 |
 
@@ -107,13 +107,13 @@ python3 scripts/import_reports.py \
 
 ```bash
 python3 scripts/pipeline_health.py \
-  --reports data/reports.json \
+  --reports artifacts/public/data/reports.json \
   --expected-date YYYY-MM-DD \
   --strict
 python3 scripts/generate_insights.py \
-  --reports data/reports.json \
-  --history data/insights.json \
-  --output data/insights.json \
+  --reports artifacts/public/data/reports.json \
+  --history artifacts/public/data/insights.json \
+  --output artifacts/public/data/insights.json \
   --archive-dir /path/to/private-archive
 python3 scripts/build_site.py --output /tmp/quant-market-intel-check
 ```
@@ -157,7 +157,7 @@ python3 scripts/build_site.py --output /tmp/quant-market-intel-check
 
 ```bash
 python3 scripts/compare_models.py \
-  --reports data/reports.json \
+  --reports artifacts/public/data/reports.json \
   --output-dir /path/to/private-comparison
 ```
 

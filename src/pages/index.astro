@@ -5,7 +5,7 @@ import { renderMarkdown } from '../lib/markdown.mjs';
 import { formatEvidenceLine } from '../lib/evidence.mjs';
 import { buildEveningNotes } from '../lib/evening-notes.mjs';
 import { factSource, uniqueFactSources } from '../lib/market-sources.mjs';
-import marketDailyUtils from '../../market-daily-utils.js';
+import marketDailyUtils from '../lib/market-daily-utils.js';
 
 const reports = loadReports();
 const summaries = loadSummaries(reports).sort((a, b) => b.date.localeCompare(a.date));

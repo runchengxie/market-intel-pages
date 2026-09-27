@@ -1,5 +1,5 @@
 {
-  "name": "market-intel-pages",
+  "name": "quant-intel-pages",
   "private": true,
   "engines": {
     "node": ">=22.12.0"

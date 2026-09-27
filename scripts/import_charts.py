@@ -12,9 +12,11 @@ from tempfile import NamedTemporaryFile
 try:
     from .chart_contract import validate_public_chart
     from .chart_review import validate_review_receipt
+    from .public_paths import public_snapshot_root
 except ImportError:
     from chart_contract import validate_public_chart
     from chart_review import validate_review_receipt
+    from public_paths import public_snapshot_root
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
@@ -57,14 +59,15 @@ def import_charts(
         raise ValueError("review receipt must remain outside public repository")
     reviewed = validate_review_receipt(payload, json.loads(review.read_text(encoding="utf-8")))
     report_id = payload["report_id"]
-    index = json.loads((root / "data/reports.json").read_text(encoding="utf-8"))
+    public_root = public_snapshot_root(root)
+    index = json.loads((public_root / "data/reports.json").read_text(encoding="utf-8"))
     if index.get("schema_version") != "market_intel_pages.reports.v1" or not isinstance(
         index.get("reports"), list
     ):
         raise ValueError("invalid report index")
     if report_id not in {item.get("id") for item in index["reports"] if isinstance(item, dict)}:
         raise ValueError("chart identity is not in the public report index")
-    destination = root / "data" / "charts" / f"{report_id}.json"
+    destination = public_root / "data" / "charts" / f"{report_id}.json"
     old = destination.read_bytes() if destination.is_file() else None
     data = (json.dumps(payload, ensure_ascii=False, indent=2, allow_nan=False) + "\n").encode()
     changed = int(old != data)

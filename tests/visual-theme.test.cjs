@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-const css = fs.readFileSync(path.join(__dirname, "../styles.css"), "utf8");
+const css = fs.readFileSync(path.join(__dirname, "../src/legacy/styles.css"), "utf8");
 
 function palette(selector) {
   const start = css.indexOf(`${selector} {`);

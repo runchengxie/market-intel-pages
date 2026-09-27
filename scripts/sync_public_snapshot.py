@@ -7,6 +7,11 @@ import json
 import shutil
 from pathlib import Path
 
+try:
+    from .public_paths import public_snapshot_root, safe_public_report_path
+except ImportError:
+    from public_paths import public_snapshot_root, safe_public_report_path
+
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 PUBLIC_SESSION_COUNT = 5
@@ -66,7 +71,7 @@ def _archive_reports(root: Path, archive_dir: Path, reports: list[dict]) -> None
         source_url = report.get("source_url")
         if not source_url:
             raise ValueError(f"report {report.get('id')} has no source_url")
-        source = _safe_report_path(root, source_url)
+        source = safe_public_report_path(root, source_url)
         if not source.is_file():
             raise ValueError(f"report Markdown is missing: {source_url}")
         destination = _safe_report_path(archive_dir, source_url)
@@ -80,8 +85,9 @@ def sync_snapshot(root: Path, archive_dir: Path) -> None:
     if archive_dir == root or archive_dir.is_relative_to(root):
         raise ValueError("archive directory must be outside the repository")
 
-    report_index_path = root / "data/reports.json"
-    summary_index_path = root / "data/daily_summaries.json"
+    public_root = public_snapshot_root(root)
+    report_index_path = public_root / "data/reports.json"
+    summary_index_path = public_root / "data/daily_summaries.json"
     incoming_report_index = _read_json(report_index_path)
     incoming_summary_index = _read_json(summary_index_path)
     incoming_reports = _validate_index(incoming_report_index, REPORT_SCHEMA, "reports")
@@ -149,8 +155,9 @@ def _publish_snapshot(
     incoming_report_index: dict,
     incoming_summary_index: dict,
 ) -> None:
-    report_index_path = root / "data/reports.json"
-    summary_index_path = root / "data/daily_summaries.json"
+    public_root = public_snapshot_root(root)
+    report_index_path = public_root / "data/reports.json"
+    summary_index_path = public_root / "data/daily_summaries.json"
     session_dates = sorted(
         {report["date"] for report in all_reports},
         reverse=True,
@@ -168,7 +175,7 @@ def _publish_snapshot(
 
     for report in public_reports:
         source = _safe_report_path(archive_dir, report["source_url"])
-        destination = _safe_report_path(root, report["source_url"])
+        destination = safe_public_report_path(root, report["source_url"])
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
 
@@ -186,10 +193,10 @@ def _publish_snapshot(
     _write_json(summary_index_path, public_summary_index)
 
     referenced = {report.get("source_url") for report in public_reports}
-    reports_dir = root / "reports"
+    reports_dir = public_root / "reports"
     if reports_dir.exists():
         for markdown in reports_dir.glob("*.md"):
-            relative = markdown.relative_to(root).as_posix()
+            relative = markdown.relative_to(public_root).as_posix()
             if relative not in referenced:
                 markdown.unlink()
 

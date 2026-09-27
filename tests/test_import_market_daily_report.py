@@ -65,8 +65,9 @@ def test_import_report_writes_public_json_and_markdown(tmp_path):
     output = tmp_path / "site"
     result = import_report(source, output, manifest)
     assert result == "2026-09-19"
-    assert (output / "data/market_daily_report.json").exists()
-    assert "SPX rose" in (output / "reports/2026-09-19-market-daily.md").read_text()
+    assert (output / "artifacts/public/data/market_daily_report.json").is_file()
+    assert (output / "artifacts/public/data/market_daily_report.json").exists()
+    assert "SPX rose" in (output / "artifacts/public/reports/2026-09-19-market-daily.md").read_text()
 
 
 def test_import_report_writes_reference_free_markdown_with_all_treasury_tenors(tmp_path):
@@ -94,8 +95,8 @@ def test_import_report_writes_reference_free_markdown_with_all_treasury_tenors(t
     output = tmp_path / "site"
     import_report(source, output, manifest)
 
-    original = (output / "reports/2026-09-19-market-daily.md").read_text()
-    reading = (output / "reports/2026-09-19-market-daily-no-citations.md").read_text()
+    original = (output / "artifacts/public/reports/2026-09-19-market-daily.md").read_text()
+    reading = (output / "artifacts/public/reports/2026-09-19-market-daily-no-citations.md").read_text()
     assert "[来源1](https://example.test)" in original
     assert "证据：" in original
     assert "| 来源 |" in original
@@ -117,7 +118,7 @@ def test_import_report_writes_reference_free_markdown_with_all_treasury_tenors(t
         < reading.index("## 美债收益率")
         < reading.index("## 布伦特、金银与比特币")
     )
-    plain = (output / "reports/2026-09-19-market-daily.txt").read_text()
+    plain = (output / "artifacts/public/reports/2026-09-19-market-daily.txt").read_text()
     assert (
         plain.index("一、美股市场表现")
         < plain.index("二、重点个股")
@@ -144,7 +145,7 @@ def test_markdown_keeps_treasury_level_when_daily_change_is_missing(tmp_path):
     output = tmp_path / "site"
     import_report(source, output, manifest)
     for suffix in ("", "-no-citations"):
-        report = (output / f"reports/2026-09-19-market-daily{suffix}.md").read_text()
+        report = (output / f"artifacts/public/reports/2026-09-19-market-daily{suffix}.md").read_text()
         assert "| 2 年期 | 4.25% | — | 2026-09-19 |" in report
 
 
@@ -159,7 +160,7 @@ def test_markdown_includes_public_source_status_without_private_metadata(tmp_pat
     source, manifest = _source(tmp_path, payload)
     output = tmp_path / "site"
     import_report(source, output, manifest)
-    markdown = (output / "reports/2026-09-19-market-daily.md").read_text()
+    markdown = (output / "artifacts/public/reports/2026-09-19-market-daily.md").read_text()
     assert "## 数据质量与核验说明" in markdown
     assert "| 指数行情 | 已核实 | 目标交易日数据齐全 |" in markdown
     assert "| 研究材料 | 已审阅 | 来源已逐条核查 |" in markdown
@@ -178,7 +179,7 @@ def test_reference_free_backfill_keeps_only_short_notice(tmp_path):
     source, manifest = _source(tmp_path, payload)
     output = tmp_path / "site"
     import_report(source, output, manifest)
-    reading = (output / "reports/2026-09-19-market-daily-no-citations.md").read_text()
+    reading = (output / "artifacts/public/reports/2026-09-19-market-daily-no-citations.md").read_text()
     assert "事后整理" in reading
     assert "历史补报：" not in reading
     assert "新闻资料截止：" not in reading
@@ -208,10 +209,10 @@ def test_equity_pairs_appear_in_public_json_and_both_markdown_editions(tmp_path)
     source, manifest = _source(tmp_path, payload)
     output = tmp_path / "site"
     import_report(source, output, manifest)
-    public = json.loads((output / "data/market_daily_report.json").read_text())
+    public = json.loads((output / "artifacts/public/data/market_daily_report.json").read_text())
     assert len([row for row in public["facts"] if row["id"].startswith("equity.msft.")]) == 2
     for suffix in ("", "-no-citations"):
-        report = (output / f"reports/2026-09-19-market-daily{suffix}.md").read_text()
+        report = (output / f"artifacts/public/reports/2026-09-19-market-daily{suffix}.md").read_text()
         assert "| MSFT | 200.50 美元 | +1.25% | 2026-09-19 |" in report
         assert (
             report.index("## 美股市场表现") < report.index("## 美股个股行情") < report.index("## 美债收益率")
@@ -345,7 +346,7 @@ def test_markdown_explains_unavailable_research_without_implying_a_source_exists
     source, manifest = _source(tmp_path, payload)
     output = tmp_path / "site"
     import_report(source, output, manifest)
-    markdown = (output / "reports/2026-09-19-market-daily.md").read_text()
+    markdown = (output / "artifacts/public/reports/2026-09-19-market-daily.md").read_text()
     assert "| 研究材料 | 有缺项 | 研究材料尚未接入，不提供未经核实的解释 |" in markdown
 
 
@@ -363,7 +364,7 @@ def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp
         source, manifest = _source(work, payload)
         import_report(source, output, manifest)
 
-    history = json.loads((output / "data/market_daily_reports.json").read_text())
+    history = json.loads((output / "artifacts/public/data/market_daily_reports.json").read_text())
     assert [row["run_id"] for row in history["reports"]] == [
         "daily-2026-09-25",
         "daily-2026-09-24",
@@ -371,7 +372,10 @@ def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp
         "daily-2026-09-22",
         "daily-2026-09-21",
     ]
-    assert json.loads((output / "data/market_daily_report.json").read_text())["run_id"] == "daily-2026-09-25"
+    assert (
+        json.loads((output / "artifacts/public/data/market_daily_report.json").read_text())["run_id"]
+        == "daily-2026-09-25"
+    )
 
     work = tmp_path / "revision"
     work.mkdir()
@@ -386,9 +390,12 @@ def test_import_report_keeps_five_dates_and_backfill_does_not_replace_latest(tmp
     )
     source, manifest = _source(work, payload)
     import_report(source, output, manifest)
-    history = json.loads((output / "data/market_daily_reports.json").read_text())
+    history = json.loads((output / "artifacts/public/data/market_daily_reports.json").read_text())
     assert history["reports"][1]["quality_summary"]["revision"] == "historical_backfill"
-    assert json.loads((output / "data/market_daily_report.json").read_text())["run_id"] == "daily-2026-09-25"
+    assert (
+        json.loads((output / "artifacts/public/data/market_daily_report.json").read_text())["run_id"]
+        == "daily-2026-09-25"
+    )
 
 
 def test_import_report_rejects_credentials(tmp_path):
@@ -430,7 +437,7 @@ def test_import_report_renders_sourced_macro_facts_for_new_york_date(tmp_path):
     source, manifest = _source(tmp_path, payload)
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
-    markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-23-market-daily.md").read_text()
     assert "| 10 年期 | — | -5.00 bp | 2026-09-23 | [FRED]" in markdown
     assert "| CPI 同比 | 3.40% | 2026-08-01 | [FRED]" in markdown
     assert "| 2026-08-01 |" in markdown
@@ -483,7 +490,7 @@ def test_import_report_renders_official_rates_and_reviewed_indexes(tmp_path):
     )
     source, manifest = _source(tmp_path, payload)
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
-    markdown = (tmp_path / "site/reports/2026-09-23-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-23-market-daily.md").read_text()
     assert "报告生成时间：2026-09-24T08:30:00+00:00" in markdown
     assert "| 标普 500 | -0.80% | 2026-09-23 | [核实报道]" in markdown
     assert "| 10 年期 | — | +15.00 bp | 2026-09-23 | [美国财政部]" in markdown
@@ -622,7 +629,7 @@ def test_import_report_accepts_complete_same_day_yahoo_index_set(tmp_path):
     source, manifest = _source(tmp_path, payload)
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-24-market-daily.md").read_text()
     assert "| 标普 500 | -0.02% | 2026-09-24 | [Yahoo Finance]" in markdown
 
 
@@ -653,8 +660,8 @@ def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
     source, manifest = _source(tmp_path, _cross_asset_payload())
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
-    public = json.loads((tmp_path / "site/data/market_daily_report.json").read_text())
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-24-market-daily.md").read_text()
+    public = json.loads((tmp_path / "site/artifacts/public/data/market_daily_report.json").read_text())
 
     assert "| 2 年期 | 4.15% | +5.00 bp | 2026-09-24 | [美国财政部]" in markdown
     assert "| 布伦特期货 | 71.25 美元/桶 | +1.20% | 2026-09-24 | [Yahoo Finance]" in markdown
@@ -744,7 +751,7 @@ def test_import_report_accepts_separate_fmp_btc_spot_pair(tmp_path):
     source, manifest = _source(tmp_path, payload)
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-24-market-daily.md").read_text()
     assert "| BTC/USD 现货 | 84,093.13 美元/BTC | -0.35% | 2026-09-24 | [FMP]" in markdown
     assert "| CME 比特币期货 |" in markdown
 
@@ -812,7 +819,7 @@ def test_import_report_accepts_authorized_btc_spot_fallbacks(
     source, manifest = _source(tmp_path, payload)
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-24-market-daily.md").read_text()
     assert f"[{label}]({source_url})" in markdown
 
 
@@ -876,7 +883,7 @@ def test_partial_cross_asset_gap_names_only_unavailable_contract(tmp_path):
     source, manifest = _source(tmp_path, payload)
 
     import_report(source, tmp_path / "site", manifest)
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-24-market-daily.md").read_text()
     assert "尚缺：比特币期货行情。" in markdown
     assert "尚缺：布伦特、金银或比特币行情。" not in markdown
 
@@ -890,7 +897,7 @@ def test_import_report_labels_late_historical_market_facts(tmp_path):
 
     import_report(source, tmp_path / "site", manifest)
 
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-24-market-daily.md").read_text()
     assert "历史补报" in markdown
     assert "布伦特期货" in markdown
     payload["quality_summary"].pop("revision")
@@ -962,7 +969,7 @@ def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_pa
     source, manifest = _source(tmp_path, payload)
 
     assert import_report(source, tmp_path / "site", manifest) == "2026-09-23"
-    report = (tmp_path / "site/reports/2026-09-23-market-daily.txt").read_text()
+    report = (tmp_path / "site/artifacts/public/reports/2026-09-23-market-daily.txt").read_text()
     assert "报告生成时间：2026-09-24T08:30:00+00:00" in report
     assert "一、美股市场表现" in report
     assert "标普 500 日涨跌：-0.80%（观测日 2026-09-23）" in report
@@ -1010,7 +1017,7 @@ def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_
     source, manifest = _source(tmp_path, payload)
     import_report(source, tmp_path / "site", manifest)
 
-    report = (tmp_path / "site/reports/2026-09-19-market-daily.txt").read_text()
+    report = (tmp_path / "site/artifacts/public/reports/2026-09-19-market-daily.txt").read_text()
     assert "五、市场驱动因素" in report
     assert "七、公司新闻" in report
     assert report.index("五、市场驱动因素") < report.index("收盘报道将跌势")
@@ -1018,7 +1025,7 @@ def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_
     assert report.count("收盘报道将跌势") == 1
     assert report.count("公司公告披露") == 1
 
-    markdown = (tmp_path / "site/reports/2026-09-19-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-19-market-daily.md").read_text()
     headings = [
         f"## {title}"
         for title in (
@@ -1038,7 +1045,7 @@ def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_
 def test_markdown_unclassified_claim_keeps_evidence_ids(tmp_path):
     source, manifest = _source(tmp_path, _payload())
     import_report(source, tmp_path / "site", manifest)
-    markdown = (tmp_path / "site/reports/2026-09-19-market-daily.md").read_text()
+    markdown = (tmp_path / "site/artifacts/public/reports/2026-09-19-market-daily.md").read_text()
     assert "## 其他已核实内容" in markdown
     assert "证据：`index.spx.change_percent`" in markdown
 
@@ -1059,7 +1066,7 @@ def test_import_requires_matching_public_manifest_and_omits_private_fields(tmp_p
     source, manifest = _source(tmp_path, payload)
     output = tmp_path / "site"
     assert import_report(source, output, manifest) == "2026-09-19"
-    public = (output / "data/market_daily_report.json").read_text()
+    public = (output / "artifacts/public/data/market_daily_report.json").read_text()
     assert json.loads(public)["report_formats"] == ["md", "txt"]
     assert "private_research_draft" not in public
     assert "private_passage" not in public

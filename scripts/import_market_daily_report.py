@@ -927,14 +927,20 @@ def _text_report(payload: dict[str, Any]) -> str:
 
 
 def import_report(source: Path, root: Path, manifest_path: Path) -> str:
+    try:
+        from .public_paths import public_snapshot_root
+    except ImportError:
+        from public_paths import public_snapshot_root
+
     manifest = _public_manifest(source, manifest_path)
     payload = _public_payload(_read(source), manifest)
     report_date = _date(payload)
-    data_path = root / "data/market_daily_report.json"
-    history_path = root / "data/market_daily_reports.json"
-    report_path = root / f"reports/{report_date}-market-daily.md"
-    reading_path = root / f"reports/{report_date}-market-daily-no-citations.md"
-    text_path = root / f"reports/{report_date}-market-daily.txt"
+    public_root = public_snapshot_root(root)
+    data_path = public_root / "data/market_daily_report.json"
+    history_path = public_root / "data/market_daily_reports.json"
+    report_path = public_root / f"reports/{report_date}-market-daily.md"
+    reading_path = public_root / f"reports/{report_date}-market-daily-no-citations.md"
+    text_path = public_root / f"reports/{report_date}-market-daily.txt"
     if history_path.is_file():
         previous = json.loads(history_path.read_text(encoding="utf-8"))
         if previous.get("schema_version") != "market_intel_pages.us_daily_history.v1" or not isinstance(

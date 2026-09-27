@@ -4,6 +4,8 @@ import unittest
 from datetime import datetime
 from pathlib import Path
 
+import pytest
+
 from scripts.import_reports import import_reports
 from scripts.pipeline_health import health_report
 
@@ -13,13 +15,13 @@ class PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
             root, source, archive = p / "site", p / "source", p / "archive"
-            (root / "data").mkdir(parents=True)
-            (root / "reports").mkdir()
+            (root / "artifacts/public/data").mkdir(parents=True)
+            (root / "artifacts/public/reports").mkdir()
             source.mkdir()
-            (root / "data/reports.json").write_text(
+            (root / "artifacts/public/data/reports.json").write_text(
                 json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": []})
             )
-            (root / "data/daily_summaries.json").write_text(
+            (root / "artifacts/public/data/daily_summaries.json").write_text(
                 json.dumps({"schema_version": "market_intel_pages.daily_summaries.v1", "summaries": []})
             )
             entries = []
@@ -40,7 +42,7 @@ class PipelineTests(unittest.TestCase):
                 )
             )
             import_reports(root, manifest, archive, apply=True)
-            self.assertFalse((root / "reports/2026-09-01-evening.md").exists())
+            self.assertFalse((root / "artifacts/public/reports/2026-09-01-evening.md").exists())
             (source / "1.md").write_text(
                 "# 收盘\n生成时间: 2026-09-01 19:00\n## 盘面\n更正版本。\n", encoding="utf-8"
             )
@@ -102,13 +104,13 @@ class PipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory)
             root, source, archive = p / "site", p / "source", p / "archive"
-            (root / "data").mkdir(parents=True)
-            (root / "reports").mkdir()
+            (root / "artifacts/public/data").mkdir(parents=True)
+            (root / "artifacts/public/reports").mkdir()
             source.mkdir()
-            (root / "data/reports.json").write_text(
+            (root / "artifacts/public/data/reports.json").write_text(
                 json.dumps({"schema_version": "market_intel_pages.reports.v1", "reports": []})
             )
-            (root / "data/daily_summaries.json").write_text(
+            (root / "artifacts/public/data/daily_summaries.json").write_text(
                 json.dumps({"schema_version": "market_intel_pages.daily_summaries.v1", "summaries": []})
             )
             (source / "report.md").write_text(
@@ -126,12 +128,15 @@ class PipelineTests(unittest.TestCase):
             )
             result = import_reports(root, manifest, archive, apply=False)
             self.assertEqual(1, result["changed"])
-            self.assertEqual([], json.loads((root / "data/reports.json").read_text())["reports"])
+            self.assertEqual(
+                [], json.loads((root / "artifacts/public/data/reports.json").read_text())["reports"]
+            )
             import_reports(root, manifest, archive, apply=True)
+            self.assertTrue((root / "artifacts/public/data/reports.json").is_file())
             self.assertTrue((archive / "reports/2026-09-18-evening.md").exists())
-            before = (root / "data/reports.json").read_bytes()
+            before = (root / "artifacts/public/data/reports.json").read_bytes()
             self.assertEqual(0, import_reports(root, manifest, archive, apply=True)["changed"])
-            self.assertEqual(before, (root / "data/reports.json").read_bytes())
+            self.assertEqual(before, (root / "artifacts/public/data/reports.json").read_bytes())
 
     def test_import_rejects_unsafe_source_before_any_write(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -153,3 +158,10 @@ class PipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_public_report_path_rejects_traversal_before_reading(tmp_path):
+    from scripts.public_paths import safe_public_report_path
+
+    with pytest.raises(ValueError):
+        safe_public_report_path(tmp_path, "reports/../secret.md")

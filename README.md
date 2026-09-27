@@ -1,156 +1,47 @@
-# Quant Market Intel
+# Quant 市场情报
 
-Quant 市场情报是一个静态报告阅读网站。首页按北京时间 07:00 美股收盘复盘、19:00 亚洲市场收盘复盘组织入口；原晨报与晚报框架、每日简评和带来源的市场解读继续留在归档中。公开页面和仓库快照保留最近五个有报告的日期，完整报告与历次解读存放在仓库外的私有归档中。
+这是一个静态日报网站。早上看美股收盘，晚上看亚洲市场收盘；旧晨报和晚报仍可在归档中阅读。网页展示最近五个有报告的日期，并标出数据的原始观测日、来源和缺项。报告仅供研究参考。
 
-[打开公开网站](https://runchengxie.github.io/market-intel-pages/)。
+[打开网站](https://runchengxie.github.io/quant-intel-pages/)
 
-## 已有功能
+## 能看到什么
 
-- 按两个现行 session 阅读报告，并按日期和原晨晚报类型检索历史报告、展开正文或查看 Markdown 原文。美股首页依次展示指数、已核实重点个股、美债四期限收益率和跨资产行情；同页可展开图表并按需下载 PNG。最近五份美股日报另有无来源链接和证据编号的 Markdown 阅读版，保留数值、观测日与缺项说明；需要核查时仍以 Markdown 原文为准。两个 Markdown 链接均提供源文件，不是另一个网页视图。
-- 将晨报与此前最近的一份晚报配对，生成一段每日简评。报告目标日期可以与生成日期不同，配对时同时检查日期和时间。
-- 根据配对报告及截止时间内最近五个报告日期的材料生成市场解读，展示变化、分歧、观察条件和逐条来源。
-- 校验解读中的引用和数字，并用后续首份符合条件的晚报核对观察条件。原解读和后续结果分别记录。
-- 显示原报告时间、数据缺项和生成状态。补发材料及晚于材料截止时间三小时生成的解读标为历史回放。
-- 展示最近一次美国宏观与利率日报的 FRED 指标、观测日、来源和缺项；该日期独立于 A 股晨晚报筛选。
-- 从明确允许公开的 manifest 导入报告，预览变更后再写入公开快照和私有归档。
+- 07:00 美股收盘复盘：指数、已核实重点个股、美债收益率及日变动、布伦特原油、金银和比特币行情。
+- 19:00 亚洲市场收盘复盘：A 股与亚洲市场表现、六维观察、图表和次日验证。
+- 原报告、Markdown 阅读版和纯文本下载。需要核对数字时，以带来源的原报告为准。
 
-窗口按实际存在的报告日期计算。某日只有晚报也会占用一个日期，五个日期的上限不代表最近五个交易日的数据已经齐全。
+页面的 07:00 和 19:00 是北京时间的发布目标，并不保证每次准点或每项数据齐全。请以页面显示的实际生成时间、观测日和数据状态判断新鲜度。五个日期的窗口也不表示五个交易日的数据都已齐全。
 
-## 项目边界
+## 快速预览
 
-本仓库负责报告导入、公开快照、模型解读、静态展示和 GitHub Pages 发布。相邻的 `quant-intel-platform` 负责行情与报告能力，私有仓库 `quant-intel-deploy` 维护生产部署和定时任务。后两者位于服务器 `/home/richard/code/quant/` 下，三个仓库独立管理，本项目没有 Git submodule。
-
-Pages 部署成功只说明网站构建和发布完成。数据是否及时，应查看页面中的原报告时间与数据状态。上游交接方式、已知缺口和运行记录见[每日生成与维护说明](docs/daily-generation-options.md)。
-
-## 本地预览
-
-构建脚本先用 Python 标准库审核公开快照，再调用 Astro 生成首页和逐期静态页。需要 Node.js 24 与锁定依赖。下面的输出目录专用于预览，构建时会重新创建，请勿指向已有业务数据的目录。
+准备 Python 3.11、Node.js 24 和 npm。在仓库根目录执行：
 
 ```bash
 npm ci
 preview_root=$(mktemp -d /tmp/qmi-preview.XXXXXX)
-python3 scripts/build_site.py --output "$preview_root/market-intel-pages"
+python3 scripts/build_site.py --output "$preview_root/quant-intel-pages"
 python3 -m http.server 8000 --directory "$preview_root"
 ```
 
-打开 <http://localhost:8000/market-intel-pages/>。构建产物内链接按 GitHub Pages `/market-intel-pages/` 生成，构建目录必须位于仓库外。直接检查静态 HTML 可运行 `npm run build`，其 `dist/` 仅供开发验证。
+然后打开 <http://localhost:8000/quant-intel-pages/>。输出目录由 `mktemp` 新建；构建会重新创建指定目录，请勿改成存放业务数据的路径。只想检查 Astro 页面时，可运行 `npm run build`。
 
-## 导入与归档
+## 到哪里找
 
-在独立任务工作树中，先预览上游提供的公开报告清单：
-
-```bash
-python3 scripts/import_reports.py \
-  --manifest /path/to/public/manifest.json \
-  --archive-dir /path/to/private-archive
-```
-
-检查变更后，使用同样的参数加上 `--apply`。导入器会检查报告内容、生成时间和路径，保存报告修订，再更新最近五个报告日期的快照。清单格式见[导入流程](docs/daily-generation-options.md#导入与核验)。
-
-已有报告索引需要归档或收窄公开窗口时，可单独运行：
-
-```bash
-python3 scripts/sync_public_snapshot.py \
-  --archive-dir /home/richard/code/.research-data/quant-market-intel-archive
-```
-
-该命令先合并报告与简评并核对归档中的 Markdown，再更新公开快照。修改既有报告时优先使用导入器，以便保留修订记录。归档目录应与仓库分开，且互不包含。已提交过的报告仍可从公开 Git 历史中找到，收窄当前快照不会删除那些历史副本。
-
-## 模型生成
-
-生产发布器在本机定时导入新报告时，优先用已登录的 Codex CLI 一次生成结构化解读，并将其通过证据引用与数字校验的概览用作每日简评；CLI 在只读沙盒运行，登录态不上传到 GitHub。无效输出不会写入公开索引，也不会阻止原报告发布。
-
-Actions 部署会保留有效的 Codex 记录；如无记录，结构化解读依次尝试 Gemini、DeepSeek、MiniMax。首个通过校验的结果即停止回退，简评优先沿用同一条解读的概览；所有解读均不可自行补造没有来源的公司新闻或市场归因。若三者均不可用，短简评仍可独立尝试 MiniMax。
-
-本地入口：
-
-| 内容 | 脚本 | 配置 |
-|---|---|---|
-| 本机默认 | `scripts/generate_codex_commentary.py` | 已登录的 Codex CLI；私有工作与归档目录 |
-| 一段每日简评 | `scripts/generate_daily_summary.py` | 有效解读概览；否则 `MINIMAX_API_KEY` |
-| 带来源的市场解读 | `scripts/generate_insights.py` | Actions 依次尝试 Gemini、DeepSeek、MiniMax |
-
-本地单独测试可通过 `--provider` 选择 Gemini、DeepSeek 或 MiniMax；GitHub Actions 使用固定的回退顺序。密钥通过本地进程环境或 GitHub Actions Secret 提供，浏览器只读取生成结果。模型输出通过格式校验并不等于新闻事实获得独立核实。
-
-本地模型环境可以复制 `.env.example` 为 `.env`，再加载后运行：
-
-```bash
-cp .env.example .env
-set -a; . ./.env; set +a
-python3 scripts/generate_insights.py --reports data/reports.json --output /tmp/insights.json --provider deepseek --force
-```
-
-Astro 页面目前统一使用暖色浅色主题；旧版主题按钮仅保留在回退页面中。
-
-本地生成示例：
-
-```bash
-python3 scripts/generate_insights.py \
-  --reports data/reports.json \
-  --history data/insights.json \
-  --output /tmp/quant-market-intel-insights.json \
-  --archive-dir /path/to/private-archive
-```
-
-源内容、提示词和模型决定缓存是否可复用。`--force` 可重新生成，旧解读仍应保留在归档中。模型缺失、调用失败或材料未齐时，原报告保持可读，页面显示对应状态。
-
-GitHub Actions 在 PR 中执行检查，在 `main` 更新或手动触发时发布。发布流程会读取已部署的近期生成记录，生成新的简评与解读，再上传 Pages 产物。手动输入 `force_summary` 和 `force_insights` 分别控制两种内容的重新生成。
-
-Actions 中的解读与核验记录另存为保留 90 天的 artifact。生产发布器会在部署完成后下载 ledger，写入仓库外的私有归档并核对文件哈希，具体安排见维护说明。
-
-## 文件与数据
-
-| 路径 | 用途 |
+| 目录 | 内容 |
 |---|---|
-| `src/pages/`、`src/components/`、`src/lib/`、`src/styles/` | Astro 首页、逐期静态正文、六图状态与安全 Markdown 渲染 |
-| `index.html`、`app.js`、`report-markdown.js`、`summary-utils.js`、`market-daily-utils.js`、`styles.css` | 迁移期间保留的旧页面回退材料，不再作为正式构建的首页 |
-| `data/charts/` | 仅收录逐点审核后 `publication: public` 的按期六图 JSON；无批准文件时静态页显示缺项 |
-| `data/reports.json`、`reports/` | 公开报告索引、正文与 Markdown 原文 |
-| `data/daily_summaries.json` | 每日简评及配对来源 |
-| `data/insights.json` | 带来源的解读、生成状态和观察条件结果 |
-| `data/market_daily_report.json` | 最近一次美股宏观日报；仅在上游产出并经导入校验后存在 |
-| `prompts/` | 两套生成入口使用的提示词 |
-| `scripts/` | 导入、归档、生成、比较、健康检查与构建脚本 |
-| `tests/` | Python 数据与流水线测试、Node.js 展示辅助函数测试 |
-| `docs/` | 维护说明及历史设计记录 |
+| `src/` | 正式 Astro 网站和 `/legacy/` 旧版回退页面 |
+| `artifacts/public/` | 已审核、可公开的近期报告与数据，构建后仍以 `/data/`、`/reports/` 提供下载 |
+| `scripts/`、`prompts/` | 导入、生成、校验与构建脚本；模型提示词 |
+| `configs/` | 无密钥的配置样例，真实凭据放在仓库外 |
+| `tests/`、`tools/` | 测试与结构审计工具 |
+| `docs/` | 维护方法、数据契约和历史设计记录 |
 
-报告使用 `market_intel_pages.reports.v1`，每条记录包含 `id`、`date`、`kind`、`title`、`summary`、`sections` 和指向 `reports/` 的 `source_url`。`kind` 为 `morning` 或 `evening`。
+本仓库没有 Git submodule。行情和报告生产属于独立的 `quant-intel-platform`；生产部署与定时任务属于独立的 `quant-intel-deploy`。
 
-每日简评使用 `market_intel_pages.daily_summaries.v1`，记录目标日期、正文、晨晚报 ID、生成时间、模型和提示词版本。结构化解读使用 `market_intel_pages.insights.v1`，另记录材料截止时间、内容哈希、段落证据、观察条件与核验结果。
+## 常见问题
 
-构建时生成的 `data/health.json` 使用 `market_intel_pages.health.v1`，分别计算原报告时间和目标数据日期的年龄，避免补发旧数据掩盖延迟。未提供交易日历目标时，标记 `calendar_unverified`，并保留默认 72 小时的过期提醒。报告正文中的 Markdown 表格、列表和标题会转换为页面结构，单元格与正文仍通过文本节点展示；不执行原文中的 HTML。
+为什么网页有缺项？报告只展示通过日期、来源和公开审核的字段。模型输出通过格式校验，不代表新闻事实已核实；缺少可靠材料时会保留空缺。
 
-六图由上游生成私有候选，逐点核对来源网页、观测日、许可和数值后才可另行签发 `publication: public` 清单。审核人须为该公开清单生成私有回执模板，填写每个点值的事实依据、公开再展示许可依据与核对说明。回执与清单内容哈希绑定；网址存在、回执齐全仅证明流程完整，不能代替人工核实网页内容或法律判断。Pages 导入器不会把候选自动升级为公开数据，也不会接受没有匹配回执的公开清单：
+数据和报告为什么不直接放在网站根目录？`artifacts/public/` 是 Git 中的公开输入，构建器会把它们放到网站的 `/data/` 和 `/reports/`。因此下载网址没有增加 `artifacts/public/` 这一层。
 
-```bash
-python3 scripts/chart_review.py --source /path/to/reviewed-public-chart.json --output /path/to/private-review.json
-# 人工填写 private-review.json 中每个点值的 fact_url、fact_note、rights_url、rights_note、reviewer、reviewed_at。
-python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --review /path/to/private-review.json --archive /path/to/private-archive
-python3 scripts/import_charts.py --source /path/to/reviewed-public-chart.json --review /path/to/private-review.json --archive /path/to/private-archive --apply
-```
-
-回执只存仓库外的私有归档；导入时按回执自身内容哈希追加到 `chart_reviews/<report_id>/<chart_sha256>/<review_sha256>.json`。即使图表未变，新的有效复核仍留档，旧回执不会被覆盖。无审核通过的清单时，页面显示六张缺项卡。已审核卡片的原始数值、日期和来源在静态 HTML 中可读；交互图仅在展开时加载当期 JSON 与绘图库，不请求旧 PNG。Actions 在生成解读与简评后重渲染 Astro HTML，避免正文与本次数据快照不一致。2026-09-24 批次的实际审核状态见[六图候选审核记录](docs/chart-review-2026-09-25.md)。
-
-## 检查与维护
-
-```bash
-npm ci
-python3 -m pip install --group dev
-ruff check scripts tests tools
-ruff format --check scripts tests tools
-ty check
-vulture scripts tests tools --min-confidence 80
-python3 -m pytest
-node --test tests/*.cjs
-node --check app.js
-node --check report-markdown.js
-python3 scripts/build_site.py --output /tmp/quant-market-intel-check
-pip-audit --strict
-python3 tools/audit_structure.py --output /tmp/market-intel-structure.json
-```
-
-开发工具版本固定在 `pyproject.toml`。CI 使用 Python 3.11 和 Node.js 24，检查类型、格式、未使用代码、依赖漏洞和 85% 的行与分支联合覆盖率门槛。Ruff 的 McCabe 复杂度上限为 10，另输出 Radon 报告与 AST、模块依赖和静态直接调用清单。不同工具对布尔表达式和推导式的计数不同，数值应在同一工具内比较。
-
-提交前还应运行 `git diff --check`。页面展示有改动时，检查默认日期、日期切换、晨晚报筛选、缺少简评和来源展开等状态。本轮事实、质量指标和遗留项见[维护检查记录](docs/maintenance-audit-2026-09-19.md)。
-
-维护约定见 [AGENTS.md](AGENTS.md)。09-15 的[设计记录](docs/superpowers/specs/2026-09-15-quant-market-intel-pages-design.md)、[网站实施记录](docs/superpowers/plans/2026-09-15-quant-market-intel-pages.md)与 [MiniMax 实施记录](docs/superpowers/plans/2026-09-15-quant-market-intel-minimax.md)保留早期决策背景，当前操作以本页和每日生成说明为准。
+如何导入报告或运行完整检查？参见[开发与数据维护](docs/technical-guide.md)、[每日生成与维护说明](docs/daily-generation-options.md)和[仓库协作约定](AGENTS.md)。六图的公开审核另见[审核记录](docs/chart-review-2026-09-25.md)。

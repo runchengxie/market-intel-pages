@@ -198,7 +198,7 @@ def site(tmp_path):
     root = tmp_path / "site"
     root.mkdir()
     create_site(root)
-    index_path = root / "data/reports.json"
+    index_path = root / "artifacts/public/data/reports.json"
     data = json.loads(index_path.read_text())
     for row in data["reports"]:
         hour = "07:00:00" if row["kind"] == "morning" else "19:00:00"
@@ -226,7 +226,7 @@ def test_snapshot_build_and_health_cli_use_real_temporary_files(site, tmp_path):
             "pipeline_health.py",
             [
                 "--reports",
-                site / "data/reports.json",
+                site / "artifacts/public/data/reports.json",
                 "--output",
                 health,
                 "--expected-date",
@@ -239,12 +239,19 @@ def test_snapshot_build_and_health_cli_use_real_temporary_files(site, tmp_path):
 
 
 def test_generation_and_comparison_clis_without_credentials(site, tmp_path):
-    reports = site / "data/reports.json"
+    reports = site / "artifacts/public/data/reports.json"
     summaries = tmp_path / "summaries.json"
     with pytest.raises(SystemExit) as exit_status:
         invoke(
             "generate_daily_summary.py",
-            ["--reports", reports, "--summaries", site / "data/daily_summaries.json", "--output", summaries],
+            [
+                "--reports",
+                reports,
+                "--summaries",
+                site / "artifacts/public/data/daily_summaries.json",
+                "--output",
+                summaries,
+            ],
         )
     assert exit_status.value.code == 0
     assert summaries.is_file()
@@ -269,9 +276,9 @@ def test_import_cli_preview_never_changes_the_public_snapshot(site, tmp_path):
             }
         )
     )
-    before = (site / "data/reports.json").read_bytes()
+    before = (site / "artifacts/public/data/reports.json").read_bytes()
     invoke(
         "import_reports.py", ["--root", site, "--manifest", manifest, "--archive-dir", tmp_path / "archive"]
     )
-    assert (site / "data/reports.json").read_bytes() == before
+    assert (site / "artifacts/public/data/reports.json").read_bytes() == before
     assert not (tmp_path / "archive").exists()
