@@ -33,9 +33,9 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.ok(chart);
   assert.match(chart, /2026-09-25 美东交易日市场图表/);
   assert.match(chart, /观测日 2026-09-25/);
-  assert.match(chart, /home\.treasury\.gov/);
+  assert.doesNotMatch(chart, /home\.treasury\.gov|来源/);
   assert.match(chart, /BTC\/USD 现货/);
-  assert.doesNotMatch(chart, /2026-08-01|2026-07-01/);
+  assert.match(chart, /2026-08-01|2026-07-01/);
   assert.doesNotMatch(index, /美国财政部<\/a><a[^>]*>美国财政部/);
   assert.doesNotMatch(index, /Yahoo Finance<\/a><a[^>]*>Yahoo Finance/);
   assert.doesNotMatch(index, /FMP<\/a><a[^>]*>FMP/);

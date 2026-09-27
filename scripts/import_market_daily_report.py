@@ -72,12 +72,16 @@ YAHOO_INDEX_URLS = {
     "nasdaq": r"https://finance\.yahoo\.com/quote/%5EIXIC/history/",
     "russell2000": r"https://finance\.yahoo\.com/quote/%5ERUT/history/",
 }
+EQUITY_ID = re.compile(r"equity\.([a-z]{1,5})\.(close|change_percent)")
+ALPACA_STOCK_BARS_URL = "https://docs.alpaca.markets/us/reference/stockbars"
+CORE_EQUITIES = {"MSFT", "AAPL", "NVDA", "AMZN", "GOOGL", "META"}
 MISSING_LABELS = {
     "quotes": "指数行情",
     "research": "研究解释",
     "fred": "部分 FRED 数据",
     "rates_lag": "美债收益率当日变动",
     "cross_asset": "部分跨资产行情",
+    "equities": "部分美股个股行情",
 }
 ASSET_GAP_LABELS = {
     "brent": "布伦特期货行情",
@@ -92,6 +96,7 @@ SOURCE_STATUS_LABELS = {
     "research": "研究材料",
     "cross_asset": "跨资产行情",
     "btc_spot": "比特币现货",
+    "equities": "美股个股行情",
 }
 SOURCE_QUALITY_LABELS = {"ok": "已核实", "reviewed": "已审阅", "degraded": "有缺项"}
 SOURCE_REASON_LABELS = {
@@ -100,6 +105,8 @@ SOURCE_REASON_LABELS = {
     "source_audited": "来源已逐条核查",
     "not_connected": "研究材料尚未接入，不提供未经核实的解释",
     "ok": "来源状态正常",
+    "all_equities_fresh": "核心观察股票行情齐全",
+    "one_or_more_equities_unavailable": "部分股票行情暂缺",
 }
 PUBLIC_FACT_FIELDS = (
     "id",
@@ -116,7 +123,7 @@ PUBLIC_FACT_FIELDS = (
     "quality",
     "observation_date",
 )
-PUBLIC_EVENT_FIELDS = ("id",)
+PUBLIC_EVENT_FIELDS = ("id", "event_type", "actual", "source_url", "quality")
 PUBLIC_CLAIM_FIELDS = (
     "claim",
     "evidence_ids",
@@ -191,6 +198,25 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
     observed = fact.get("observation_date")
     source_url = str(fact.get("source_url") or "")
     unit = fact.get("unit")
+    equity_match = EQUITY_ID.fullmatch(fact_id)
+    if equity_match:
+        symbol, field = equity_match.groups()
+        yahoo_url = f"https://finance.yahoo.com/quote/{symbol.upper()}/history/"
+        source_valid = (fact.get("source") == "Yahoo Finance" and source_url == yahoo_url) or (
+            fact.get("source") == "Alpaca SIP" and source_url == ALPACA_STOCK_BARS_URL
+        )
+        return (
+            fact.get("instrument") == symbol.upper()
+            and source_valid
+            and fact.get("quality") == "ok"
+            and observed == report_date
+            and fact.get("metric") == ("stock_close" if field == "close" else "daily_return")
+            and unit == ("USD/share" if field == "close" else "percent")
+            and isinstance(fact.get("value"), (int, float))
+            and not isinstance(fact.get("value"), bool)
+            and math.isfinite(fact["value"])
+            and (fact["value"] > 0 if field == "close" else abs(fact["value"]) <= 100)
+        )
     if fact_id.startswith("index."):
         key = fact_id.removeprefix("index.").removesuffix(".change_percent")
         yahoo_pattern = YAHOO_INDEX_URLS.get(key)
@@ -270,24 +296,64 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
     return False
 
 
-def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
-    if not any(fact.get("id") in FACT_LABELS for fact in payload["facts"]):
-        return True
-    if not _valid_report_time(payload):
+def _valid_equity_pairs(facts_by_id: dict[str, dict[str, Any]], payload: dict[str, Any]) -> bool:
+    symbols = {match.group(1) for fact_id in facts_by_id if (match := EQUITY_ID.fullmatch(fact_id))}
+    equities_status = payload.get("source_status", {}).get("equities", {})
+    if equities_status.get("quality") == "ok" and not CORE_EQUITIES <= {symbol.upper() for symbol in symbols}:
         return False
-    report_date = str(payload["run_id"]).removeprefix("daily-")
-    report_date = str(payload["run_id"]).removeprefix("daily-")
-    known_facts = [fact for fact in payload["facts"] if fact.get("id") in FACT_LABELS]
-    if not all(_valid_market_fact(fact, report_date) for fact in known_facts):
+    reviewed_movers = equities_status.get("reviewed_movers", [])
+    if not isinstance(reviewed_movers, list):
         return False
-    facts_by_id = {fact["id"]: fact for fact in known_facts}
-    yahoo_indices = [
-        fact for fact in known_facts if fact["id"].startswith("index.") and fact.get("quality") == "ok"
-    ]
-    if yahoo_indices and {fact["id"] for fact in yahoo_indices} != {
-        f"index.{key}.change_percent" for key in YAHOO_INDEX_URLS
-    }:
+    mover_ids = {
+        claim_id
+        for section in payload.get("sections", [])
+        if section.get("key") == "movers"
+        for claim_id in section.get("claims", [])
+    }
+    events = {event.get("id"): event for event in payload.get("events", []) if isinstance(event, dict)}
+    claims = payload.get("claims", [])
+    if reviewed_movers and payload.get("source_status", {}).get("research", {}).get("quality") != "reviewed":
         return False
+    if any(
+        not isinstance(row, dict)
+        or not re.fullmatch(r"[A-Z]{1,5}", str(row.get("ticker", "")))
+        or row.get("evidence_id") not in mover_ids
+        or not (event := events.get(row.get("evidence_id")))
+        or not re.fullmatch(r"web_(gainers|losers)_(close|intraday|event)", str(event.get("event_type", "")))
+        or event.get("quality") != "reviewed"
+        or not str(event.get("source_url", "")).startswith("https://")
+        or not any(
+            isinstance(claim, dict)
+            and row["evidence_id"] in claim.get("evidence_ids", [])
+            and claim.get("claim") == event.get("actual")
+            and event["source_url"] in claim.get("sources", [])
+            and claim.get("status") == "accepted"
+            and claim.get("confidence") == "confirmed"
+            and claim.get("provider") == "source_audit"
+            for claim in claims
+        )
+        for row in reviewed_movers
+    ):
+        return False
+    allowed = CORE_EQUITIES | {row["ticker"] for row in reviewed_movers}
+    if {symbol.upper() for symbol in symbols} - allowed:
+        return False
+    for symbol in symbols:
+        close = facts_by_id.get(f"equity.{symbol}.close")
+        change = facts_by_id.get(f"equity.{symbol}.change_percent")
+        if (
+            not close
+            or not change
+            or any(
+                close.get(key) != change.get(key)
+                for key in ("observation_date", "source", "source_url", "instrument")
+            )
+        ):
+            return False
+    return True
+
+
+def _valid_rate_and_asset_pairs(facts_by_id: dict[str, dict[str, Any]]) -> bool:
     for tenor in ("2y", "5y", "10y", "30y"):
         level = facts_by_id.get(f"treasury.{tenor}.level_percent")
         change = facts_by_id.get(f"treasury.{tenor}.change_bp")
@@ -312,6 +378,39 @@ def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
         ):
             return False
     return True
+
+
+def _valid_sourced_fact_date(payload: dict[str, Any]) -> bool:
+    if any(
+        str(fact.get("id", "")).startswith("equity.") and not EQUITY_ID.fullmatch(str(fact.get("id")))
+        for fact in payload["facts"]
+    ):
+        return False
+    if not any(
+        fact.get("id") in FACT_LABELS or EQUITY_ID.fullmatch(str(fact.get("id"))) for fact in payload["facts"]
+    ):
+        return True
+    if not _valid_report_time(payload):
+        return False
+    report_date = str(payload["run_id"]).removeprefix("daily-")
+    known_facts = [
+        fact
+        for fact in payload["facts"]
+        if fact.get("id") in FACT_LABELS or EQUITY_ID.fullmatch(str(fact.get("id")))
+    ]
+    if not all(_valid_market_fact(fact, report_date) for fact in known_facts):
+        return False
+    facts_by_id = {fact["id"]: fact for fact in known_facts}
+    if not _valid_equity_pairs(facts_by_id, payload):
+        return False
+    yahoo_indices = [
+        fact for fact in known_facts if fact["id"].startswith("index.") and fact.get("quality") == "ok"
+    ]
+    if yahoo_indices and {fact["id"] for fact in yahoo_indices} != {
+        f"index.{key}.change_percent" for key in YAHOO_INDEX_URLS
+    }:
+        return False
+    return _valid_rate_and_asset_pairs(facts_by_id)
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -360,11 +459,19 @@ def _select(row: dict[str, Any], names: tuple[str, ...]) -> dict[str, Any]:
 
 
 def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
-    facts = [_select(fact, PUBLIC_FACT_FIELDS) for fact in payload["facts"] if fact.get("id") in FACT_LABELS]
+    facts = [
+        _select(fact, PUBLIC_FACT_FIELDS)
+        for fact in payload["facts"]
+        if fact.get("id") in FACT_LABELS or EQUITY_ID.fullmatch(str(fact.get("id")))
+    ]
     claims = [_select(claim, PUBLIC_CLAIM_FIELDS) for claim in payload["claims"]]
     evidence_ids = {item for claim in claims for item in claim.get("evidence_ids", [])}
+    mover_evidence_ids = {
+        row["evidence_id"]
+        for row in payload.get("source_status", {}).get("equities", {}).get("reviewed_movers", [])
+    }
     events = [
-        _select(event, PUBLIC_EVENT_FIELDS)
+        _select(event, PUBLIC_EVENT_FIELDS if event.get("id") in mover_evidence_ids else ("id",))
         for event in payload.get("events", [])
         if event.get("id") in evidence_ids
     ]
@@ -385,8 +492,11 @@ def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[s
             ("status", "revision", "reviewed_source_cutoff"),
         ),
         "source_status": {
-            key: _select(payload.get("source_status", {}).get(key, {}), ("quality", "reason"))
-            for key in ("rates", "macro", "quotes", "research", "cross_asset", "btc_spot")
+            key: _select(
+                payload.get("source_status", {}).get(key, {}),
+                ("quality", "reason", "reviewed_movers") if key == "equities" else ("quality", "reason"),
+            )
+            for key in ("rates", "macro", "quotes", "research", "cross_asset", "btc_spot", "equities")
             if key in payload.get("source_status", {})
         },
         "content_hash": payload.get("content_hash"),
@@ -421,6 +531,7 @@ def _missing_labels(payload: dict[str, Any]) -> list[str]:
 def _fact_category(fact_id: str) -> str:
     for prefix, category in (
         ("index.", "market"),
+        ("equity.", "equities"),
         ("treasury.", "rates"),
         ("cross_asset.", "cross_asset"),
         ("macro.", "macro"),
@@ -435,6 +546,8 @@ def _markdown_source(fact: dict[str, Any]) -> str:
     url = str(fact["source_url"])
     if fact_id.startswith("index."):
         name = "Yahoo Finance" if fact.get("source") == "Yahoo Finance" else "核实报道"
+    elif fact_id.startswith("equity."):
+        name = str(fact.get("source"))
     elif fact_id.startswith("cross_asset."):
         name = {
             "Financial Modeling Prep": "FMP",
@@ -458,6 +571,26 @@ def _market_table(facts: list[dict[str, Any]], include_references: bool = True) 
         label = FACT_LABELS[fact["id"]][0].removesuffix("日涨跌").strip()
         lines.append(
             f"| {label} | {float(fact['value']):+.2f}% | {fact['observation_date']} |"
+            + (f" {_markdown_source(fact)} |" if include_references else "")
+        )
+    return lines
+
+
+def _equities_table(facts: list[dict[str, Any]], include_references: bool = True) -> list[str]:
+    lines = (
+        ["| 股票 | 收盘价 | 日涨跌 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+        if include_references
+        else ["| 股票 | 收盘价 | 日涨跌 | 观测日 |", "|---|---:|---:|---|"]
+    )
+    by_id = {fact["id"]: fact for fact in facts}
+    for fact in facts:
+        match = EQUITY_ID.fullmatch(fact["id"])
+        if not match or match.group(2) != "close":
+            continue
+        change = by_id[f"equity.{match.group(1)}.change_percent"]
+        lines.append(
+            f"| {fact['instrument']} | {float(fact['value']):,.2f} 美元 | "
+            f"{float(change['value']):+.2f}% | {fact['observation_date']} |"
             + (f" {_markdown_source(fact)} |" if include_references else "")
         )
     return lines
@@ -529,7 +662,9 @@ def _markdown_fact_lines(payload: dict[str, Any], section: str, include_referenc
     grouped = []
     for fact in payload["facts"]:
         fact_id = str(fact.get("id") or "")
-        if _fact_category(fact_id) != section or fact_id not in FACT_LABELS:
+        if _fact_category(fact_id) != section or (
+            fact_id not in FACT_LABELS and not EQUITY_ID.fullmatch(fact_id)
+        ):
             continue
         value = fact.get("value")
         observed = str(fact.get("observation_date") or "")
@@ -547,6 +682,7 @@ def _markdown_fact_lines(payload: dict[str, Any], section: str, include_referenc
         return []
     renderers = {
         "market": _market_table,
+        "equities": _equities_table,
         "rates": _rates_table,
         "cross_asset": _cross_asset_table,
         "macro": _macro_table,
@@ -581,25 +717,40 @@ def _claim_markdown_lines(claim: dict[str, Any], include_references: bool) -> li
     return lines
 
 
-def _markdown(payload: dict[str, Any], include_references: bool = True) -> str:
-    lines = [
-        f"# 美股市场日报（{_date(payload)}）",
-        "",
-        f"数据状态：{payload.get('quality_summary', {}).get('status', 'unknown')}",
-        f"报告生成时间：{payload['as_of']}（美东报告日 {_date(payload)}）",
-        "",
-    ]
-    cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
-    if cutoff:
-        lines[4:4] = [f"新闻资料截止：{cutoff}。", ""]
+def _markdown_header(payload: dict[str, Any], include_references: bool) -> list[str]:
+    lines = [f"# 美股市场日报（{_date(payload)}）", ""]
+    if include_references:
+        lines.extend(
+            [
+                f"数据状态：{payload.get('quality_summary', {}).get('status', 'unknown')}",
+                f"报告生成时间：{payload['as_of']}（美东报告日 {_date(payload)}）",
+                "",
+            ]
+        )
+        cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
+        if cutoff:
+            lines.extend([f"新闻资料截止：{cutoff}。", ""])
     if payload.get("quality_summary", {}).get("revision") == "historical_backfill":
-        lines[4:4] = ["历史补报：按指定交易日数据事后重建，生成时间不代表当日已发布。", ""]
+        lines.extend(
+            [
+                "历史补报：按指定交易日数据事后重建，生成时间不代表当日已发布。"
+                if include_references
+                else "事后整理",
+                "",
+            ]
+        )
+    return lines
+
+
+def _markdown(payload: dict[str, Any], include_references: bool = True) -> str:
+    lines = _markdown_header(payload, include_references)
     gaps = _missing_labels(payload)
     if gaps:
         lines.extend([f"尚缺：{'、'.join(gaps)}。", ""])
     grouped = _group_claims(payload)
     report_sections = (
         ("market", "美股市场表现"),
+        ("equities", "美股个股行情"),
         ("movers", "主要个股"),
         ("rates", "美债收益率"),
         ("cross_asset", "布伦特、金银与比特币"),
@@ -620,7 +771,11 @@ def _markdown(payload: dict[str, Any], include_references: bool = True) -> str:
         lines.extend(["## 其他已核实内容", ""])
         for claim in grouped["other"]:
             lines.extend(_claim_markdown_lines(claim, include_references))
-    source_status = _source_status_lines(payload.get("source_status", {}), include_references)
+    source_status = (
+        _source_status_lines(payload.get("source_status", {}), include_references)
+        if include_references
+        else []
+    )
     lines.extend(source_status)
     if not source_status:
         lines.append("")
@@ -680,6 +835,13 @@ def _text_report(payload: dict[str, Any]) -> str:
     report_date = _date(payload)
     grouped = _group_claims(payload)
     market_facts = _text_fact_lines(payload, "index.")
+    equity_facts = [
+        f"- {fact['instrument']}：{float(fact['value']):,.2f} 美元，"
+        f"{float(next(row for row in payload['facts'] if row['id'] == fact['id'].removesuffix('.close') + '.change_percent')['value']):+.2f}%"
+        f"（观测日 {fact['observation_date']}）\n  来源：{fact['source_url']}"
+        for fact in payload["facts"]
+        if EQUITY_ID.fullmatch(str(fact.get("id"))) and fact["id"].endswith(".close")
+    ]
     treasury_facts = _text_fact_lines(payload, "treasury.")
     macro_facts = _text_fact_lines(payload, "macro.")
     cross_asset_facts = _text_fact_lines(payload, "cross_asset.")
@@ -692,6 +854,7 @@ def _text_report(payload: dict[str, Any]) -> str:
         *(_text_claim_lines(grouped["market"]) if grouped["market"] else []),
         "",
         "二、重点个股",
+        *equity_facts,
         *_text_claim_lines(grouped["movers"]),
         "",
         "三、美债收益率",
