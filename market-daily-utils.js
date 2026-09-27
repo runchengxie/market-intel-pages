@@ -48,9 +48,12 @@ const YAHOO_INDEX_SOURCES = {
   nasdaq: /^https:\/\/finance\.yahoo\.com\/quote\/%5EIXIC\/history\/$/,
   russell2000: /^https:\/\/finance\.yahoo\.com\/quote\/%5ERUT\/history\/$/,
 };
+const EQUITY_ID = /^equity\.([a-z]{1,5})\.(close|change_percent)$/;
+const ALPACA_STOCK_BARS_URL = "https://docs.alpaca.markets/us/reference/stockbars";
 const MARKET_DAILY_GAPS = {
   rates_lag: "美债收益率当日变动", quotes: "指数行情", research: "研究解释", fred: "部分 FRED 数据",
   cross_asset: "布伦特、金银或比特币行情",
+  equities: "部分美股个股行情",
 };
 const MARKET_DAILY_CLAIM_SECTIONS = [
   ["market", "市场表现"], ["drivers", "市场驱动因素"], ["movers", "主要个股"],
@@ -69,6 +72,16 @@ function validHttpSource(sourceUrl) {
 
 function validMarketDailyFact(id, fact, reportDate) {
   const url = fact.source_url ?? "";
+  const equity = id.match(EQUITY_ID);
+  if (equity) {
+    const [, symbol, field] = equity;
+    return fact.observation_date === reportDate && fact.quality === "ok"
+      && fact.instrument === symbol.toUpperCase()
+      && ((fact.source === "Yahoo Finance" && url === `https://finance.yahoo.com/quote/${symbol.toUpperCase()}/history/`)
+        || (fact.source === "Alpaca SIP" && url === ALPACA_STOCK_BARS_URL))
+      && fact.metric === (field === "close" ? "stock_close" : "daily_return")
+      && fact.unit === (field === "close" ? "USD/share" : "percent");
+  }
   if (id.startsWith("index.")) {
     const key = id.split(".")[1];
     return fact.observation_date === reportDate && (
@@ -146,6 +159,16 @@ function summarizeMarketDaily(payload) {
       quality: fact.quality,
     });
   }
+  for (const fact of payload.facts) {
+    const match = String(fact.id ?? "").match(EQUITY_ID);
+    if (!match) continue;
+    if (typeof fact.value !== "number" || !Number.isFinite(fact.value)
+      || !validMarketDailyFact(fact.id, fact, date)) return null;
+    rows.push({ id: fact.id, label: match[1].toUpperCase(), value: fact.value,
+      observationDate: fact.observation_date, sourceUrl: fact.source_url,
+      sourceLabel: fact.source, instrument: fact.instrument, metric: fact.metric,
+      unit: fact.unit, quality: fact.quality });
+  }
   if (!rows.length) return null;
   const yahooIndexRows = rows.filter((row) => row.id.startsWith("index.") && row.quality === "ok");
   if (yahooIndexRows.length && yahooIndexRows.length !== Object.keys(YAHOO_INDEX_SOURCES).length) return null;
@@ -205,6 +228,17 @@ function summarizeMarketDaily(payload) {
       priceUnit: close.unit, changeValue: change.value, observationDate: close.observationDate,
       sourceUrl: close.sourceUrl, sourceLabel: close.sourceLabel } : null;
   }).filter(Boolean);
+  const equityRows = [];
+  for (const symbol of [...new Set(rows.filter((row) => row.id.startsWith("equity.")).map((row) => row.id.split(".")[1]))]) {
+    const close = rows.find((row) => row.id === `equity.${symbol}.close`);
+    const change = rows.find((row) => row.id === `equity.${symbol}.change_percent`);
+    if (!close || !change || close.observationDate !== change.observationDate
+      || close.sourceUrl !== change.sourceUrl || close.sourceLabel !== change.sourceLabel
+      || close.instrument !== change.instrument) return null;
+    equityRows.push({ symbol: symbol.toUpperCase(), priceValue: close.value,
+      changeValue: change.value, observationDate: close.observationDate,
+      sourceUrl: close.sourceUrl, sourceLabel: close.sourceLabel });
+  }
   const parts = payload.as_of
     ? new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(payload.as_of))
     : [];
@@ -219,14 +253,16 @@ function summarizeMarketDaily(payload) {
   const secondaryClaimSections = claimSections
     .filter((section) => !["drivers", "movers"].includes(section.key));
   const secondaryRows = rows.filter((row) => row.id.startsWith("macro."));
-  return { date, rows, rateRows, crossAssetRows, claims, claimSections, primaryClaims,
-    secondaryClaimSections, secondaryRows, gaps, hasTextReport, nextMorningRevision: updatedDate !== date };
+  return { date, rows, rateRows, crossAssetRows, equityRows, claims, claimSections, primaryClaims,
+    secondaryClaimSections, secondaryRows, gaps, hasTextReport, nextMorningRevision: updatedDate !== date,
+    historicalBackfill: payload.quality_summary?.revision === "historical_backfill" };
 }
 
 function buildMarketDailyCharts(summary) {
   if (!summary) return [];
   const definitions = [
     { title: "四大指数收盘涨跌", unit: "%", prefix: "index.", ids: [/^index\./] },
+    { title: "美股个股日涨跌", unit: "%", prefix: "equity.", ids: [/\.change_percent$/] },
     { title: "美债收益率水平", unit: "%", prefix: "treasury.", ids: [/\.level_percent$/], kind: "level" },
     { title: "美债收益率当日变动", unit: "bp", prefix: "treasury.", ids: [/\.change_bp$/] },
     { title: "跨资产日涨跌", unit: "%", prefix: "cross_asset.", ids: [/\.change_percent$/] },
@@ -257,10 +293,9 @@ function escapeSvgText(value) {
 
 function svgClaimLines(text) {
   const characters = Array.from(text.replace(/\s+/g, " ").trim());
-  if (characters.length > 160) return ["个股说明较长，请查看完整报告。"];
   const lines = [];
   let line = "";
-  for (const token of characters.join("").match(/[A-Za-z][A-Za-z0-9.\/%+-]*|./gu) ?? []) {
+  for (const token of characters.join("").match(/[A-Za-z][A-Za-z0-9./%+-]*|[+-]?\d[\d,.%/-]*|./gu) ?? []) {
     if (line.length + token.length > 50 && line) {
       lines.push(line.trimEnd());
       line = "";
@@ -274,27 +309,33 @@ function svgClaimLines(text) {
 
 function buildMarketDailyChartSvg(summary) {
   const charts = buildMarketDailyCharts(summary);
-  if (!charts.length && !summary.crossAssetRows.length) return null;
+  if (!charts.length && !summary.crossAssetRows.length && !summary.claims.length) return null;
   const moverRows = (summary.claimSections.find((section) => section.key === "movers")?.claims ?? [])
-    .slice(0, 2).map((claim) => ({
-      lines: svgClaimLines(claim.text), host: new URL(claim.sourceUrls[0]).hostname,
-    }));
-  const moverHeight = moverRows.length
-    ? 45 + moverRows.reduce((total, row) => total + row.lines.length * 20 + 24, 0) : 0;
-  const supplementalHeight = summary.crossAssetRows.length ? 54 + summary.crossAssetRows.length * 27 : 0;
-  const height = 134 + charts.reduce((total, chart) => total + 54 + chart.rows.length * 58, 0)
-    + moverHeight + supplementalHeight + 50;
+    .map((claim) => ({ lines: svgClaimLines(claim.text) }));
   let y = 118;
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="${height}" viewBox="0 0 960 ${height}" role="img">`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="__HEIGHT__" viewBox="0 0 960 __HEIGHT__" role="img">`,
     `<title>${escapeSvgText(summary.date)} 美东交易日市场图表</title>`,
-    `<desc>展示报告日来源和日期校验通过的指数、美债收益率水平与日变动、跨资产行情，并列出观测日和来源。</desc>`,
-    `<rect width="960" height="${height}" fill="#fff9f2"/>`,
+    `<desc>展示已核实的指数、个股、美债、跨资产、宏观数据和市场说明，并列出数值观测日。</desc>`,
+    `<rect width="960" height="__HEIGHT__" fill="#fff9f2"/>`,
     `<text x="54" y="62" fill="#34271f" font-family="sans-serif" font-size="28" font-weight="700">${escapeSvgText(summary.date)} 美东交易日</text>`,
-    `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股市场速览 · 仅含来源和日期校验通过的同日数值</text>`,
+    `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股收盘复盘${summary.historicalBackfill ? " · 事后整理" : ""} · 数值逐项标注观测日</text>`,
   ];
-  const moverInsertAt = charts[0]?.title === "四大指数收盘涨跌" ? 1 : 0;
+  const firstRates = charts.findIndex((chart) => chart.title.startsWith("美债"));
+  const firstCross = charts.findIndex((chart) => chart.title.startsWith("跨资产"));
+  const moverInsertAt = firstRates >= 0 ? firstRates : firstCross >= 0 ? firstCross : charts.length;
+  const addEquityPrices = () => {
+    if (!summary.equityRows.length) return;
+    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">美股个股收盘价</text>`);
+    y += 30;
+    for (const row of summary.equityRows) {
+      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.symbol)}：${escapeSvgText(row.priceValue.toFixed(2))} 美元 · ${escapeSvgText(row.changeValue >= 0 ? "+" : "")}${escapeSvgText(row.changeValue.toFixed(2))}% · 观测日 ${escapeSvgText(row.observationDate)}</text>`);
+      y += 27;
+    }
+    y += 12;
+  };
   const addMovers = () => {
+    addEquityPrices();
     if (!moverRows.length) return;
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">重点个股（已核实）</text>`);
     y += 30;
@@ -303,8 +344,7 @@ function buildMarketDailyChartSvg(summary) {
         parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(line)}</text>`);
         y += 20;
       }
-      parts.push(`<text x="54" y="${y}" fill="#715f52" font-family="sans-serif" font-size="12">来源 ${escapeSvgText(row.host)}</text>`);
-      y += 24;
+      y += 12;
     }
     y += 15;
   };
@@ -317,13 +357,12 @@ function buildMarketDailyChartSvg(summary) {
       const width = Math.round(row.width * (chart.kind === "level" ? 4.3 : 2.15));
       const barX = row.side === "negative" ? center - width : center;
       const color = row.side === "negative" ? "#9e806d" : "#c74f36";
-      const host = new URL(row.sourceUrl).hostname;
       parts.push(`<text x="54" y="${y + 5}" fill="#34271f" font-family="sans-serif" font-size="16" font-weight="600">${escapeSvgText(row.label)}</text>`);
       parts.push(`<rect x="350" y="${y - 13}" width="430" height="18" rx="3" fill="#f2e7dc"/>`);
       parts.push(`<rect x="${barX}" y="${y - 11}" width="${width}" height="14" rx="2" fill="${color}"/>`);
       parts.push(`<line x1="${center}" y1="${y - 16}" x2="${center}" y2="${y + 8}" stroke="#5d4c40" stroke-width="1"/>`);
       parts.push(`<text x="800" y="${y + 5}" fill="#34271f" font-family="monospace" font-size="16" font-weight="700">${escapeSvgText(row.valueText)}</text>`);
-      parts.push(`<text x="54" y="${y + 25}" fill="#715f52" font-family="sans-serif" font-size="12">观测日 ${escapeSvgText(row.observationDate)} · 来源 ${escapeSvgText(row.sourceLabel)} (${escapeSvgText(host)})</text>`);
+      parts.push(`<text x="54" y="${y + 25}" fill="#715f52" font-family="sans-serif" font-size="12">观测日 ${escapeSvgText(row.observationDate)}</text>`);
       y += 58;
     }
     y += 20;
@@ -333,17 +372,46 @@ function buildMarketDailyChartSvg(summary) {
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="18" font-weight="700">跨资产价格</text>`);
     y += 27;
     for (const row of summary.crossAssetRows) {
-      const price = `${row.priceValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.priceUnit}`;
+      const unit = ({ "USD/barrel": "美元/桶", "USD/troy_ounce": "美元/金衡盎司", "USD/bitcoin": "美元/BTC" })[row.priceUnit] ?? row.priceUnit;
+      const price = `${row.priceValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${unit}`;
       const change = `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)}%`;
-      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(price)} · ${escapeSvgText(change)} · ${escapeSvgText(row.observationDate)} · ${escapeSvgText(row.sourceLabel)}</text>`);
+      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(price)} · ${escapeSvgText(change)} · 观测日 ${escapeSvgText(row.observationDate)}</text>`);
       y += 27;
     }
     y += 12;
   }
+  if (summary.secondaryRows.length) {
+    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">经济数据</text>`);
+    y += 30;
+    for (const row of summary.secondaryRows) {
+      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.text)} · 观测日 ${escapeSvgText(row.observationDate)}</text>`);
+      y += 27;
+    }
+    y += 12;
+  }
+  for (const section of summary.claimSections.filter((item) => item.key !== "movers")) {
+    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">${escapeSvgText(section.title)}</text>`);
+    y += 30;
+    for (const claim of section.claims) {
+      for (const line of svgClaimLines(claim.text)) {
+        parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(line)}</text>`);
+        y += 20;
+      }
+      y += 12;
+    }
+    y += 12;
+  }
+  if (summary.gaps.length) {
+    for (const line of svgClaimLines(`尚缺：${summary.gaps.join("、")}。`)) {
+      parts.push(`<text x="54" y="${y}" fill="#715f52" font-family="sans-serif" font-size="13">${escapeSvgText(line)}</text>`);
+      y += 20;
+    }
+  }
+  const height = y + 55;
   parts.push(`<line x1="54" y1="${height - 48}" x2="906" y2="${height - 48}" stroke="#d9c7b6"/>`);
-  parts.push(`<text x="54" y="${height - 22}" fill="#715f52" font-family="sans-serif" font-size="12">来源详情和核实说明请见同日报告；市场有风险，投资需谨慎。</text>`);
+  parts.push(`<text x="54" y="${height - 22}" fill="#715f52" font-family="sans-serif" font-size="12">市场有风险，投资需谨慎。</text>`);
   parts.push("</svg>");
-  return parts.join("");
+  return parts.join("").replaceAll("__HEIGHT__", String(height));
 }
 
 function formatMarketDailyStatus(summary) {

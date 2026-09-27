@@ -104,8 +104,9 @@ def test_import_report_writes_reference_free_markdown_with_all_treasury_tenors(t
     assert "| 5 年期 | 4.98% | -5.00 bp | 2026-09-19 |" in reading
     assert "| 30 年期 | 5.49% | +2.00 bp | 2026-09-19 |" in reading
     assert "|---|---:|---:|---|" in reading
-    assert "数据状态：ok" in reading
-    assert "## 数据质量与核验说明" in reading
+    assert "数据状态：ok" not in reading
+    assert "报告生成时间：" not in reading
+    assert "## 数据质量与核验说明" not in reading
     assert "https://" not in reading
     assert "证据：" not in reading
     assert "| 来源 |" not in reading
@@ -164,6 +165,77 @@ def test_markdown_includes_public_source_status_without_private_metadata(tmp_pat
     assert "| 研究材料 | 已审阅 | 来源已逐条核查 |" in markdown
     assert "2026-09-19T23:59:59-04:00" in markdown
     assert "DO_NOT_PUBLISH" not in markdown
+
+
+def test_reference_free_backfill_keeps_only_short_notice(tmp_path):
+    payload = _payload()
+    payload["as_of"] = payload["generated_at"] = "2026-09-21T01:00:00+00:00"
+    payload["quality_summary"] = {
+        "status": "ok",
+        "revision": "historical_backfill",
+        "reviewed_source_cutoff": "2026-09-19T23:59:59-04:00",
+    }
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    import_report(source, output, manifest)
+    reading = (output / "reports/2026-09-19-market-daily-no-citations.md").read_text()
+    assert "事后整理" in reading
+    assert "历史补报：" not in reading
+    assert "新闻资料截止：" not in reading
+    assert "2026-09-21T01:00:00+00:00" not in reading
+    assert "2026-09-19T23:59:59-04:00" not in reading
+
+
+def test_equity_pairs_appear_in_public_json_and_both_markdown_editions(tmp_path):
+    payload = _payload()
+    for field, value, metric, unit in (
+        ("close", 200.5, "stock_close", "USD/share"),
+        ("change_percent", 1.25, "daily_return", "percent"),
+    ):
+        payload["facts"].append(
+            {
+                "id": f"equity.msft.{field}",
+                "instrument": "MSFT",
+                "value": value,
+                "metric": metric,
+                "unit": unit,
+                "source": "Yahoo Finance",
+                "quality": "ok",
+                "source_url": "https://finance.yahoo.com/quote/MSFT/history/",
+                "observation_date": "2026-09-19",
+            }
+        )
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    import_report(source, output, manifest)
+    public = json.loads((output / "data/market_daily_report.json").read_text())
+    assert len([row for row in public["facts"] if row["id"].startswith("equity.msft.")]) == 2
+    for suffix in ("", "-no-citations"):
+        report = (output / f"reports/2026-09-19-market-daily{suffix}.md").read_text()
+        assert "| MSFT | 200.50 美元 | +1.25% | 2026-09-19 |" in report
+        assert (
+            report.index("## 美股市场表现") < report.index("## 美股个股行情") < report.index("## 美债收益率")
+        )
+
+
+def test_equity_price_without_matching_return_is_rejected(tmp_path):
+    payload = _payload()
+    payload["facts"].append(
+        {
+            "id": "equity.msft.close",
+            "instrument": "MSFT",
+            "value": 200.5,
+            "metric": "stock_close",
+            "unit": "USD/share",
+            "source": "Yahoo Finance",
+            "quality": "ok",
+            "source_url": "https://finance.yahoo.com/quote/MSFT/history/",
+            "observation_date": "2026-09-19",
+        }
+    )
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
 
 
 def test_markdown_explains_unavailable_research_without_implying_a_source_exists(tmp_path):

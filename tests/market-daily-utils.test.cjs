@@ -46,7 +46,7 @@ test("a verified same-day Treasury level alone still produces a sourced image", 
   const svg = buildMarketDailyChartSvg(summary);
   assert.match(svg, /4\.25%/);
   assert.match(svg, /2026-09-24/);
-  assert.match(svg, /FRED/);
+  assert.doesNotMatch(svg, /FRED/);
 });
 
 test("Treasury yield levels have their own four-tenor percent chart", () => {
@@ -65,7 +65,8 @@ test("Treasury yield levels have their own four-tenor percent chart", () => {
   ]);
   const svg = buildMarketDailyChartSvg(summary);
   assert.match(svg, /美债收益率水平（%）/);
-  assert.match(svg, /观测日 2026-09-25 · 来源 美国财政部 \(home\.treasury\.gov\)/);
+  assert.match(svg, /观测日 2026-09-25/);
+  assert.doesNotMatch(svg, /美国财政部|home\.treasury\.gov/);
   assert.doesNotMatch(svg, /\+4\.81%/);
 });
 
@@ -95,6 +96,40 @@ test("stock note wrapping keeps Latin company names intact", () => {
     { claim: `${"中".repeat(48)}Anthropic`, evidence_ids: ["reviewed.11"], sources: ["https://example.test/stock"] },
   ], sections: [{ key: "movers", claims: ["reviewed.11"] }] });
   assert.match(buildMarketDailyChartSvg(summary), />Anthropic<\/text>/);
+});
+
+test("image wrapping does not break a decimal percentage across lines", () => {
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts: [
+    { id: "index.spx.change_percent", value: 0.51, quality: "reviewed", observation_date: "2026-09-25", source_url: "https://example.test/close" },
+  ], events: [{ id: "reviewed.0" }], claims: [
+    { claim: `${"中".repeat(47)}道指上涨 0.93%。`, evidence_ids: ["reviewed.0"], sources: ["https://example.test/close"] },
+  ], sections: [{ key: "market", claims: ["reviewed.0"] }] });
+  assert.match(buildMarketDailyChartSvg(summary), /<text[^>]*>[^<]*0\.93%[^<]*<\/text>/);
+});
+
+test("image includes verified stock quotes and every substantive report section", () => {
+  const marketDate = "2026-09-25";
+  const facts = [
+    { id: "index.spx.change_percent", value: 0.51, quality: "reviewed", observation_date: marketDate, source_url: "https://example.test/close" },
+    ...[["close", 200.5, "stock_close", "USD/share"], ["change_percent", 1.25, "daily_return", "percent"]].map(([field, value, metric, unit]) => ({
+      id: `equity.msft.${field}`, value, metric, unit, instrument: "MSFT", source: "Yahoo Finance", quality: "ok",
+      observation_date: marketDate, source_url: "https://finance.yahoo.com/quote/MSFT/history/",
+    })),
+    { id: "macro.cpi_yoy", value: 3.4, quality: "ok", observation_date: "2026-08-01", source_url: "https://fred.stlouisfed.org/series/CPIAUCNS" },
+  ];
+  const sections = ["market", "movers", "drivers", "macro", "company_news"];
+  const claims = sections.map((section, index) => ({ claim: `${section} 已核实的完整说明`, evidence_ids: [`reviewed.${index}`], sources: [`https://example.test/${section}`] }));
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: `daily-${marketDate}`, facts,
+    events: sections.map((section, index) => ({ id: `reviewed.${index}` })), claims,
+    sections: sections.map((section, index) => ({ key: section, claims: [`reviewed.${index}`] })) });
+  assert.equal(summary.equityRows[0].symbol, "MSFT");
+  const svg = buildMarketDailyChartSvg(summary);
+  assert.match(svg, /MSFT/);
+  assert.match(svg, /200\.50/);
+  assert.match(svg, /\+1\.25%/);
+  assert.match(svg, /CPI 同比/);
+  for (const section of sections) assert.match(svg, new RegExp(`${section} 已核实的完整说明`));
+  assert.doesNotMatch(svg, /example\.test|finance\.yahoo\.com|fred\.stlouisfed\.org|来源/);
 });
 
 test("market daily status calls a report date a report date, including missing sources", () => {
@@ -180,9 +215,9 @@ test("market daily accepts same-day Treasury levels and cross-asset futures fact
   assert.match(svg, /美债收益率水平（%）/);
   assert.match(svg, /美债收益率当日变动（bp）/);
   assert.match(svg, /4\.20%/);
-  assert.match(svg, /布伦特期货收盘：71\.00 USD\/barrel/);
-  assert.match(svg, /COMEX 黄金期货收盘：3,900\.00 USD\/troy_ounce/);
-  assert.match(svg, /CME 比特币期货收盘：108,000\.00 USD\/bitcoin/);
+  assert.match(svg, /布伦特期货收盘：71\.00 美元\/桶/);
+  assert.match(svg, /COMEX 黄金期货收盘：3,900\.00 美元\/金衡盎司/);
+  assert.match(svg, /CME 比特币期货收盘：108,000\.00 美元\/BTC/);
 });
 
 test("market daily charts preserve FMP commodity provenance", () => {
@@ -197,7 +232,7 @@ test("market daily charts preserve FMP commodity provenance", () => {
 
   assert.ok(summary);
   assert.equal(summary.crossAssetRows[0].sourceLabel, "FMP");
-  assert.match(buildMarketDailyChartSvg(summary), /2026-09-24 · FMP/);
+  assert.doesNotMatch(buildMarketDailyChartSvg(summary), /FMP/);
   assert.equal(summarizeMarketDaily({ ...payload, facts: pair.map((row) => ({ ...row, instrument: "Brent (FMP GCUSD, continuous)" })) }), null);
 });
 
@@ -217,7 +252,7 @@ test("BTC/USD spot is shown separately from CME bitcoin futures", () => {
   assert.ok(summary);
   assert.deepEqual(summary.crossAssetRows.map((row) => row.name), ["bitcoin", "bitcoin_spot"]);
   assert.equal(summary.crossAssetRows[1].sourceLabel, "FMP");
-  assert.match(buildMarketDailyChartSvg(summary), /BTC\/USD 现货收盘：84,093\.13 USD\/bitcoin/);
+  assert.match(buildMarketDailyChartSvg(summary), /BTC\/USD 现货收盘：84,093\.13 美元\/BTC/);
 });
 
 test("authorized BTC/USD spot fallbacks retain their own attribution", () => {
@@ -328,7 +363,7 @@ test("market daily charts keep signed values and source dates in separate units"
   assert.match(charts[1].rows[0].sourceUrl, /^https:\/\/home\.treasury\.gov\//);
 });
 
-test("chart image uses reviewed report-date facts with dates, units and source hosts", () => {
+test("chart image uses reviewed report-date facts with dates and units but no sources", () => {
   const summary = summarizeMarketDaily({
     schema_version: "1.0", run_id: "daily-2026-09-23", facts: [
       { id: "index.spx.change_percent", value: -0.8, quality: "reviewed", observation_date: "2026-09-23", source_url: "https://abcnews.com/Business/close" },
@@ -345,8 +380,7 @@ test("chart image uses reviewed report-date facts with dates, units and source h
   assert.match(svg, /\+0\.40%/);
   assert.match(svg, /\+15\.00 bp/);
   assert.match(svg, /观测日 2026-09-23/);
-  assert.match(svg, /abcnews\.com/);
-  assert.match(svg, /home\.treasury\.gov/);
+  assert.doesNotMatch(svg, /abcnews\.com|home\.treasury\.gov|来源/);
   assert.doesNotMatch(svg, /2026-09-22|FRED 原始数据|<script>/);
 });
 
