@@ -12,7 +12,10 @@
 - 罗素 2000 日涨跌：+0.51%（观测日 2026-09-22）
   来源：https://finance.yahoo.com/quote/%5ERUT/history/
 
-二、美债、布伦特、金银与比特币
+二、重点个股
+- 暂无经核实内容。
+
+三、美债收益率
 - 2 年期美债收益率日变动：-5.00 bp（观测日 2026-09-22）
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
 - 5 年期美债收益率日变动：+0.00 bp（观测日 2026-09-22）
@@ -29,6 +32,8 @@
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
 - 30 年期美债收益率水平：5.29%（观测日 2026-09-22）
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
+
+四、跨资产行情
 - 布伦特期货收盘：99.25 美元/桶（观测日 2026-09-22）
   来源：https://finance.yahoo.com/quote/BZ%3DF/history/
 - 布伦特日涨跌：-1.09%（观测日 2026-09-22）
@@ -46,10 +51,10 @@
 - 比特币期货日涨跌：-0.35%（观测日 2026-09-22）
   来源：https://finance.yahoo.com/quote/BTC%3DF/history/
 
-三、市场驱动因素
+五、市场驱动因素
 - 暂无经核实内容。
 
-四、经济数据与美联储动态
+六、经济数据与美联储动态
 - CPI 同比：3.40%（观测日 2026-08-01）
   来源：https://fred.stlouisfed.org/series/CPIAUCNS
 - PCE 同比：3.70%（观测日 2026-07-01）
@@ -59,10 +64,7 @@
 - 非农就业月变动：162.00 千人（观测日 2026-08-01）
   来源：https://fred.stlouisfed.org/series/PAYEMS
 
-五、公司新闻
-- 暂无经核实内容。
-
-六、主要上涨与下跌个股
+七、公司新闻
 - 暂无经核实内容。
 
 

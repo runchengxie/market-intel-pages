@@ -17,6 +17,7 @@ try:
     from .generate_daily_summary import current_summaries
     from .generate_insights import SCHEMA as INSIGHT_SCHEMA
     from .generate_insights import _valid_history
+    from .import_market_daily_report import _markdown as render_market_daily_markdown
     from .insight_contract import evaluate_watchpoints
     from .pipeline_health import health_report
 except ImportError:
@@ -25,6 +26,7 @@ except ImportError:
     from generate_daily_summary import current_summaries
     from generate_insights import SCHEMA as INSIGHT_SCHEMA
     from generate_insights import _valid_history
+    from import_market_daily_report import _markdown as render_market_daily_markdown
     from insight_contract import evaluate_watchpoints
     from pipeline_health import health_report
 
@@ -158,6 +160,9 @@ def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
             raise ValueError(f"claimed market daily format missing: {filename}")
         if source.is_file():
             shutil.copy2(source, output / filename)
+    if payload.get("publication") == "public":
+        reading = output / f"reports/{report_date}-market-daily-no-citations.md"
+        reading.write_text(render_market_daily_markdown(payload, include_references=False), encoding="utf-8")
 
 
 def _copy_daily_report(root: Path, output: Path) -> None:

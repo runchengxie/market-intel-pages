@@ -59,7 +59,9 @@ export function loadMarketDaily() {
   if (!report || !/^daily-\d{4}-\d{2}-\d{2}$/.test(report.run_id)) return null;
   const date = report.run_id.slice(6);
   const file = path.join(dataRoot(), `reports/${date}-market-daily.md`);
-  return { ...report, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null };
+  const reading = path.join(dataRoot(), `reports/${date}-market-daily-no-citations.md`);
+  return { ...report, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null,
+    hasCitationFreeMarkdown: existsSync(reading) };
 }
 
 export function loadMarketDailyHistory() {
@@ -70,7 +72,9 @@ export function loadMarketDailyHistory() {
     .slice(0, 5).map((row) => {
       const date = row.run_id.slice(6);
       const file = path.join(dataRoot(), `reports/${date}-market-daily.md`);
-      return { ...row, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null };
+      const reading = path.join(dataRoot(), `reports/${date}-market-daily-no-citations.md`);
+      return { ...row, date, markdown: existsSync(file) ? readFileSync(file, 'utf8') : null,
+        hasCitationFreeMarkdown: existsSync(reading) };
     }).filter((row) => row.markdown);
 }
 

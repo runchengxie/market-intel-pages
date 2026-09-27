@@ -448,34 +448,52 @@ def _markdown_source(fact: dict[str, Any]) -> str:
     return f"[{name}]({url})"
 
 
-def _market_table(facts: list[dict[str, Any]]) -> list[str]:
-    lines = ["| 指数 | 收盘涨跌 | 观测日 | 来源 |", "|---|---:|---|---|"]
+def _market_table(facts: list[dict[str, Any]], include_references: bool = True) -> list[str]:
+    lines = (
+        ["| 指数 | 收盘涨跌 | 观测日 | 来源 |", "|---|---:|---|---|"]
+        if include_references
+        else ["| 指数 | 收盘涨跌 | 观测日 |", "|---|---:|---|"]
+    )
     for fact in facts:
         label = FACT_LABELS[fact["id"]][0].removesuffix("日涨跌").strip()
         lines.append(
-            f"| {label} | {float(fact['value']):+.2f}% | {fact['observation_date']} | {_markdown_source(fact)} |"
+            f"| {label} | {float(fact['value']):+.2f}% | {fact['observation_date']} |"
+            + (f" {_markdown_source(fact)} |" if include_references else "")
         )
     return lines
 
 
-def _rates_table(facts: list[dict[str, Any]]) -> list[str]:
-    lines = ["| 美债期限 | 收益率水平 | 日变动 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+def _rates_table(facts: list[dict[str, Any]], include_references: bool = True) -> list[str]:
+    lines = (
+        ["| 美债期限 | 收益率水平 | 日变动 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+        if include_references
+        else ["| 美债期限 | 收益率水平 | 日变动 | 观测日 |", "|---|---:|---:|---|"]
+    )
     names = {"2y": "2 年期", "5y": "5 年期", "10y": "10 年期", "30y": "30 年期"}
-    for fact in facts:
-        _, tenor, metric = fact["id"].split(".")
-        if metric == "level_percent":
+    by_id = {fact["id"]: fact for fact in facts}
+    for tenor, name in names.items():
+        level = by_id.get(f"treasury.{tenor}.level_percent")
+        change = by_id.get(f"treasury.{tenor}.change_bp")
+        if not level and not change:
             continue
-        level = next((row for row in facts if row["id"] == f"treasury.{tenor}.level_percent"), None)
         level_text = f"{float(level['value']):.2f}%" if level else "—"
+        change_text = f"{float(change['value']):+.2f} bp" if change else "—"
+        fact = change if change is not None else level
+        if fact is None:
+            continue
         lines.append(
-            f"| {names[tenor]} | {level_text} | {float(fact['value']):+.2f} bp | "
-            f"{fact['observation_date']} | {_markdown_source(fact)} |"
+            f"| {name} | {level_text} | {change_text} | "
+            f"{fact['observation_date']} |" + (f" {_markdown_source(fact)} |" if include_references else "")
         )
     return lines
 
 
-def _cross_asset_table(facts: list[dict[str, Any]]) -> list[str]:
-    lines = ["| 品种 | 价格 | 日涨跌 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+def _cross_asset_table(facts: list[dict[str, Any]], include_references: bool = True) -> list[str]:
+    lines = (
+        ["| 品种 | 价格 | 日涨跌 | 观测日 | 来源 |", "|---|---:|---:|---|---|"]
+        if include_references
+        else ["| 品种 | 价格 | 日涨跌 | 观测日 |", "|---|---:|---:|---|"]
+    )
     for fact in facts:
         if not fact["id"].endswith(".close"):
             continue
@@ -487,23 +505,27 @@ def _cross_asset_table(facts: list[dict[str, Any]]) -> list[str]:
         unit = FACT_LABELS[fact["id"]][1]
         lines.append(
             f"| {label} | {float(fact['value']):,.2f} {unit} | {float(change['value']):+.2f}% | "
-            f"{fact['observation_date']} | {_markdown_source(fact)} |"
+            f"{fact['observation_date']} |" + (f" {_markdown_source(fact)} |" if include_references else "")
         )
     return lines
 
 
-def _macro_table(facts: list[dict[str, Any]]) -> list[str]:
-    lines = ["| 数据 | 数值 | 观测日 | 来源 |", "|---|---:|---|---|"]
+def _macro_table(facts: list[dict[str, Any]], include_references: bool = True) -> list[str]:
+    lines = (
+        ["| 数据 | 数值 | 观测日 | 来源 |", "|---|---:|---|---|"]
+        if include_references
+        else ["| 数据 | 数值 | 观测日 |", "|---|---:|---|"]
+    )
     for fact in facts:
         label, unit = FACT_LABELS[fact["id"]]
         lines.append(
-            f"| {label} | {float(fact['value']):.2f}{unit} | {fact['observation_date']} | "
-            f"{_markdown_source(fact)} |"
+            f"| {label} | {float(fact['value']):.2f}{unit} | {fact['observation_date']} |"
+            + (f" {_markdown_source(fact)} |" if include_references else "")
         )
     return lines
 
 
-def _markdown_fact_lines(payload: dict[str, Any], section: str) -> list[str]:
+def _markdown_fact_lines(payload: dict[str, Any], section: str, include_references: bool = True) -> list[str]:
     grouped = []
     for fact in payload["facts"]:
         fact_id = str(fact.get("id") or "")
@@ -529,10 +551,10 @@ def _markdown_fact_lines(payload: dict[str, Any], section: str) -> list[str]:
         "cross_asset": _cross_asset_table,
         "macro": _macro_table,
     }
-    return renderers[section](grouped)
+    return renderers[section](grouped, include_references)
 
 
-def _source_status_lines(statuses: dict[str, Any]) -> list[str]:
+def _source_status_lines(statuses: dict[str, Any], include_references: bool = True) -> list[str]:
     if not statuses:
         return []
     lines = ["## 数据质量与核验说明", "", "| 数据链路 | 状态 | 说明 |", "|---|---|---|"]
@@ -543,10 +565,23 @@ def _source_status_lines(statuses: dict[str, Any]) -> list[str]:
         quality = SOURCE_QUALITY_LABELS.get(status.get("quality"), "未确认")
         reason = SOURCE_REASON_LABELS.get(status.get("reason"), "详见逐项观测日与来源")
         lines.append(f"| {label} | {quality} | {reason} |")
-    return [*lines, "", "证据编号对应已审阅材料；公开报告不包含私有核验工作底稿。", ""]
+    return (
+        [*lines, "", "证据编号对应已审阅材料；公开报告不包含私有核验工作底稿。", ""]
+        if include_references
+        else [*lines, ""]
+    )
 
 
-def _markdown(payload: dict[str, Any]) -> str:
+def _claim_markdown_lines(claim: dict[str, Any], include_references: bool) -> list[str]:
+    lines = [f"- {claim['claim']}"]
+    if include_references:
+        evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
+        sources = "、".join(f"[来源{index}]({url})" for index, url in enumerate(claim["sources"], start=1))
+        lines.extend([f"  - 证据：{evidence}", f"  - {sources}"])
+    return lines
+
+
+def _markdown(payload: dict[str, Any], include_references: bool = True) -> str:
     lines = [
         f"# 美股市场日报（{_date(payload)}）",
         "",
@@ -565,35 +600,27 @@ def _markdown(payload: dict[str, Any]) -> str:
     grouped = _group_claims(payload)
     report_sections = (
         ("market", "美股市场表现"),
+        ("movers", "主要个股"),
         ("rates", "美债收益率"),
         ("cross_asset", "布伦特、金银与比特币"),
         ("drivers", "市场驱动因素"),
         ("macro", "经济数据与美联储动态"),
         ("company_news", "公司新闻"),
-        ("movers", "主要个股"),
     )
     for key, title in report_sections:
         lines.extend([f"## {title}", ""])
-        facts = _markdown_fact_lines(payload, key)
+        facts = _markdown_fact_lines(payload, key, include_references)
         lines.extend(facts)
         for claim in grouped.get(key, []):
-            evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
-            sources = "、".join(
-                f"[来源{index}]({url})" for index, url in enumerate(claim["sources"], start=1)
-            )
-            lines.extend([f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - {sources}"])
+            lines.extend(_claim_markdown_lines(claim, include_references))
         if not facts and not grouped.get(key, []):
             lines.append("暂无经核实内容。")
         lines.append("")
     if grouped["other"]:
         lines.extend(["## 其他已核实内容", ""])
         for claim in grouped["other"]:
-            evidence = ", ".join(f"`{item}`" for item in claim["evidence_ids"])
-            sources = "、".join(
-                f"[来源{index}]({url})" for index, url in enumerate(claim["sources"], start=1)
-            )
-            lines.extend([f"- {claim['claim']}", f"  - 证据：{evidence}", f"  - {sources}"])
-    source_status = _source_status_lines(payload.get("source_status", {}))
+            lines.extend(_claim_markdown_lines(claim, include_references))
+    source_status = _source_status_lines(payload.get("source_status", {}), include_references)
     lines.extend(source_status)
     if not source_status:
         lines.append("")
@@ -664,22 +691,24 @@ def _text_report(payload: dict[str, Any]) -> str:
         *(market_facts or ["- 暂无经核实指数行情。"]),
         *(_text_claim_lines(grouped["market"]) if grouped["market"] else []),
         "",
-        "二、美债、布伦特、金银与比特币",
+        "二、重点个股",
+        *_text_claim_lines(grouped["movers"]),
+        "",
+        "三、美债收益率",
         *(treasury_facts or ["- 暂无经核实的美债收益率水平或日变动。"]),
+        "",
+        "四、跨资产行情",
         *(cross_asset_facts or ["- 暂无经核实的跨资产行情。"]),
         "",
-        "三、市场驱动因素",
+        "五、市场驱动因素",
         *_text_claim_lines(grouped["drivers"]),
         "",
-        "四、经济数据与美联储动态",
+        "六、经济数据与美联储动态",
         *(macro_facts or ["- 暂无经核实利率与宏观数据。"]),
         *(_text_claim_lines(grouped["macro"]) if grouped["macro"] else []),
         "",
-        "五、公司新闻",
+        "七、公司新闻",
         *_text_claim_lines(grouped["company_news"]),
-        "",
-        "六、主要上涨与下跌个股",
-        *_text_claim_lines(grouped["movers"]),
         "",
     ]
     cutoff = payload.get("quality_summary", {}).get("reviewed_source_cutoff")
@@ -688,7 +717,7 @@ def _text_report(payload: dict[str, Any]) -> str:
     if payload.get("quality_summary", {}).get("revision") == "historical_backfill":
         lines[2:2] = ["历史补报：本次事后重建，非当日已发布报告。"]
     if grouped["other"]:
-        lines.extend(["六、其他已核实内容", *_text_claim_lines(grouped["other"])])
+        lines.extend(["八、其他已核实内容", *_text_claim_lines(grouped["other"])])
     gaps = _missing_labels(payload)
     if gaps:
         lines.extend(["", f"尚缺：{'、'.join(gaps)}。"])
@@ -703,6 +732,7 @@ def import_report(source: Path, root: Path, manifest_path: Path) -> str:
     data_path = root / "data/market_daily_report.json"
     history_path = root / "data/market_daily_reports.json"
     report_path = root / f"reports/{report_date}-market-daily.md"
+    reading_path = root / f"reports/{report_date}-market-daily-no-citations.md"
     text_path = root / f"reports/{report_date}-market-daily.txt"
     if history_path.is_file():
         previous = json.loads(history_path.read_text(encoding="utf-8"))
@@ -736,6 +766,7 @@ def import_report(source: Path, root: Path, manifest_path: Path) -> str:
         json.dumps(history["reports"][0], ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
     report_path.write_text(_markdown(payload), encoding="utf-8")
+    reading_path.write_text(_markdown(payload, include_references=False), encoding="utf-8")
     text_path.write_text(_text_report(payload), encoding="utf-8")
     return report_date
 

@@ -16,6 +16,10 @@
 | 纳指 | +0.01% | 2026-09-24 | [Yahoo Finance](https://finance.yahoo.com/quote/%5EIXIC/history/) |
 | 罗素 2000 | -0.11% | 2026-09-24 | [Yahoo Finance](https://finance.yahoo.com/quote/%5ERUT/history/) |
 
+## 主要个股
+
+暂无经核实内容。
+
 ## 美债收益率
 
 | 美债期限 | 收益率水平 | 日变动 | 观测日 | 来源 |
@@ -27,7 +31,7 @@
 
 ## 布伦特、金银与比特币
 
-| 品种 | 期货价格 | 日涨跌 | 观测日 | 来源 |
+| 品种 | 价格 | 日涨跌 | 观测日 | 来源 |
 |---|---:|---:|---|---|
 | 布伦特期货 | 106.60 美元/桶 | +3.41% | 2026-09-24 | [Yahoo Finance](https://finance.yahoo.com/quote/BZ%3DF/history/) |
 | COMEX 黄金期货 | 4,298.00 美元/金衡盎司 | -0.47% | 2026-09-24 | [Yahoo Finance](https://finance.yahoo.com/quote/GC%3DF/history/) |
@@ -48,10 +52,6 @@
 | 非农就业月变动 | 162.00千人 | 2026-08-01 | [FRED](https://fred.stlouisfed.org/series/PAYEMS) |
 
 ## 公司新闻
-
-暂无经核实内容。
-
-## 主要个股
 
 暂无经核实内容。
 

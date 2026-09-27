@@ -19,6 +19,18 @@
   - 证据：`reviewed.0`
   - [来源1](https://www-cdn.abcnews.com/Business/wireStory/major-us-stock-indexes-fared-wednesday-9232026-136697299)
 
+## 主要个股
+
+- 据路透社收盘报道，Cracker Barrel 当日上涨约 4.5%；报道将涨势与其第四财季销售额高于预期联系起来。
+  - 证据：`reviewed.10`
+  - [来源1](https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222)
+- 据路透社收盘报道，Paychex 当日跌近 9%；报道指出，其最大业务部门第一财季收入低于市场预期。
+  - 证据：`reviewed.11`
+  - [来源1](https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222)
+- 据路透社收盘报道，Alphabet 当日跌近 4%，Amazon 跌逾 2%；报道同时讨论了市场对 Meta Muse 助手的反应，但未证明其为两只股票下跌的唯一原因。
+  - 证据：`reviewed.12`
+  - [来源1](https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222)
+
 ## 美债收益率
 
 | 美债期限 | 收益率水平 | 日变动 | 观测日 | 来源 |
@@ -30,7 +42,7 @@
 
 ## 布伦特、金银与比特币
 
-| 品种 | 期货价格 | 日涨跌 | 观测日 | 来源 |
+| 品种 | 价格 | 日涨跌 | 观测日 | 来源 |
 |---|---:|---:|---|---|
 | 布伦特期货 | 103.08 美元/桶 | +3.86% | 2026-09-23 | [Yahoo Finance](https://finance.yahoo.com/quote/BZ%3DF/history/) |
 | COMEX 黄金期货 | 4,318.40 美元/金衡盎司 | -1.33% | 2026-09-23 | [Yahoo Finance](https://finance.yahoo.com/quote/GC%3DF/history/) |
@@ -72,18 +84,6 @@
 - Cracker Barrel 公布 2026 财年第四财季收入 8.493 亿美元，同比下降 2.2%，并给出 2027 财年业绩展望。
   - 证据：`reviewed.7`
   - [来源1](https://investor.crackerbarrel.com/news-releases/news-release-details/cracker-barrel-reports-fourth-quarter-and-full-year-fiscal-2026)
-
-## 主要个股
-
-- 据路透社收盘报道，Cracker Barrel 当日上涨约 4.5%；报道将涨势与其第四财季销售额高于预期联系起来。
-  - 证据：`reviewed.10`
-  - [来源1](https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222)
-- 据路透社收盘报道，Paychex 当日跌近 9%；报道指出，其最大业务部门第一财季收入低于市场预期。
-  - 证据：`reviewed.11`
-  - [来源1](https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222)
-- 据路透社收盘报道，Alphabet 当日跌近 4%，Amazon 跌逾 2%；报道同时讨论了市场对 Meta Muse 助手的反应，但未证明其为两只股票下跌的唯一原因。
-  - 证据：`reviewed.12`
-  - [来源1](https://www.marketscreener.com/news/wall-street-ends-down-as-oil-prices-treasury-yields-rise-ce785aded98ff222)
 
 ## 数据质量与核验说明
 
