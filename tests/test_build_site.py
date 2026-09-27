@@ -22,6 +22,13 @@ def test_new_public_copy_cannot_reuse_legacy_continuous_commodity_exception(tmp_
     with pytest.raises(ValueError, match="invalid sourced market fact"):
         _copy_daily_report_formats(root, output, payload)
 
+    payload["content_hash"] = json.loads(
+        (root / "data/market_daily_report.json").read_text(encoding="utf-8")
+    )["content_hash"]
+    next(fact for fact in payload["facts"] if fact["id"] == "cross_asset.brent.close")["value"] += 1
+    with pytest.raises(ValueError, match="invalid sourced market fact"):
+        _copy_daily_report_formats(root, output, payload)
+
 
 def create_site(root: Path, session_count: int = 6) -> None:
     (root / "data").mkdir(parents=True)
