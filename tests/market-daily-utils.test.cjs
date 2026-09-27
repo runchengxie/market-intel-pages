@@ -410,13 +410,16 @@ test("chart image uses reviewed report-date facts with dates and units but no so
   assert.doesNotMatch(svg, /FRED 原始数据|<script>/);
 });
 
-test("chart image has no invented marks when no report-date chart facts exist", () => {
+test("chart image can show only lagged Treasury readings without invented bars", () => {
   const summary = summarizeMarketDaily({
     schema_version: "1.0", run_id: "daily-2026-09-23", facts: [
       { id: "treasury.10y.change_bp", metric: "yield_change", value: 15, unit: "basis_points", quality: "lagged", observation_date: "2026-09-22", source_url: "https://fred.stlouisfed.org/series/DGS10" },
     ],
   });
-  assert.equal(buildMarketDailyChartSvg?.(summary) ?? null, null);
+  const svg = buildMarketDailyChartSvg(summary);
+  assert.match(svg, /10 年期美债：收益率暂缺 · \+15\.00 bp/);
+  assert.match(svg, /观测日 2026-09-22，非报告日/);
+  assert.doesNotMatch(svg, /美债收益率当日变动（bp）/);
 });
 
 test("image discloses lagged Treasury readings without plotting them as same-day bars", () => {

@@ -318,7 +318,7 @@ function svgClaimLines(text) {
 
 function buildMarketDailyChartSvg(summary) {
   const charts = buildMarketDailyCharts(summary);
-  if (!charts.length && !summary.crossAssetRows.length && !summary.claims.length) return null;
+  if (!charts.length && !summary.crossAssetRows.length && !summary.rateRows.length && !summary.claims.length) return null;
   const moverRows = (summary.claimSections.find((section) => section.key === "movers")?.claims ?? [])
     .map((claim) => ({ lines: svgClaimLines(claim.text) }));
   let y = 118;

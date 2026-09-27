@@ -123,7 +123,7 @@ PUBLIC_FACT_FIELDS = (
     "quality",
     "observation_date",
 )
-PUBLIC_EVENT_FIELDS = ("id",)
+PUBLIC_EVENT_FIELDS = ("id", "event_type", "actual", "source_url", "quality")
 PUBLIC_CLAIM_FIELDS = (
     "claim",
     "evidence_ids",
@@ -310,12 +310,28 @@ def _valid_equity_pairs(facts_by_id: dict[str, dict[str, Any]], payload: dict[st
         if section.get("key") == "movers"
         for claim_id in section.get("claims", [])
     }
+    events = {event.get("id"): event for event in payload.get("events", []) if isinstance(event, dict)}
+    claims = payload.get("claims", [])
     if reviewed_movers and payload.get("source_status", {}).get("research", {}).get("quality") != "reviewed":
         return False
     if any(
         not isinstance(row, dict)
         or not re.fullmatch(r"[A-Z]{1,5}", str(row.get("ticker", "")))
         or row.get("evidence_id") not in mover_ids
+        or not (event := events.get(row.get("evidence_id")))
+        or not re.fullmatch(r"web_(gainers|losers)_(close|intraday|event)", str(event.get("event_type", "")))
+        or event.get("quality") != "reviewed"
+        or not str(event.get("source_url", "")).startswith("https://")
+        or not any(
+            isinstance(claim, dict)
+            and row["evidence_id"] in claim.get("evidence_ids", [])
+            and claim.get("claim") == event.get("actual")
+            and event["source_url"] in claim.get("sources", [])
+            and claim.get("status") == "accepted"
+            and claim.get("confidence") == "confirmed"
+            and claim.get("provider") == "source_audit"
+            for claim in claims
+        )
         for row in reviewed_movers
     ):
         return False
@@ -450,8 +466,12 @@ def _public_payload(payload: dict[str, Any], manifest: dict[str, Any]) -> dict[s
     ]
     claims = [_select(claim, PUBLIC_CLAIM_FIELDS) for claim in payload["claims"]]
     evidence_ids = {item for claim in claims for item in claim.get("evidence_ids", [])}
+    mover_evidence_ids = {
+        row["evidence_id"]
+        for row in payload.get("source_status", {}).get("equities", {}).get("reviewed_movers", [])
+    }
     events = [
-        _select(event, PUBLIC_EVENT_FIELDS)
+        _select(event, PUBLIC_EVENT_FIELDS if event.get("id") in mover_evidence_ids else ("id",))
         for event in payload.get("events", [])
         if event.get("id") in evidence_ids
     ]

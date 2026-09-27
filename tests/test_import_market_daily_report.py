@@ -308,12 +308,35 @@ def test_mover_quote_needs_audited_ticker_evidence(tmp_path):
     payload["source_status"]["equities"] = {
         "quality": "degraded",
         "reviewed_movers": [
-            {"ticker": "AKAM", "evidence_id": "index.spx.change_percent"},
+            {"ticker": "AKAM", "evidence_id": "reviewed.12"},
         ],
     }
-    payload["sections"] = [{"key": "movers", "claims": ["index.spx.change_percent"]}]
+    payload["sections"] = [{"key": "movers", "claims": ["reviewed.12"]}]
+    payload["events"] = [
+        {
+            "id": "reviewed.12",
+            "event_type": "web_gainers_close",
+            "quality": "reviewed",
+            "source_url": "https://example.test/story",
+            "actual": "AKAM rose",
+        }
+    ]
+    payload["claims"].append(
+        {
+            "claim": "AKAM rose",
+            "evidence_ids": ["reviewed.12"],
+            "sources": ["https://example.test/story"],
+            "status": "accepted",
+            "confidence": "confirmed",
+            "provider": "source_audit",
+        }
+    )
     source, manifest = _source(tmp_path, payload)
     import_report(source, tmp_path / "site", manifest)
+    payload["events"][0]["event_type"] = "web_company_news_event"
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
 
 
 def test_markdown_explains_unavailable_research_without_implying_a_source_exists(tmp_path):
