@@ -46,15 +46,34 @@ FACT_LABELS = {
 FRED_URL = r"https://fred\.stlouisfed\.org/series/[A-Z0-9]+"
 TREASURY_URL = r"https://home\.treasury\.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates\.csv/all/\d{6}\?_format=csv&field_tdr_date_value_month=\d{6}&page=&type=daily_treasury_yield_curve"
 YAHOO_URLS = {
-    "brent": r"https://finance\.yahoo\.com/quote/BZ%3DF/history/",
-    "gold": r"https://finance\.yahoo\.com/quote/GC%3DF/history/",
-    "silver": r"https://finance\.yahoo\.com/quote/SI%3DF/history/",
+    "brent": None,
+    "gold": None,
+    "silver": None,
     "bitcoin": r"https://finance\.yahoo\.com/quote/BTC%3DF/history/",
 }
-FMP_COMMODITY_URL = (
-    "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full"
-)
-FMP_COMMODITY_SYMBOLS = {"brent": "BZUSD", "gold": "GCUSD", "silver": "SIUSD"}
+FUTURES_MONTH_CODES = "FGHJKMNQUVXZ"
+DATED_DELIVERY_MONTHS = {"gold": (2, 4, 6, 8, 12), "silver": (3, 5, 7, 9, 12)}
+LEGACY_COMMODITY_SYMBOLS = {"brent": "BZ%3DF", "gold": "GC%3DF", "silver": "SI%3DF"}
+
+
+def _dated_futures_symbol(asset: str, report_date: date) -> str | None:
+    if asset == "brent":
+        offset, root, exchange = 2, "BZ", "NYM"
+    elif asset in DATED_DELIVERY_MONTHS:
+        offset = next(
+            step
+            for step in range(1, 13)
+            if (report_date.month - 1 + step) % 12 + 1 in DATED_DELIVERY_MONTHS[asset]
+        )
+        root, exchange = {"gold": "GC", "silver": "SI"}[asset], "CMX"
+    else:
+        return None
+    absolute_month = report_date.month - 1 + offset
+    month = absolute_month % 12 + 1
+    year = report_date.year + absolute_month // 12
+    return f"{root}{FUTURES_MONTH_CODES[month - 1]}{year % 100:02d}.{exchange}"
+
+
 FMP_CRYPTO_URL = (
     "https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full"
 )
@@ -193,7 +212,9 @@ def _unique_evidence_ids(payload: dict[str, Any]) -> bool:
     )
 
 
-def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
+def _valid_market_fact(
+    fact: dict[str, Any], report_date: str, *, allow_legacy_commodity: bool = False
+) -> bool:
     fact_id = str(fact.get("id") or "")
     observed = fact.get("observation_date")
     source_url = str(fact.get("source_url") or "")
@@ -272,20 +293,24 @@ def _valid_market_fact(fact: dict[str, Any], report_date: str) -> bool:
             if is_close
             else "daily_return"
         )
+        dated_symbol = _dated_futures_symbol(asset, date.fromisoformat(report_date))
+        dated_url = f"https://finance.yahoo.com/quote/{dated_symbol}/history/"
         yahoo_source = (
-            url_pattern is not None
-            and bool(re.fullmatch(url_pattern, source_url))
+            (url_pattern is not None and bool(re.fullmatch(url_pattern, source_url)))
+            or (
+                dated_symbol is not None
+                and source_url == dated_url
+                and f"({dated_symbol})" in str(fact.get("instrument") or "")
+            )
+        ) and fact.get("source") == "Yahoo Finance"
+        legacy_commodity = (
+            allow_legacy_commodity
+            and asset in LEGACY_COMMODITY_SYMBOLS
             and fact.get("source") == "Yahoo Finance"
-        )
-        fmp_symbol = FMP_COMMODITY_SYMBOLS.get(asset)
-        fmp_source = (
-            fmp_symbol is not None
-            and source_url == FMP_COMMODITY_URL
-            and fact.get("source") == "Financial Modeling Prep"
-            and f"(FMP {fmp_symbol}, continuous)" in str(fact.get("instrument") or "")
+            and source_url == f"https://finance.yahoo.com/quote/{LEGACY_COMMODITY_SYMBOLS[asset]}/history/"
         )
         return (
-            (yahoo_source or fmp_source)
+            (yahoo_source or legacy_commodity)
             and fact.get("quality") == "ok"
             and observed == report_date
             and unit == (expected_unit if is_close else "percent")
@@ -658,7 +683,13 @@ def _macro_table(facts: list[dict[str, Any]], include_references: bool = True) -
     return lines
 
 
-def _markdown_fact_lines(payload: dict[str, Any], section: str, include_references: bool = True) -> list[str]:
+def _markdown_fact_lines(
+    payload: dict[str, Any],
+    section: str,
+    include_references: bool = True,
+    *,
+    allow_legacy_commodity: bool = False,
+) -> list[str]:
     grouped = []
     for fact in payload["facts"]:
         fact_id = str(fact.get("id") or "")
@@ -673,7 +704,7 @@ def _markdown_fact_lines(payload: dict[str, Any], section: str, include_referenc
             and isinstance(value, (int, float))
             and math.isfinite(value)
             and re.fullmatch(r"\d{4}-\d{2}-\d{2}", observed)
-            and _valid_market_fact(fact, _date(payload))
+            and _valid_market_fact(fact, _date(payload), allow_legacy_commodity=allow_legacy_commodity)
         )
         if not is_valid:
             raise ValueError(f"invalid sourced market fact: {fact_id}")
@@ -742,7 +773,12 @@ def _markdown_header(payload: dict[str, Any], include_references: bool) -> list[
     return lines
 
 
-def _markdown(payload: dict[str, Any], include_references: bool = True) -> str:
+def _markdown(
+    payload: dict[str, Any],
+    include_references: bool = True,
+    *,
+    allow_legacy_commodity: bool = False,
+) -> str:
     lines = _markdown_header(payload, include_references)
     gaps = _missing_labels(payload)
     if gaps:
@@ -760,7 +796,9 @@ def _markdown(payload: dict[str, Any], include_references: bool = True) -> str:
     )
     for key, title in report_sections:
         lines.extend([f"## {title}", ""])
-        facts = _markdown_fact_lines(payload, key, include_references)
+        facts = _markdown_fact_lines(
+            payload, key, include_references, allow_legacy_commodity=allow_legacy_commodity
+        )
         lines.extend(facts)
         for claim in grouped.get(key, []):
             lines.extend(_claim_markdown_lines(claim, include_references))

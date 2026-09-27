@@ -162,7 +162,12 @@ def _copy_daily_report_formats(root: Path, output: Path, payload: dict) -> None:
             shutil.copy2(source, output / filename)
     if payload.get("publication") == "public":
         reading = output / f"reports/{report_date}-market-daily-no-citations.md"
-        reading.write_text(render_market_daily_markdown(payload, include_references=False), encoding="utf-8")
+        # Archived public editions predate the dated-contract rule. Re-render
+        # their reading copy without treating them as new import candidates.
+        reading.write_text(
+            render_market_daily_markdown(payload, include_references=False, allow_legacy_commodity=True),
+            encoding="utf-8",
+        )
 
 
 def _copy_daily_report(root: Path, output: Path) -> None:

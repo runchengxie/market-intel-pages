@@ -547,9 +547,9 @@ def _cross_asset_payload():
             ]
         )
     for asset, ticker, metric, unit, value in (
-        ("brent", "BZ%3DF", "commodity_close", "USD/barrel", 71.25),
-        ("gold", "GC%3DF", "commodity_close", "USD/troy_ounce", 3980.5),
-        ("silver", "SI%3DF", "commodity_close", "USD/troy_ounce", 47.12),
+        ("brent", "BZX26.NYM", "commodity_close", "USD/barrel", 71.25),
+        ("gold", "GCZ26.CMX", "commodity_close", "USD/troy_ounce", 3980.5),
+        ("silver", "SIZ26.CMX", "commodity_close", "USD/troy_ounce", 47.12),
         ("bitcoin", "BTC%3DF", "crypto_futures_close", "USD/bitcoin", 108500),
     ):
         url = f"https://finance.yahoo.com/quote/{ticker}/history/"
@@ -663,7 +663,28 @@ def test_import_report_publishes_same_day_rates_and_cross_asset_table(tmp_path):
     assert public["source_status"]["cross_asset"]["quality"] == "ok"
 
 
-def test_import_report_accepts_fmp_commodity_pair_with_matching_symbol(tmp_path):
+def test_import_accepts_dated_futures_and_rejects_wrong_delivery_month(tmp_path):
+    payload = _cross_asset_payload()
+    expected = {"brent": "BZX26.NYM", "gold": "GCZ26.CMX", "silver": "SIZ26.CMX"}
+    for fact in payload["facts"]:
+        parts = fact["id"].split(".")
+        if len(parts) == 3 and parts[0] == "cross_asset" and parts[1] in expected:
+            symbol = expected[parts[1]]
+            fact["source_url"] = f"https://finance.yahoo.com/quote/{symbol}/history/"
+            fact["instrument"] = f"dated future ({symbol})"
+    source, manifest = _source(tmp_path, payload)
+    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
+
+    for fact in payload["facts"]:
+        if fact["id"].startswith("cross_asset.brent."):
+            fact["source_url"] = "https://finance.yahoo.com/quote/BZZ26.NYM/history/"
+            fact["instrument"] = "dated future (BZZ26.NYM)"
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
+def test_import_report_rejects_continuous_fmp_commodity_pair(tmp_path):
     payload = _cross_asset_payload()
     fmp_url = (
         "https://site.financialmodelingprep.com/developer/docs/stable/commodities-historical-price-eod-full"
@@ -677,9 +698,21 @@ def test_import_report_accepts_fmp_commodity_pair_with_matching_symbol(tmp_path)
             )
     source, manifest = _source(tmp_path, payload)
 
-    assert import_report(source, tmp_path / "site", manifest) == "2026-09-24"
-    markdown = (tmp_path / "site/reports/2026-09-24-market-daily.md").read_text()
-    assert "| 布伦特期货 | 71.25 美元/桶 | +1.20% | 2026-09-24 | [FMP]" in markdown
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
+
+
+def test_import_report_rejects_continuous_yahoo_commodity_pair(tmp_path):
+    payload = _cross_asset_payload()
+    for fact in payload["facts"]:
+        if fact["id"].startswith("cross_asset.brent."):
+            fact.update(
+                source_url="https://finance.yahoo.com/quote/BZ%3DF/history/",
+                instrument="Brent continuous future (BZ=F)",
+            )
+    source, manifest = _source(tmp_path, payload)
+    with pytest.raises(ValueError, match="market date mismatch"):
+        import_report(source, tmp_path / "site", manifest)
 
 
 def test_import_report_accepts_separate_fmp_btc_spot_pair(tmp_path):
