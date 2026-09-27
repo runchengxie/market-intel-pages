@@ -1,3 +1,4 @@
+import hashlib
 import json
 import tempfile
 import unittest
@@ -5,26 +6,41 @@ from pathlib import Path
 
 import pytest
 
+import scripts.build_site as build_site_module
 from scripts.build_site import _copy_daily_report_formats, build_site, refresh_astro
 from scripts.sync_public_snapshot import sync_snapshot
 from tests.test_chart_contract import public_chart, rehash
+from tests.test_import_market_daily_report import _cross_asset_payload
 
 REPORT_SCHEMA = "market_intel_pages.reports.v1"
 SUMMARY_SCHEMA = "market_intel_pages.daily_summaries.v1"
 
 
-def test_new_public_copy_cannot_reuse_legacy_continuous_commodity_exception(tmp_path: Path) -> None:
+def test_new_public_copy_cannot_reuse_legacy_continuous_commodity_exception(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     root = Path(__file__).resolve().parents[1]
-    payload = json.loads((root / "data/market_daily_report.json").read_text(encoding="utf-8"))
-    payload["content_hash"] = "different-new-report-hash"
+    payload = _cross_asset_payload()
+    payload["publication"] = "public"
+    payload["report_formats"] = []
+    for fact in payload["facts"]:
+        if fact["id"].startswith("cross_asset.brent."):
+            fact["source_url"] = "https://finance.yahoo.com/quote/BZ%3DF/history/"
+            fact["instrument"] = "Brent continuous futures (BZ=F)"
+    projection_hash = hashlib.sha256(
+        json.dumps(payload, ensure_ascii=False, sort_keys=True).encode()
+    ).hexdigest()
+    monkeypatch.setattr(build_site_module, "LEGACY_CONTINUOUS_REPORT_HASHES", {projection_hash})
+    published_hash = payload["content_hash"]
     output = tmp_path / "site"
     (output / "reports").mkdir(parents=True)
+    _copy_daily_report_formats(root, output, payload)
+
+    payload["content_hash"] = "different-new-report-hash"
     with pytest.raises(ValueError, match="invalid sourced market fact"):
         _copy_daily_report_formats(root, output, payload)
 
-    payload["content_hash"] = json.loads(
-        (root / "data/market_daily_report.json").read_text(encoding="utf-8")
-    )["content_hash"]
+    payload["content_hash"] = published_hash
     next(fact for fact in payload["facts"] if fact["id"] == "cross_asset.brent.close")["value"] += 1
     with pytest.raises(ValueError, match="invalid sourced market fact"):
         _copy_daily_report_formats(root, output, payload)
