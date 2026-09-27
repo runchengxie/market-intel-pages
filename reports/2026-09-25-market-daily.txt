@@ -15,7 +15,13 @@
 1、据路透社 9 月 25 日收盘报道，标普 500 涨 0.51%、纳指涨 0.48%、道指涨 0.93%；标普 500 的 11 个板块中有 7 个上涨，上涨与下跌成分股数量约为 1.9:1。
    来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
 
-二、美债、布伦特、金银与比特币
+二、重点个股
+1、据路透社 9 月 25 日收盘报道，微软上涨约 3.7%；报道将其与包括代码工具和常驻 AI 智能体在内的 Copilot 新功能发布联系起来。
+   来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
+2、据路透社 9 月 25 日收盘报道，Akamai 上涨约 3.2%；报道将涨势与其此前宣布的 Anthropic 云服务协议联系起来。
+   来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
+
+三、美债收益率
 - 2 年期美债收益率日变动：-6.00 bp（观测日 2026-09-25）
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
 - 5 年期美债收益率日变动：-5.00 bp（观测日 2026-09-25）
@@ -32,6 +38,8 @@
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
 - 30 年期美债收益率水平：5.49%（观测日 2026-09-25）
   来源：https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve
+
+四、跨资产行情
 - 布伦特期货收盘：104.32 美元/桶（观测日 2026-09-25）
   来源：https://finance.yahoo.com/quote/BZ%3DF/history/
 - 布伦特日涨跌：-2.14%（观测日 2026-09-25）
@@ -53,11 +61,11 @@
 - BTC/USD 现货日涨跌：-0.35%（观测日 2026-09-25）
   来源：https://site.financialmodelingprep.com/developer/docs/stable/cryptocurrency-historical-price-eod-full
 
-三、市场驱动因素
+五、市场驱动因素
 1、路透社将当日美股上涨部分归于微软等 AI 相关股票的支撑，并称有关美伊继续讨论的报道改善了市场情绪；这是该报道的归因，并非独立证明的单一原因。
    来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
 
-四、经济数据与美联储动态
+六、经济数据与美联储动态
 - CPI 同比：3.40%（观测日 2026-08-01）
   来源：https://fred.stlouisfed.org/series/CPIAUCNS
 - PCE 同比：3.70%（观测日 2026-07-01）
@@ -67,15 +75,9 @@
 - 非农就业月变动：162.00 千人（观测日 2026-08-01）
   来源：https://fred.stlouisfed.org/series/PAYEMS
 
-五、公司新闻
+七、公司新闻
 1、Akamai 9 月 24 日公告，与 Anthropic 达成七年期 116 亿美元云服务承诺，关系还可能额外扩展 90 亿美元；公司同时披露了与合作扩展挂钩的认股权证。
    来源：https://www.ir.akamai.com/news-releases/news-release-details/akamai-announces-116-billion-multi-year-agreement-anthropic
-
-六、主要上涨与下跌个股
-1、据路透社 9 月 25 日收盘报道，微软上涨约 3.7%；报道将其与包括代码工具和常驻 AI 智能体在内的 Copilot 新功能发布联系起来。
-   来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
-2、据路透社 9 月 25 日收盘报道，Akamai 上涨约 3.2%；报道将涨势与其此前宣布的 Anthropic 云服务协议联系起来。
-   来源：https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT
 
 
 风险提示：市场有风险，投资需谨慎。

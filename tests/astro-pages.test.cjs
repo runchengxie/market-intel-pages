@@ -20,6 +20,11 @@ test('Astro emits a readable five-session static site with six chart states', ()
   assert.match(index, /旧晨报保留归档/);
   assert.match(index, /市场驱动/);
   assert.match(index, /展开完整已核实报告/);
+  assert.ok(index.indexOf('<h3>美股收盘</h3>') < index.indexOf('<h3>重点个股</h3>'));
+  assert.ok(index.indexOf('<h3>重点个股</h3>') < index.indexOf('<h3>美债收益率</h3>'));
+  assert.ok(index.indexOf('<h3>美债收益率</h3>') < index.indexOf('<h3>跨资产行情</h3>'));
+  assert.match(index, /<th>5 年<\/th><td>4\.980%/);
+  assert.match(index, /<th>30 年<\/th><td>5\.490%/);
   assert.match(index, /Markdown 原文/);
   assert.match(index, /id="market-daily-chart"/);
   assert.match(index, /<details class="market-chart"/);

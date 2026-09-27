@@ -227,21 +227,23 @@ function buildMarketDailyCharts(summary) {
   if (!summary) return [];
   const definitions = [
     { title: "四大指数收盘涨跌", unit: "%", prefix: "index.", ids: [/^index\./] },
+    { title: "美债收益率水平", unit: "%", prefix: "treasury.", ids: [/\.level_percent$/], kind: "level" },
     { title: "美债收益率当日变动", unit: "bp", prefix: "treasury.", ids: [/\.change_bp$/] },
     { title: "跨资产日涨跌", unit: "%", prefix: "cross_asset.", ids: [/\.change_percent$/] },
   ];
-  return definitions.map(({ title, unit, prefix, ids }) => {
+  return definitions.map(({ title, unit, prefix, ids, kind }) => {
     const rows = summary.rows.filter((row) => row.id.startsWith(prefix)
       && ids.some((pattern) => pattern.test(row.id))
       && row.observationDate === summary.date && row.quality !== "lagged");
     const maximum = Math.max(...rows.map((row) => Math.abs(row.value)), 0);
     return {
-      title, unit,
+      title, unit, kind,
       rows: rows.map((row) => ({
         ...row,
-        side: row.value < 0 ? "negative" : "positive",
+        side: kind === "level" ? "level" : row.value < 0 ? "negative" : "positive",
         width: maximum ? Math.abs(row.value) / maximum * 100 : 0,
-        valueText: `${row.value >= 0 ? "+" : ""}${row.value.toFixed(2)}${unit === "%" ? "%" : " bp"}`,
+        valueText: kind === "level" ? `${row.value.toFixed(2)}%`
+          : `${row.value >= 0 ? "+" : ""}${row.value.toFixed(2)}${unit === "%" ? "%" : " bp"}`,
       })),
     };
   }).filter((chart) => chart.rows.length);
@@ -253,29 +255,66 @@ function escapeSvgText(value) {
   })[character]);
 }
 
+function svgClaimLines(text) {
+  const characters = Array.from(text.replace(/\s+/g, " ").trim());
+  if (characters.length > 160) return ["个股说明较长，请查看完整报告。"];
+  const lines = [];
+  let line = "";
+  for (const token of characters.join("").match(/[A-Za-z][A-Za-z0-9.\/%+-]*|./gu) ?? []) {
+    if (line.length + token.length > 50 && line) {
+      lines.push(line.trimEnd());
+      line = "";
+    }
+    if (!line && /^\s+$/.test(token)) continue;
+    line += token;
+  }
+  if (line) lines.push(line.trimEnd());
+  return lines;
+}
+
 function buildMarketDailyChartSvg(summary) {
   const charts = buildMarketDailyCharts(summary);
-  const freshRates = summary.rateRows.filter((row) => row.observationDate === summary.date);
-  if (!charts.length && !freshRates.length && !summary.crossAssetRows.length) return null;
-  const supplementalHeight = (freshRates.length ? 54 + freshRates.length * 27 : 0)
-    + (summary.crossAssetRows.length ? 54 + summary.crossAssetRows.length * 27 : 0);
+  if (!charts.length && !summary.crossAssetRows.length) return null;
+  const moverRows = (summary.claimSections.find((section) => section.key === "movers")?.claims ?? [])
+    .slice(0, 2).map((claim) => ({
+      lines: svgClaimLines(claim.text), host: new URL(claim.sourceUrls[0]).hostname,
+    }));
+  const moverHeight = moverRows.length
+    ? 45 + moverRows.reduce((total, row) => total + row.lines.length * 20 + 24, 0) : 0;
+  const supplementalHeight = summary.crossAssetRows.length ? 54 + summary.crossAssetRows.length * 27 : 0;
   const height = 134 + charts.reduce((total, chart) => total + 54 + chart.rows.length * 58, 0)
-    + supplementalHeight + 50;
+    + moverHeight + supplementalHeight + 50;
   let y = 118;
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="${height}" viewBox="0 0 960 ${height}" role="img">`,
     `<title>${escapeSvgText(summary.date)} 美东交易日市场图表</title>`,
-    `<desc>展示报告日来源和日期校验通过的可用行情，并列出美债水平、跨资产价格、观测日和来源。</desc>`,
+    `<desc>展示报告日来源和日期校验通过的指数、美债收益率水平与日变动、跨资产行情，并列出观测日和来源。</desc>`,
     `<rect width="960" height="${height}" fill="#fff9f2"/>`,
     `<text x="54" y="62" fill="#34271f" font-family="sans-serif" font-size="28" font-weight="700">${escapeSvgText(summary.date)} 美东交易日</text>`,
     `<text x="54" y="91" fill="#715f52" font-family="sans-serif" font-size="15">美股市场速览 · 仅含来源和日期校验通过的同日数值</text>`,
   ];
-  for (const chart of charts) {
+  const moverInsertAt = charts[0]?.title === "四大指数收盘涨跌" ? 1 : 0;
+  const addMovers = () => {
+    if (!moverRows.length) return;
+    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">重点个股（已核实）</text>`);
+    y += 30;
+    for (const row of moverRows) {
+      for (const line of row.lines) {
+        parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(line)}</text>`);
+        y += 20;
+      }
+      parts.push(`<text x="54" y="${y}" fill="#715f52" font-family="sans-serif" font-size="12">来源 ${escapeSvgText(row.host)}</text>`);
+      y += 24;
+    }
+    y += 15;
+  };
+  for (const [chartIndex, chart] of charts.entries()) {
+    if (chartIndex === moverInsertAt) addMovers();
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="19" font-weight="700">${escapeSvgText(chart.title)}（${escapeSvgText(chart.unit)}）</text>`);
     y += 34;
     for (const row of chart.rows) {
-      const center = 565;
-      const width = Math.round(row.width * 2.15);
+      const center = chart.kind === "level" ? 350 : 565;
+      const width = Math.round(row.width * (chart.kind === "level" ? 4.3 : 2.15));
       const barX = row.side === "negative" ? center - width : center;
       const color = row.side === "negative" ? "#9e806d" : "#c74f36";
       const host = new URL(row.sourceUrl).hostname;
@@ -284,27 +323,17 @@ function buildMarketDailyChartSvg(summary) {
       parts.push(`<rect x="${barX}" y="${y - 11}" width="${width}" height="14" rx="2" fill="${color}"/>`);
       parts.push(`<line x1="${center}" y1="${y - 16}" x2="${center}" y2="${y + 8}" stroke="#5d4c40" stroke-width="1"/>`);
       parts.push(`<text x="800" y="${y + 5}" fill="#34271f" font-family="monospace" font-size="16" font-weight="700">${escapeSvgText(row.valueText)}</text>`);
-      parts.push(`<text x="54" y="${y + 25}" fill="#715f52" font-family="sans-serif" font-size="12">观测日 ${escapeSvgText(row.observationDate)} · 来源 ${escapeSvgText(host)}</text>`);
+      parts.push(`<text x="54" y="${y + 25}" fill="#715f52" font-family="sans-serif" font-size="12">观测日 ${escapeSvgText(row.observationDate)} · 来源 ${escapeSvgText(row.sourceLabel)} (${escapeSvgText(host)})</text>`);
       y += 58;
     }
     y += 20;
   }
-  if (freshRates.length) {
-    parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="18" font-weight="700">美债收益率水平与日变动</text>`);
-    y += 27;
-    for (const row of freshRates) {
-      const level = row.levelValue === null ? "—" : `${row.levelValue.toFixed(2)}%`;
-      const change = row.changeValue === null ? "—" : `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)} bp`;
-      parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(level)} · ${escapeSvgText(change)} · ${escapeSvgText(row.observationDate)} · ${escapeSvgText(row.sourceLabel)}</text>`);
-      y += 27;
-    }
-    y += 12;
-  }
+  if (moverInsertAt === charts.length) addMovers();
   if (summary.crossAssetRows.length) {
     parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="18" font-weight="700">跨资产价格</text>`);
     y += 27;
     for (const row of summary.crossAssetRows) {
-      const price = `${row.priceValue.toLocaleString("en-US", { maximumFractionDigits: 4 })} ${row.priceUnit}`;
+      const price = `${row.priceValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${row.priceUnit}`;
       const change = `${row.changeValue >= 0 ? "+" : ""}${row.changeValue.toFixed(2)}%`;
       parts.push(`<text x="54" y="${y}" fill="#34271f" font-family="sans-serif" font-size="14">${escapeSvgText(row.label)}：${escapeSvgText(price)} · ${escapeSvgText(change)} · ${escapeSvgText(row.observationDate)} · ${escapeSvgText(row.sourceLabel)}</text>`);
       y += 27;

@@ -311,6 +311,23 @@ def test_real_site_build_overlays_astro_pages_and_keeps_downloads(tmp_path: Path
     market_date = market["run_id"].removeprefix("daily-")
     assert (output / f"reports/{market_date}-market-daily.md").is_file()
     assert (output / f"reports/{market_date}-market-daily.txt").is_file()
+    history = json.loads((output / "data/market_daily_reports.json").read_text(encoding="utf-8"))["reports"]
+    for report in history:
+        date = report["run_id"].removeprefix("daily-")
+        reading = (output / f"reports/{date}-market-daily-no-citations.md").read_text(encoding="utf-8")
+        assert f"# 美股市场日报（{date}）" in reading
+        assert "https://" not in reading
+        assert "证据：" not in reading
+        assert f"/market-intel-pages/reports/{date}-market-daily-no-citations.md" in index
+    assert "| 5 年期 | 4.98% | -5.00 bp | 2026-09-25 |" in (
+        output / "reports/2026-09-25-market-daily-no-citations.md"
+    ).read_text(encoding="utf-8")
+    sourced = (output / "reports/2026-09-25-market-daily.md").read_text(encoding="utf-8")
+    plain = (output / "reports/2026-09-25-market-daily.txt").read_text(encoding="utf-8")
+    assert sourced.index("## 美股市场表现") < sourced.index("## 主要个股") < sourced.index("## 美债收益率")
+    assert sourced.index("## 美债收益率") < sourced.index("## 布伦特、金银与比特币")
+    assert plain.index("一、美股市场表现") < plain.index("二、重点个股") < plain.index("三、美债收益率")
+    assert plain.index("三、美债收益率") < plain.index("四、跨资产行情")
 
 
 def test_refresh_astro_uses_latest_generated_snapshot(tmp_path: Path) -> None:

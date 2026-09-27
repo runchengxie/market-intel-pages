@@ -69,6 +69,84 @@ def test_import_report_writes_public_json_and_markdown(tmp_path):
     assert "SPX rose" in (output / "reports/2026-09-19-market-daily.md").read_text()
 
 
+def test_import_report_writes_reference_free_markdown_with_all_treasury_tenors(tmp_path):
+    payload = _payload()
+    payload["source_status"] = {"rates": {"quality": "ok", "reason": "ok"}}
+    payload["sections"] = [{"key": "movers", "claims": ["index.spx.change_percent"]}]
+    treasury_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve"
+    for tenor, level, change in (("2y", 4.81, -6), ("5y", 4.98, -5), ("10y", 5.17, -1), ("30y", 5.49, 2)):
+        for metric, value, unit in (
+            ("level_percent", level, "percent"),
+            ("change_bp", change, "basis_points"),
+        ):
+            payload["facts"].append(
+                {
+                    "id": f"treasury.{tenor}.{metric}",
+                    "metric": "yield_level" if metric == "level_percent" else "yield_change",
+                    "value": value,
+                    "unit": unit,
+                    "quality": "ok",
+                    "source_url": treasury_url,
+                    "observation_date": "2026-09-19",
+                }
+            )
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    import_report(source, output, manifest)
+
+    original = (output / "reports/2026-09-19-market-daily.md").read_text()
+    reading = (output / "reports/2026-09-19-market-daily-no-citations.md").read_text()
+    assert "[来源1](https://example.test)" in original
+    assert "证据：" in original
+    assert "| 来源 |" in original
+    assert "|---|---:|---:|---|---|" in original
+    assert "SPX rose" in reading
+    assert "| 5 年期 | 4.98% | -5.00 bp | 2026-09-19 |" in reading
+    assert "| 30 年期 | 5.49% | +2.00 bp | 2026-09-19 |" in reading
+    assert "|---|---:|---:|---|" in reading
+    assert "数据状态：ok" in reading
+    assert "## 数据质量与核验说明" in reading
+    assert "https://" not in reading
+    assert "证据：" not in reading
+    assert "| 来源 |" not in reading
+    assert "[来源" not in reading
+    assert (
+        reading.index("## 美股市场表现")
+        < reading.index("## 主要个股")
+        < reading.index("## 美债收益率")
+        < reading.index("## 布伦特、金银与比特币")
+    )
+    plain = (output / "reports/2026-09-19-market-daily.txt").read_text()
+    assert (
+        plain.index("一、美股市场表现")
+        < plain.index("二、重点个股")
+        < plain.index("三、美债收益率")
+        < plain.index("四、跨资产行情")
+    )
+    assert plain.index("SPX rose") < plain.index("三、美债收益率")
+
+
+def test_markdown_keeps_treasury_level_when_daily_change_is_missing(tmp_path):
+    payload = _payload()
+    payload["facts"].append(
+        {
+            "id": "treasury.2y.level_percent",
+            "metric": "yield_level",
+            "value": 4.25,
+            "unit": "percent",
+            "quality": "ok",
+            "source_url": "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve",
+            "observation_date": "2026-09-19",
+        }
+    )
+    source, manifest = _source(tmp_path, payload)
+    output = tmp_path / "site"
+    import_report(source, output, manifest)
+    for suffix in ("", "-no-citations"):
+        report = (output / f"reports/2026-09-19-market-daily{suffix}.md").read_text()
+        assert "| 2 年期 | 4.25% | — | 2026-09-19 |" in report
+
+
 def test_markdown_includes_public_source_status_without_private_metadata(tmp_path):
     payload = _payload()
     payload["source_status"] = {
@@ -682,11 +760,11 @@ def test_import_report_writes_source_backed_plain_text_from_public_fields(tmp_pa
     assert "报告生成时间：2026-09-24T08:30:00+00:00" in report
     assert "一、美股市场表现" in report
     assert "标普 500 日涨跌：-0.80%（观测日 2026-09-23）" in report
-    assert "三、市场驱动因素" in report
-    assert "四、经济数据与美联储动态" in report
+    assert "五、市场驱动因素" in report
+    assert "六、经济数据与美联储动态" in report
     assert "10 年期美债收益率日变动：+15.00 bp" in report
-    assert "暂无经核实内容" not in report.split("四、经济数据与美联储动态")[1].split("五、公司新闻")[0]
-    assert "六、其他已核实内容" in report
+    assert "暂无经核实内容" not in report.split("六、经济数据与美联储动态")[1].split("七、公司新闻")[0]
+    assert "八、其他已核实内容" in report
     assert "报道认为收益率上升带来压力；这不是已证明的唯一因果。" in report
     assert "https://abcnews.com/amp/Business/example" in report
     assert "private draft must not leak" not in report
@@ -727,10 +805,10 @@ def test_plain_text_keeps_reviewed_drivers_and_company_news_in_own_sections(tmp_
     import_report(source, tmp_path / "site", manifest)
 
     report = (tmp_path / "site/reports/2026-09-19-market-daily.txt").read_text()
-    assert "三、市场驱动因素" in report
-    assert "五、公司新闻" in report
-    assert report.index("三、市场驱动因素") < report.index("收盘报道将跌势")
-    assert report.index("五、公司新闻") < report.index("公司公告披露")
+    assert "五、市场驱动因素" in report
+    assert "七、公司新闻" in report
+    assert report.index("五、市场驱动因素") < report.index("收盘报道将跌势")
+    assert report.index("七、公司新闻") < report.index("公司公告披露")
     assert report.count("收盘报道将跌势") == 1
     assert report.count("公司公告披露") == 1
 

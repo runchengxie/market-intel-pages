@@ -19,6 +19,15 @@
   - 证据：`reviewed.0`
   - [来源1](https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT)
 
+## 主要个股
+
+- 据路透社 9 月 25 日收盘报道，微软上涨约 3.7%；报道将其与包括代码工具和常驻 AI 智能体在内的 Copilot 新功能发布联系起来。
+  - 证据：`reviewed.11`
+  - [来源1](https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT)
+- 据路透社 9 月 25 日收盘报道，Akamai 上涨约 3.2%；报道将涨势与其此前宣布的 Anthropic 云服务协议联系起来。
+  - 证据：`reviewed.12`
+  - [来源1](https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT)
+
 ## 美债收益率
 
 | 美债期限 | 收益率水平 | 日变动 | 观测日 | 来源 |
@@ -58,15 +67,6 @@
 - Akamai 9 月 24 日公告，与 Anthropic 达成七年期 116 亿美元云服务承诺，关系还可能额外扩展 90 亿美元；公司同时披露了与合作扩展挂钩的认股权证。
   - 证据：`reviewed.7`
   - [来源1](https://www.ir.akamai.com/news-releases/news-release-details/akamai-announces-116-billion-multi-year-agreement-anthropic)
-
-## 主要个股
-
-- 据路透社 9 月 25 日收盘报道，微软上涨约 3.7%；报道将其与包括代码工具和常驻 AI 智能体在内的 Copilot 新功能发布联系起来。
-  - 证据：`reviewed.11`
-  - [来源1](https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT)
-- 据路透社 9 月 25 日收盘报道，Akamai 上涨约 3.2%；报道将涨势与其此前宣布的 Anthropic 云服务协议联系起来。
-  - 证据：`reviewed.12`
-  - [来源1](https://www.schwab.wallst.com/schwab/Prospect/research/stocks/news.asp?doc=3200-nL6N45H11B-4&symbol=MSFT)
 
 ## 数据质量与核验说明
 

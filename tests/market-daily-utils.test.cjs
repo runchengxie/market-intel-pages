@@ -49,6 +49,54 @@ test("a verified same-day Treasury level alone still produces a sourced image", 
   assert.match(svg, /FRED/);
 });
 
+test("Treasury yield levels have their own four-tenor percent chart", () => {
+  const source_url = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve";
+  const facts = [["2y", 4.81], ["5y", 4.98], ["10y", 5.17], ["30y", 5.49]].map(([tenor, value]) => ({
+    id: `treasury.${tenor}.level_percent`, metric: "yield_level", value, unit: "percent",
+    quality: "ok", observation_date: "2026-09-25", source_url,
+  }));
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts });
+  const chart = buildMarketDailyCharts(summary).find((item) => item.title === "美债收益率水平");
+  assert.ok(chart);
+  assert.equal(chart.unit, "%");
+  assert.deepEqual(chart.rows.map((row) => [row.label, row.valueText]), [
+    ["2 年期美债收益率水平", "4.81%"], ["5 年期美债收益率水平", "4.98%"],
+    ["10 年期美债收益率水平", "5.17%"], ["30 年期美债收益率水平", "5.49%"],
+  ]);
+  const svg = buildMarketDailyChartSvg(summary);
+  assert.match(svg, /美债收益率水平（%）/);
+  assert.match(svg, /观测日 2026-09-25 · 来源 美国财政部 \(home\.treasury\.gov\)/);
+  assert.doesNotMatch(svg, /\+4\.81%/);
+});
+
+test("chart image orders reviewed stock notes before yields and cross-assets", () => {
+  const treasuryUrl = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?_format=csv&field_tdr_date_value_month=202609&page=&type=daily_treasury_yield_curve";
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts: [
+    { id: "index.spx.change_percent", value: 0.51, quality: "reviewed", observation_date: "2026-09-25", source_url: "https://example.test/close" },
+    { id: "treasury.2y.level_percent", metric: "yield_level", value: 4.81, unit: "percent", quality: "ok", observation_date: "2026-09-25", source_url: treasuryUrl },
+    { id: "treasury.2y.change_bp", metric: "yield_change", value: -6, unit: "basis_points", quality: "ok", observation_date: "2026-09-25", source_url: treasuryUrl },
+    { id: "cross_asset.brent.close", metric: "commodity_close", value: 104.32, unit: "USD/barrel", quality: "ok", source: "Yahoo Finance", observation_date: "2026-09-25", source_url: "https://finance.yahoo.com/quote/BZ%3DF/history/" },
+    { id: "cross_asset.brent.change_percent", metric: "daily_return", value: -2.14, unit: "percent", quality: "ok", source: "Yahoo Finance", observation_date: "2026-09-25", source_url: "https://finance.yahoo.com/quote/BZ%3DF/history/" },
+  ], events: [{ id: "reviewed.11" }], claims: [
+    { claim: "微软上涨 3.7%，与已公布的新功能有关。", evidence_ids: ["reviewed.11"], sources: ["https://example.test/stock"] },
+  ], sections: [{ key: "movers", claims: ["reviewed.11"] }] });
+  const svg = buildMarketDailyChartSvg(summary);
+  assert.ok(svg.indexOf("四大指数收盘涨跌") < svg.indexOf("重点个股（已核实）"));
+  assert.ok(svg.indexOf("微软上涨 3.7%") < svg.indexOf("美债收益率水平（%）"));
+  assert.ok(svg.indexOf("美债收益率水平（%）") < svg.indexOf("美债收益率当日变动（bp）"));
+  assert.ok(svg.indexOf("美债收益率当日变动（bp）") < svg.indexOf("跨资产日涨跌（%）"));
+  assert.ok(svg.indexOf("跨资产日涨跌（%）") < svg.indexOf("跨资产价格"));
+});
+
+test("stock note wrapping keeps Latin company names intact", () => {
+  const summary = summarizeMarketDaily({ schema_version: "1.0", run_id: "daily-2026-09-25", facts: [
+    { id: "index.spx.change_percent", value: 0.51, quality: "reviewed", observation_date: "2026-09-25", source_url: "https://example.test/close" },
+  ], events: [{ id: "reviewed.11" }], claims: [
+    { claim: `${"中".repeat(48)}Anthropic`, evidence_ids: ["reviewed.11"], sources: ["https://example.test/stock"] },
+  ], sections: [{ key: "movers", claims: ["reviewed.11"] }] });
+  assert.match(buildMarketDailyChartSvg(summary), />Anthropic<\/text>/);
+});
+
 test("market daily status calls a report date a report date, including missing sources", () => {
   assert.equal(
     formatMarketDailyStatus({ date: "2026-09-23", gaps: ["指数行情"] }),
@@ -129,10 +177,12 @@ test("market daily accepts same-day Treasury levels and cross-asset futures fact
   assert.equal(summary.crossAssetRows[3].priceValue, 108000);
   assert.equal(summary.rows.some((row) => row.id === "cross_asset.brent.close"), true);
   const svg = buildMarketDailyChartSvg(summary);
-  assert.match(svg, /美债收益率水平与日变动/);
+  assert.match(svg, /美债收益率水平（%）/);
+  assert.match(svg, /美债收益率当日变动（bp）/);
   assert.match(svg, /4\.20%/);
-  assert.match(svg, /布伦特期货收盘：71 USD\/barrel/);
-  assert.match(svg, /CME 比特币期货收盘：108,000 USD\/bitcoin/);
+  assert.match(svg, /布伦特期货收盘：71\.00 USD\/barrel/);
+  assert.match(svg, /COMEX 黄金期货收盘：3,900\.00 USD\/troy_ounce/);
+  assert.match(svg, /CME 比特币期货收盘：108,000\.00 USD\/bitcoin/);
 });
 
 test("market daily charts preserve FMP commodity provenance", () => {
