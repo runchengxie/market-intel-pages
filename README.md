@@ -36,7 +36,9 @@ python3 -m http.server 8000 --directory "$preview_root"
 | `tests/`、`tools/` | 测试与结构审计工具 |
 | `docs/` | 维护方法、数据契约和历史设计记录 |
 
-本仓库没有 Git submodule。行情和报告生产属于独立的 `quant-intel-platform`；生产部署与定时任务属于独立的 `quant-intel-deploy`。
+本仓库没有 Git submodule。它的长期定位是公开报告的展示层，负责接收已发布的数据、校验公开契约、生成静态页面和下载文件。行情采集、报告写作与研究逻辑由独立的 `quant-intel-platform` 负责。生产部署与定时任务由独立的 `quant-intel-deploy` 负责。
+
+目前 Pages 仍保留部分导入、快照和模型解读脚本，这是现有发布链路的一部分。后续会按版本化公开产物逐步把内容生产迁回 platform。现阶段不合并两个仓库，已有功能也不会因职责调整而直接删除。具体边界见[开发与数据维护](docs/technical-guide.md#项目边界)。
 
 ## 常见问题
 
