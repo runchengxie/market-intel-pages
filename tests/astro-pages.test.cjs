@@ -17,6 +17,12 @@ test('legacy page reads public data and reports from the site root', () => {
   assert.match(app, /source\.href = `\.\.\/\$\{report\.source_url\}`/);
 });
 
+test('old homepage redirects to the merged site while retaining a legacy entry', () => {
+  const page = readFileSync(path.join(root, 'src/pages/index.astro'), 'utf8');
+  assert.match(page, /runchengxie\.github\.io\/quant-intel-platform\//);
+  assert.match(page, /URLSearchParams\(window\.location\.search\)\.has\('legacy'\)/);
+});
+
 test('Astro emits a readable five-session static site with six chart states', () => {
   execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
   const index = readFileSync(path.join(root, 'dist/index.html'), 'utf8');

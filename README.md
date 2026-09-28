@@ -1,8 +1,8 @@
 # Quant 市场情报
 
-这是一个静态日报网站。早上看美股收盘，晚上看亚洲市场收盘；旧晨报和晚报仍可在归档中阅读。网页展示最近五个有报告的日期，并标出数据的原始观测日、来源和缺项。报告仅供研究参考。
+日报已经迁入 `quant-intel-platform`。本仓库暂留旧版页面、历史报告和回滚入口，不再作为新增日报的发布目标。旧首页会跳转到新站；访问旧首页并加上 `?legacy=1` 可查看旧版。报告仅供研究参考。
 
-[打开网站](https://runchengxie.github.io/quant-intel-pages/)
+[打开新日报](https://runchengxie.github.io/quant-intel-platform/) · [查看旧版归档](https://runchengxie.github.io/quant-intel-pages/?legacy=1)
 
 ## 能看到什么
 
@@ -36,9 +36,9 @@ python3 -m http.server 8000 --directory "$preview_root"
 | `tests/`、`tools/` | 测试与结构审计工具 |
 | `docs/` | 维护方法、数据契约和历史设计记录 |
 
-本仓库没有 Git submodule。它的长期定位是公开报告的展示层，负责接收已发布的数据、校验公开契约、生成静态页面和下载文件。行情采集、报告写作与研究逻辑由独立的 `quant-intel-platform` 负责。生产部署与定时任务由独立的 `quant-intel-deploy` 负责。
+本仓库没有 Git submodule。日报展示代码和公开快照已保留历史地并入 `quant-intel-platform/web/`，新站由平台仓库统一构建。生产发布与定时任务由 `quant-intel-deploy` 负责。
 
-目前 Pages 仍保留部分导入、快照和模型解读脚本，这是现有发布链路的一部分。后续会按版本化公开产物逐步把内容生产迁回 platform。现阶段不合并两个仓库，已有功能也不会因职责调整而直接删除。具体边界见[开发与数据维护](docs/technical-guide.md#项目边界)。
+这里的导入、快照和模型脚本只作为旧版回滚材料保存，不再接收新的生产报告。旧站的模型密钥不会自动迁移到新站。历史实现细节见[开发与数据维护](docs/technical-guide.md#项目边界)。
 
 ## 常见问题
 
