@@ -13,6 +13,8 @@ Daily reporting has moved to `quant-intel-platform`. This repository preserves t
 - Import, generation, validation, and build scripts under `scripts/` and `prompts/`.
 - Documentation for maintenance, data contracts, and historical design decisions.
 
+The site remains published as a compatibility archive while maintained links, historical report access, or rollback procedures still depend on it. Retirement is a separate owner decision, not a date-based cleanup. Before retiring the live site, verify that the replacement covers required historical URLs and snapshots, maintained links and downloads have been redirected or intentionally preserved, deployment and recovery procedures no longer depend on this repository, and the archive can still be recovered from its immutable Git history. Review these gates in [archive lifecycle](docs/archive-lifecycle.md); do not delete history as part of ordinary feature work.
+
 The 07:00 and 19:00 publication targets use Beijing time. They are targets rather than guarantees. Readers should use the displayed generation time, observation date, and data status to judge freshness.
 
 ## Local preview
