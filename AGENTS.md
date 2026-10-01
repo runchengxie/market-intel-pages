@@ -1,5 +1,9 @@
 # Quant Market Intel 维护约定
 
+## PR review 例外
+
+由用户本人提交，或由用户明确委托 agent 完成的 PR，无需单独的人工 review；这是持续有效的授权，不需要逐个 PR 确认，并覆盖本文件中的一般 PR review 要求。必需检查仍须通过，冲突必须解决；不得绕过 GitHub 分支保护或 ruleset 强制要求的审批。
+
 本文件适用于本仓库。服务器上还需遵循 `/home/richard/code/AGENTS.md` 的工作树、PR 和协作约定。
 
 ## 范围与工作方式
