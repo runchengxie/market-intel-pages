@@ -1,5 +1,9 @@
 # Quant Market Intel 维护约定
 
+## PR review 例外
+
+用户明确授权合并由用户本人编写，或由用户明确委托 agent 完成的 PR 时，可免除单独的人工 review。必需检查仍须通过，冲突必须解决；不得绕过分支保护、ruleset 或项目维护者明确规定的不可豁免审查。
+
 本文件适用于本仓库。服务器上还需遵循 `/home/richard/code/AGENTS.md` 的工作树、PR 和协作约定。
 
 ## 范围与工作方式
